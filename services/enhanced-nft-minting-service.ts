@@ -318,6 +318,178 @@ export class EnhancedNFTMintingService {
     }
   }
 
+  // Mint NFT with referral support
+  async mintNFTWithReferral(
+    walletAddress: PublicKey,
+    signTransaction: (transaction: Transaction) => Promise<Transaction>,
+    referralCode?: string | null,
+    onProgress?: (progress: { step: string; message: string; progress: number }) => void,
+  ): Promise<MintResult> {
+    try {
+      // Check if wallet has already minted
+      if (this.hasAlreadyMinted(walletAddress)) {
+        return {
+          success: false,
+          error: "This wallet has already minted an NFT. Only one NFT per wallet is allowed.",
+        }
+      }
+
+      // Step 1: Validate USDC balance
+      onProgress?.({
+        step: "validate",
+        message: "Validating USDC balance...",
+        progress: 10,
+      })
+
+      const usdcBalance = await this.usdcService.getUSDCBalance(walletAddress)
+      if (usdcBalance < NFT_MINT_COST_USDC) {
+        return {
+          success: false,
+          error: `Insufficient USDC balance. You need ${NFT_MINT_COST_USDC} USDC to mint an NFT.`,
+        }
+      }
+
+      // Step 2: Process USDC payment with referral splitting
+      onProgress?.({
+        step: "payment",
+        message: "Processing USDC payment...",
+        progress: 30,
+      })
+
+      let usdcSignature: string
+      if (referralCode) {
+        // Split payment: 6 USDC to treasury, 4 USDC to referrer
+        usdcSignature = await this.processReferralPayment(walletAddress, signTransaction, referralCode)
+      } else {
+        // Full 10 USDC to treasury
+        const usdcTransaction = await this.usdcService.createPlatformUSDCTransfer(walletAddress, NFT_MINT_COST_USDC)
+        const signedUsdcTransaction = await signTransaction(usdcTransaction)
+        usdcSignature = await this.connection.sendRawTransaction(signedUsdcTransaction.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: "confirmed",
+        })
+
+        await this.connection.confirmTransaction({
+          signature: usdcSignature,
+          blockhash: usdcTransaction.recentBlockhash!,
+          lastValidBlockHeight: usdcTransaction.lastValidBlockHeight!,
+        })
+      }
+
+      // Step 3: Mint NFT
+      onProgress?.({
+        step: "minting",
+        message: "Minting your NFT...",
+        progress: 60,
+      })
+
+      const { transaction: nftTransaction, mintKeypair } = await this.createNFTMintTransaction(walletAddress)
+      const signedNftTransaction = await signTransaction(nftTransaction)
+      signedNftTransaction.partialSign(mintKeypair)
+
+      const nftSignature = await this.connection.sendRawTransaction(signedNftTransaction.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      })
+
+      await this.connection.confirmTransaction({
+        signature: nftSignature,
+        blockhash: nftTransaction.recentBlockhash!,
+        lastValidBlockHeight: nftTransaction.lastValidBlockHeight!,
+      })
+
+      // Step 4: Complete
+      onProgress?.({
+        step: "complete",
+        message: "NFT minted successfully!",
+        progress: 100,
+      })
+
+      // Mark wallet as having minted
+      this.mintedWallets.add(walletAddress.toString())
+      this.saveMintedWallets()
+
+      // Grant referral access
+      this.grantReferralAccess(walletAddress)
+
+      // Complete referral if applicable
+      if (referralCode) {
+        await this.completeReferral(walletAddress.toString(), nftSignature)
+      }
+
+      return {
+        success: true,
+        signature: nftSignature,
+        mintAddress: mintKeypair.publicKey.toString(),
+        usdcSignature,
+      }
+    } catch (error: any) {
+      console.error("Minting with referral error:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to mint NFT. Please try again.",
+      }
+    }
+  }
+
+  // Process referral payment (6 USDC to treasury, 4 USDC to referrer)
+  private async processReferralPayment(
+    walletAddress: PublicKey,
+    signTransaction: (transaction: Transaction) => Promise<Transaction>,
+    referralCode: string,
+  ): Promise<string> {
+    // Import Firebase service dynamically to avoid SSR issues
+    const { firebaseReferralService } = await import("@/services/firebase-referral-service")
+
+    // Get referrer info
+    const referrer = await firebaseReferralService.getUserByReferralCode(referralCode)
+    if (!referrer) {
+      throw new Error("Invalid referral code")
+    }
+
+    // Create split payment transaction
+    const splitTransaction = await this.usdcService.createSplitUSDCTransfer(
+      walletAddress,
+      6, // 6 USDC to treasury
+      4, // 4 USDC to referrer
+      new PublicKey(referrer.walletAddress)
+    )
+
+    const signedTransaction = await signTransaction(splitTransaction)
+    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    })
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash: splitTransaction.recentBlockhash!,
+      lastValidBlockHeight: splitTransaction.lastValidBlockHeight!,
+    })
+
+    return signature
+  }
+
+  // Complete referral process
+  private async completeReferral(walletAddress: string, transactionSignature: string) {
+    try {
+      // Call API to complete referral
+      await fetch("/api/referrals/complete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress,
+          transactionSignature,
+        }),
+      })
+    } catch (error) {
+      console.error("Error completing referral:", error)
+      // Don't throw error as NFT minting was successful
+    }
+  }
+
   // Grant referral access
   private grantReferralAccess(walletAddress: PublicKey) {
     if (typeof window !== "undefined") {

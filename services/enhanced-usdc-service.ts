@@ -1,5 +1,12 @@
-import { type Connection, PublicKey } from "@solana/web3.js"
+import { type Connection, PublicKey, Transaction } from "@solana/web3.js"
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token"
+import {
+  CURRENT_NETWORK,
+  getCurrentUSDCAddress,
+  isMainnet,
+  isDevnet,
+  PLATFORM_WALLET_ADDRESS
+} from "@/config/solana"
 
 interface TokenBalance {
   mint: string
@@ -9,44 +16,39 @@ interface TokenBalance {
 
 export class EnhancedUSDCService {
   private connection: Connection
-
-  // Common devnet USDC mint addresses
-  private USDC_MINTS = [
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Your USDC-Dev
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // Circle USDC
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // SPL USDC
-  ]
+  private usdcMintAddress: PublicKey
+  private currentNetwork: string
 
   constructor(connection: Connection) {
     this.connection = connection
+    this.currentNetwork = CURRENT_NETWORK
+    this.usdcMintAddress = getCurrentUSDCAddress()
+
+    console.log(`Enhanced USDC Service initialized for network: ${this.currentNetwork}`)
+    console.log(`USDC Mint Address: ${this.usdcMintAddress.toString()}`)
   }
 
   async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
     try {
-      let totalBalance = 0
+      // Use the network-specific USDC mint address
+      const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, walletAddress)
 
-      // Check all known USDC mints
-      for (const mintAddress of this.USDC_MINTS) {
-        try {
-          const mint = new PublicKey(mintAddress)
-          const tokenAccount = await getAssociatedTokenAddress(mint, walletAddress)
+      try {
+        const accountInfo = await getAccount(this.connection, tokenAccount)
+        const balance = Number(accountInfo.amount) / Math.pow(10, 6) // USDC has 6 decimals
 
-          const accountInfo = await getAccount(this.connection, tokenAccount)
-          const balance = Number(accountInfo.amount) / Math.pow(10, 6) // USDC has 6 decimals
+        console.log(`Found USDC balance: ${balance} for network: ${this.currentNetwork}`)
+        console.log(`USDC Mint: ${this.usdcMintAddress.toString()}`)
 
-          if (balance > 0) {
-            console.log(`Found USDC balance: ${balance} for mint: ${mintAddress}`)
-            totalBalance += balance
-          }
-        } catch (error) {
-          // Token account doesn't exist for this mint, continue
-          console.log(`No token account for mint: ${mintAddress}`)
-        }
+        return balance
+      } catch (error) {
+        // Token account doesn't exist for this mint
+        console.log(`No USDC token account found for wallet: ${walletAddress.toString()}`)
+        console.log(`Network: ${this.currentNetwork}, USDC Mint: ${this.usdcMintAddress.toString()}`)
+        return 0
       }
-
-      return totalBalance
     } catch (error) {
-      console.error("Error getting USDC balance:", error)
+      console.error(`Error getting USDC balance for network ${this.currentNetwork}:`, error)
       return 0
     }
   }
@@ -82,55 +84,163 @@ export class EnhancedUSDCService {
   }
 
   private getTokenSymbol(mint: string): string {
+    // Network-aware token symbol mapping
     const symbolMap: { [key: string]: string } = {
-      Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr: "USDC-Dev",
-      EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: "USDC",
-      "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU": "USDC-SPL",
+      // Mainnet USDC
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC",
+      // Devnet USDC
+      "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU": "USDC-Dev",
+      // Legacy devnet USDC addresses
+      "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr": "USDC-Dev-Legacy",
     }
+
+    // If it's the current network's USDC mint, return appropriate symbol
+    if (mint === this.usdcMintAddress.toString()) {
+      return isMainnet() ? "USDC" : "USDC-Dev"
+    }
+
     return symbolMap[mint] || "Unknown"
+  }
+
+  /**
+   * Get the current USDC mint address for the network
+   */
+  getUSDCMintAddress(): PublicKey {
+    return this.usdcMintAddress
+  }
+
+  /**
+   * Get current network information
+   */
+  getNetworkInfo() {
+    return {
+      network: this.currentNetwork,
+      usdcMint: this.usdcMintAddress.toString(),
+      isMainnet: isMainnet(),
+      isDevnet: isDevnet(),
+    }
+  }
+
+  /**
+   * Check if the service is configured for mainnet
+   */
+  isMainnet(): boolean {
+    return isMainnet()
+  }
+
+  /**
+   * Check if the service is configured for devnet
+   */
+  isDevnet(): boolean {
+    return isDevnet()
   }
 
   async transferUSDC(
     from: PublicKey,
     to: PublicKey,
     amount: number,
-    signTransaction: any,
+    signTransaction: any, // TODO: Implement actual transaction signing
   ): Promise<{ success: boolean; signature?: string; error?: string }> {
     try {
-      // Find which USDC mint the user has balance in
-      let usdcMint: PublicKey | null = null
+      // Check if user has sufficient USDC balance using network-specific mint
+      const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, from)
 
-      for (const mintAddress of this.USDC_MINTS) {
-        try {
-          const mint = new PublicKey(mintAddress)
-          const tokenAccount = await getAssociatedTokenAddress(mint, from)
-          const accountInfo = await getAccount(this.connection, tokenAccount)
-          const balance = Number(accountInfo.amount) / Math.pow(10, 6)
+      try {
+        const accountInfo = await getAccount(this.connection, tokenAccount)
+        const balance = Number(accountInfo.amount) / Math.pow(10, 6)
 
-          if (balance >= amount) {
-            usdcMint = mint
-            break
+        if (balance < amount) {
+          return {
+            success: false,
+            error: `Insufficient USDC balance. Required: ${amount}, Available: ${balance}`
           }
-        } catch (error) {
-          continue
+        }
+
+        // Create transfer instruction (simplified for now)
+        console.log(`Would transfer ${amount} USDC from ${from.toString()} to ${to.toString()}`)
+        console.log(`Network: ${this.currentNetwork}, USDC Mint: ${this.usdcMintAddress.toString()}`)
+
+        // For now, return success (implement actual transfer later)
+        return {
+          success: true,
+          signature: "mock_signature_" + Date.now().toString(),
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: `No USDC token account found for wallet on ${this.currentNetwork}`
         }
       }
-
-      if (!usdcMint) {
-        return { success: false, error: "No sufficient USDC balance found" }
-      }
-
-      // Create transfer instruction (simplified for now)
-      console.log(`Would transfer ${amount} USDC from ${from.toString()} to ${to.toString()}`)
-
-      // For now, return success (implement actual transfer later)
-      return {
-        success: true,
-        signature: "mock_signature_" + Date.now().toString(),
-      }
     } catch (error: any) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        error: `Transfer failed on ${this.currentNetwork}: ${error.message}`
+      }
     }
+  }
+
+  /**
+   * Create a split USDC transfer transaction (for referral payments)
+   * @param from - Wallet address sending USDC
+   * @param treasuryAmount - Amount to send to treasury (6 USDC)
+   * @param referrerAmount - Amount to send to referrer (4 USDC)
+   * @param referrerWallet - Referrer's wallet address
+   */
+  async createSplitUSDCTransfer(
+    from: PublicKey,
+    treasuryAmount: number,
+    referrerAmount: number,
+    referrerWallet: PublicKey
+  ): Promise<Transaction> {
+    const { createTokenTransferTransaction } = await import("@/utils/token")
+
+    // Create transfer to treasury (6 USDC)
+    const treasuryTransferTx = await createTokenTransferTransaction(
+      this.connection,
+      from,
+      PLATFORM_WALLET_ADDRESS,
+      this.usdcMintAddress,
+      treasuryAmount
+    )
+
+    // Create transfer to referrer (4 USDC)
+    const referrerTransferTx = await createTokenTransferTransaction(
+      this.connection,
+      from,
+      referrerWallet,
+      this.usdcMintAddress,
+      referrerAmount
+    )
+
+    // Combine both transactions into one
+    const combinedTransaction = new Transaction()
+
+    // Get recent blockhash
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash()
+    combinedTransaction.recentBlockhash = blockhash
+    combinedTransaction.lastValidBlockHeight = lastValidBlockHeight
+    combinedTransaction.feePayer = from
+
+    // Add instructions from both transactions
+    combinedTransaction.add(...treasuryTransferTx.instructions)
+    combinedTransaction.add(...referrerTransferTx.instructions)
+
+    return combinedTransaction
+  }
+
+  /**
+   * Create a platform USDC transfer transaction (full 10 USDC to treasury)
+   */
+  async createPlatformUSDCTransfer(from: PublicKey, amount: number): Promise<Transaction> {
+    const { createTokenTransferTransaction } = await import("@/utils/token")
+
+    return createTokenTransferTransaction(
+      this.connection,
+      from,
+      PLATFORM_WALLET_ADDRESS,
+      this.usdcMintAddress,
+      amount
+    )
   }
 }
 

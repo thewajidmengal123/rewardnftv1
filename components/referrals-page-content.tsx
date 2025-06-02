@@ -3,55 +3,34 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Check, Copy, Twitter, Facebook, Mail } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Check, Copy, Share, MessageSquare, Mail, RefreshCw, Bug } from "lucide-react"
 import { SocialShare } from "@/components/social-share"
 import { ReferralHistory } from "@/components/referral-history"
 import { useWallet } from "@/contexts/wallet-context"
-import {
-  getReferralData,
-  getReferralLink,
-  initializeReferral,
-  getTopReferrers,
-  type ReferralData,
-} from "@/utils/referral"
-import { WalletAddress } from "@/components/wallet-address"
 import { ProtectedRoute } from "@/components/protected-route"
+import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
+import { FirebaseLeaderboard } from "@/components/firebase-leaderboard"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { runAllFirebaseTests } from "@/utils/firebase-test"
 
 export function ReferralsPageContent() {
   const { connected, publicKey } = useWallet()
   const [copied, setCopied] = useState(false)
-  const [referralData, setReferralData] = useState<ReferralData | null>(null)
-  const [referralLink, setReferralLink] = useState("")
-  const [topReferrers, setTopReferrers] = useState<
-    Array<{
-      walletAddress: string
-      totalReferrals: number
-      totalEarned: number
-    }>
-  >([])
+  const [testing, setTesting] = useState(false)
+  const [testResults, setTestResults] = useState<any>(null)
 
-  // Initialize referral data when wallet is connected
-  useEffect(() => {
-    if (connected && publicKey) {
-      const walletAddress = publicKey.toString()
+  // Use Firebase hooks
+  const {
+    referralLink,
+    stats,
+    history,
+    error,
+    refreshData,
+    loading,
+  } = useFirebaseReferrals()
 
-      // Initialize referral data if it doesn't exist
-      const data = getReferralData(walletAddress) || initializeReferral(walletAddress)
-      setReferralData(data)
-
-      // Get referral link
-      const link = getReferralLink(walletAddress)
-      setReferralLink(link)
-
-      // Get top referrers
-      const topRefs = getTopReferrers(5)
-      setTopReferrers(topRefs)
-    } else {
-      setReferralData(null)
-      setReferralLink("")
-    }
-  }, [connected, publicKey])
+  // Handle referral codes in URL
+  useReferralCodeHandler()
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink)
@@ -59,17 +38,36 @@ export function ReferralsPageContent() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleRefresh = async () => {
+    await refreshData()
+  }
+
+  const handleTest = async () => {
+    if (!publicKey) return
+
+    setTesting(true)
+    try {
+      const results = await runAllFirebaseTests(publicKey.toString())
+      setTestResults(results)
+      console.log("Firebase test results:", results)
+    } catch (err) {
+      console.error("Test failed:", err)
+      setTestResults({ error: err instanceof Error ? err.message : "Test failed" })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   // Format recent referrals for the history component
-  const recentReferrals =
-    referralData?.referrals.map((ref) => ({
-      address: ref.wallet,
-      date: new Date(ref.timestamp).toLocaleDateString(),
-      status: ref.paid ? ("completed" as const) : ("pending" as const),
-      points: 10,
-    })) || []
+  const recentReferrals = history.map((ref) => ({
+    address: ref.referredWallet,
+    date: ref.createdAt.toDate().toLocaleDateString(),
+    status: ref.status === "rewarded" ? ("completed" as const) : ("pending" as const),
+    points: ref.rewardAmount,
+  }))
 
   return (
-    <ProtectedRoute requireNft={true}>
+    <ProtectedRoute requiresNFT={true}>
       <div className="min-h-screen bg-gradient-to-br from-transparent to-indigo-900/20 p-6">
         <div className="max-w-7xl mx-auto bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 overflow-hidden">
           {/* Main Content */}
@@ -96,14 +94,57 @@ export function ReferralsPageContent() {
                     </div>
                   </div>
 
+                  {/* Error Display */}
+                  {error && (
+                    <Alert className="mb-4 bg-red-500/10 border-red-500/20">
+                      <AlertDescription className="text-red-400">
+                        {error}
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRefresh}
+                            disabled={loading}
+                            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          >
+                            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                            Retry
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleTest}
+                            disabled={testing}
+                            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          >
+                            <Bug className={`h-4 w-4 mr-1 ${testing ? 'animate-pulse' : ''}`} />
+                            Test Firebase
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Test Results Display */}
+                  {testResults && (
+                    <Alert className="mb-4 bg-blue-500/10 border-blue-500/20">
+                      <AlertDescription className="text-blue-400">
+                        <div className="font-semibold mb-2">Firebase Test Results:</div>
+                        <pre className="text-xs overflow-auto max-h-32 bg-black/20 p-2 rounded">
+                          {JSON.stringify(testResults, null, 2)}
+                        </pre>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
-                      <p className="text-4xl font-bold text-white">{referralData?.totalReferrals || 0}</p>
+                      <p className="text-4xl font-bold text-white">{stats?.totalReferrals || 0}</p>
                       <p className="text-white/80">Total Referrals</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-4xl font-bold text-white">{referralData?.totalEarned || 0} USDC</p>
+                      <p className="text-4xl font-bold text-white">{stats?.totalEarned || 0} USDC</p>
                       <p className="text-white/80">Total Earned</p>
                     </div>
                     <div className="space-y-1">
@@ -125,7 +166,7 @@ export function ReferralsPageContent() {
                           )
                         }
                       >
-                        <Twitter className="mr-2 h-4 w-4" /> Twitter
+                        <Share className="mr-2 h-4 w-4" /> Twitter
                       </Button>
                       <Button
                         className="bg-[#4267B2] hover:bg-[#4267B2]/90 text-white"
@@ -136,7 +177,7 @@ export function ReferralsPageContent() {
                           )
                         }
                       >
-                        <Facebook className="mr-2 h-4 w-4" /> Facebook
+                        <MessageSquare className="mr-2 h-4 w-4" /> Facebook
                       </Button>
                       <Button
                         className="bg-[#EA4335] hover:bg-[#EA4335]/90 text-white"
@@ -169,30 +210,12 @@ export function ReferralsPageContent() {
                 <div className="space-y-6">
                   <h2 className="text-5xl md:text-6xl font-bold text-white">Leaderboard</h2>
 
-                  <div className="bg-gradient-to-br from-transparent to-indigo-900 text-white border-none rounded-xl p-4 space-y-4">
-                    {topReferrers.length > 0 ? (
-                      topReferrers.map((referrer, index) => (
-                        <div key={index} className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <Avatar
-                              className={`bg-${["cyan", "green", "blue", "yellow", "orange"][index % 5]}-500 h-10 w-10`}
-                            >
-                              <AvatarFallback className="text-white">{index + 1}</AvatarFallback>
-                            </Avatar>
-                            <WalletAddress address={referrer.walletAddress} />
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-white font-bold text-xl">{referrer.totalReferrals} refs</span>
-                            <span className="text-white/70 text-sm">{referrer.totalEarned} USDC</span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-white/80 text-lg">No referrals yet. Be the first!</p>
-                      </div>
-                    )}
-                  </div>
+                  <FirebaseLeaderboard
+                    type="referrals"
+                    limit={10}
+                    showRefresh={true}
+                    className="space-y-4"
+                  />
 
                   {/* Social Share */}
                   <SocialShare referralLink={referralLink} />

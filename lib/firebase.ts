@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore"
+import { getFirestore } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 import { getStorage } from "firebase/storage"
 
@@ -25,13 +25,21 @@ export const auth = getAuth(app)
 // Initialize Storage
 export const storage = getStorage(app)
 
-// Connect to emulator in development
-if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+// Disable emulator connection for now - use production Firestore
+// Uncomment below only if you want to use local emulator
+/*
+if (process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   try {
     connectFirestoreEmulator(db, "localhost", 8080)
+    console.log("🔧 Connected to Firestore emulator")
   } catch (error) {
-    // Emulator already connected
+    console.log("⚠️ Firestore emulator already connected or not available")
   }
 }
+*/
+
+console.log("🔥 Using production Firestore")
 
 export default app
