@@ -12,7 +12,7 @@ export class EnhancedUSDCService {
 
   // Common devnet USDC mint addresses
   private USDC_MINTS = [
-    "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr", // Your USDC-Dev
+    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Your USDC-Dev
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // Circle USDC
     "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // SPL USDC
   ]
