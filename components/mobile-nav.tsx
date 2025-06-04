@@ -11,12 +11,11 @@ import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { cn } from "@/lib/utils"
 
 const navigationItems = [
-  { href: "/", label: "Home" },
   { href: "/mint", label: "Mint" },
-  { href: "/profile", label: "Profile" },
-  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/referrals", label: "Referrals" },
   { href: "/quests", label: "Quests" },
+  { href: "/airdrop", label: "Airdrop" },
+  { href: "/mini-game", label: "Mini-Game" },
 ]
 
 export function MobileNav() {
@@ -44,12 +43,11 @@ export function MobileNav() {
   const toggleMenu = () => setIsOpen(!isOpen)
 
   const menuItems = [
-    { href: "/", label: "Home", icon: <Home size={20} /> },
-    { href: "/mint", label: "Mint NFT", icon: <Award size={20} /> },
+    { href: "/mint", label: "Mint", icon: <Award size={20} /> },
     { href: "/referrals", label: "Referrals", icon: <Users size={20} /> },
     { href: "/quests", label: "Quests", icon: <Gift size={20} /> },
-    { href: "/leaderboard", label: "Leaderboard", icon: <Trophy size={20} /> },
-    { href: "/airdrops", label: "Airdrops", icon: <Gift size={20} /> },
+    { href: "/airdrop", label: "Airdrop", icon: <Gift size={20} /> },
+    { href: "/mini-game", label: "Mini-Game", icon: <Trophy size={20} /> },
   ]
 
   // Add profile link if connected
@@ -84,16 +82,7 @@ export function MobileNav() {
             <div className="flex flex-col h-full">
               <div className="flex justify-between items-center p-4 border-b border-white/10">
                 <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <div className="relative h-10 w-10 overflow-hidden rounded-lg">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Reward NFT Logo"
-                      width={40}
-                      height={40}
-                      className="object-cover"
-                    />
-                  </div>
-                  <span className="text-white font-bold text-xl">Reward NFT</span>
+                  <span className="text-yellow-400 font-bold text-xl">RewardNFT</span>
                 </Link>
                 <button
                   onClick={toggleMenu}
@@ -124,7 +113,7 @@ export function MobileNav() {
               </div>
 
               <div className="p-4 border-t border-white/10">
-                <WalletConnectButton className="w-full" />
+                <WalletConnectButton className="w-full gradient-button" />
               </div>
             </div>
           </motion.div>

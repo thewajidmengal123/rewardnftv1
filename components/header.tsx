@@ -2,88 +2,81 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { MainNav } from "@/components/main-nav"
 import { MobileNav } from "@/components/mobile-nav"
-import { useWallet } from "@/contexts/wallet-context"
-import { Menu, Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+import { Menu } from "lucide-react"
 
 export function Header() {
   const [showMobileNav, setShowMobileNav] = useState(false)
-  const { connected } = useWallet()
-  const { theme, setTheme } = useTheme()
-
-  // Get app name from environment or use default
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Reward NFT Platform"
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        {/* Logo and App Name */}
-        <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Image src="/images/logo.png" alt="Logo" width={32} height={32} className="rounded-md" />
-            <span className="hidden font-bold sm:inline-block">{appName}</span>
-          </Link>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <Button
-          variant="ghost"
-          className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden"
-          onClick={() => setShowMobileNav(!showMobileNav)}
-        >
-          <Menu className="h-6 w-6" />
-          <span className="sr-only">Toggle Menu</span>
-        </Button>
-
-        {/* Mobile Logo */}
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            <Link href="/" className="flex items-center space-x-2 md:hidden">
-              <Image src="/images/logo.png" alt="Logo" width={28} height={28} className="rounded-md" />
-              <span className="font-bold text-sm">{appName}</span>
+    <header className="sticky top-0 z-50 w-full bg-black border-b border-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center">
+            <Link href="/" className="text-xl font-bold text-yellow-400">
+              RewardNFT
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex">
-            <MainNav />
-          </div>
-        </div>
+          <nav className="hidden md:flex items-center space-x-8">
+            <Link
+              href="/mint"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Mint
+            </Link>
+            <Link
+              href="/referrals"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Referrals
+            </Link>
+            <Link
+              href="/quests"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Quests
+            </Link>
+            <Link
+              href="/airdrop"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Airdrop
+            </Link>
+            <Link
+              href="/mini-game"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Mini-Game
+            </Link>
+          </nav>
 
-        {/* Right Side - Network Badge, Theme Toggle and Wallet */}
-        <div className="flex items-center space-x-4">
-          {/* Theme Toggle */}
+          {/* Connect Wallet Button */}
+          <div className="flex items-center">
+            <WalletConnectButton
+              className="bg-gradient-to-r from-teal-400 to-green-400 hover:from-teal-500 hover:to-green-500 text-black font-semibold px-6 py-2 rounded-lg transition-all duration-200 border-0"
+            />
+          </div>
+
+          {/* Mobile Menu Button */}
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            className="h-9 w-9"
+            className="md:hidden text-white hover:bg-gray-800"
+            onClick={() => setShowMobileNav(!showMobileNav)}
           >
-            <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Toggle Menu</span>
           </Button>
-
-          {/* Network Badge */}
-          <Badge variant={network === "mainnet" ? "default" : "secondary"} className="hidden sm:inline-flex">
-            {network.toUpperCase()}
-          </Badge>
-
-          {/* Wallet Connect Button */}
-          <WalletConnectButton />
         </div>
       </div>
 
       {/* Mobile Navigation */}
       {showMobileNav && (
-        <div className="border-t md:hidden">
+        <div className="md:hidden border-t border-gray-800 bg-black">
           <MobileNav />
         </div>
       )}

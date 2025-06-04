@@ -1,8 +1,6 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/header"
 import { useWallet } from "@/contexts/wallet-context"
@@ -18,70 +16,80 @@ import {
 
 export function HomePageContent() {
   const { connected } = useWallet()
-  const [showVideo, setShowVideo] = useState(false)
 
   return (
-    <div className="min-h-screen flex flex-col ">
-      <Header transparent />
+    <div className="min-h-screen flex flex-col">
+      {/* <Header /> */}
 
       {/* Hero Section */}
       <FadeIn>
         <section className="relative pt-20 pb-32 px-6 flex-1 flex items-center">
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#FF5555]/20 via-[#00FFE0]/20 to-[#FFC93C]/20 z-0" />
+            <div className="absolute inset-0 bg-gradient-to-br from-teal-600/10 via-cyan-600/10 to-slate-600/10 z-0" />
           </div>
 
           <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
             <SlideInLeft delay={0.2}>
-              <div className="space-y-6">
-                <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
-                  Mint, Refer, <span className="text-[#00FFE0]">Earn</span>
+              <div className="space-y-8">
+                <h1 className="text-5xl md:text-7xl font-bold leading-tight">
+                  <span className="text-green-400">Mint Your</span>{" "}
+                  <span className="bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text text-transparent">NFT</span>
+                  <br />
+                  <span className="text-white">Unlock the Future</span>
                 </h1>
-                <p className="text-xl text-white/80 max-w-lg">
-                  Join our exclusive NFT platform on Solana. Mint your NFT, refer friends, complete quests, and earn
-                  USDC rewards.
+                <p className="text-xl text-gray-300 max-w-lg">
+                  Join the RewardNFT ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
                 <div className="flex flex-wrap gap-4 pt-4">
-                  <Button asChild size="lg" className="bg-[#00FFE0] hover:bg-[#00FFE0]/90 text-black text-lg px-8">
-                    <Link href="/mint">Mint NFT</Link>
+                  <Button asChild size="lg" className="gradient-button text-lg px-8">
+                    <Link href="/mint">Connect Wallet</Link>
                   </Button>
                   <Button
                     asChild
                     size="lg"
                     variant="outline"
-                    className="border-white/30 text-black hover:bg-white/10 text-lg px-8"
+                    className="border-teal-500/30 text-teal-400 hover:bg-teal-600/10 text-lg px-8"
                   >
-                    <Link href="/referrals">Earn Rewards</Link>
+                    <Link href="/mint">Mint NFT - $10</Link>
                   </Button>
+                </div>
+
+                {/* Stats */}
+                <div className="flex gap-8 pt-4">
+                  <div>
+                    <div className="text-2xl md:text-3xl font-bold text-green-400">500+</div>
+                    <div className="text-sm text-gray-400 uppercase tracking-wide">NFTs Minted</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl md:text-3xl font-bold text-yellow-400">50K+</div>
+                    <div className="text-sm text-gray-400 uppercase tracking-wide">USDC Earned</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl md:text-3xl font-bold text-red-400">1000+</div>
+                    <div className="text-sm text-gray-400 uppercase tracking-wide">Active Users</div>
+                  </div>
                 </div>
               </div>
             </SlideInLeft>
 
             <SlideInRight delay={0.4}>
-              <div className="flex justify-center">
-                <div className="relative w-72 md:w-96 aspect-square rounded-3xl border border-white/20 bg-white/10 backdrop-blur-sm p-6 rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Image
-                      src="/images/mint-nft-box.png"
-                      alt="NFT Preview"
-                      width={300}
-                      height={300}
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="absolute bottom-6 left-6 right-6 bg-black/40 backdrop-blur-md rounded-xl p-4 text-center">
-                    <p className="text-white font-semibold">Exclusive Identity NFT</p>
-                    <p className="text-white/80 text-sm">Mint Price: 10 USDC</p>
-                  </div>
-                </div>
-              </div>
+              <div className="flex justify-end relative min-h-[500px] pr-8">
+                {/* Autumn Card - Back Top */}
+                  <img
+                    src="/images/hero.png"
+                    alt="Autumn Dreams"
+                    className="w-full h-full object-cover"
+                  />
+</div>
+                {/* Character Card - Front Left */}
+            
             </SlideInRight>
           </div>
         </section>
       </FadeIn>
 
       {/* Features Section */}
-      <section className="py-20 px-6 bg-black/30">
+      <section className="py-20 px-6 bg-black/20">
         <div className="max-w-7xl mx-auto">
           <SlideUp delay={0.2}>
             <h2 className="text-4xl font-bold text-white text-center mb-16">How It Works</h2>
@@ -90,16 +98,16 @@ export function HomePageContent() {
           <StaggerContainer staggerDelay={0.15}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <StaggerItem>
-                <HoverCard className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 h-full">
+                <HoverCard className="glass-card glass-card-hover p-6 h-full">
                   <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-[#FF5555]/20 rounded-full flex items-center justify-center mb-4">
-                      <span className="text-[#FF5555] text-2xl font-bold">1</span>
+                    <div className="w-16 h-16 bg-purple-600/20 rounded-full flex items-center justify-center mb-4">
+                      <span className="text-purple-400 text-2xl font-bold">1</span>
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Mint Your NFT</h3>
-                    <p className="text-white/70 flex-1">
+                    <p className="text-gray-300 flex-1">
                       Mint your exclusive Reward NFT using USDC on the Solana blockchain.
                     </p>
-                    <Button asChild className="mt-4 bg-[#FF5555] hover:bg-[#FF5555]/80 text-white">
+                    <Button asChild className="mt-4 bg-purple-600 hover:bg-purple-700 text-white">
                       <Link href="/mint">Mint Now</Link>
                     </Button>
                   </div>
@@ -107,16 +115,16 @@ export function HomePageContent() {
               </StaggerItem>
 
               <StaggerItem>
-                <HoverCard className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 h-full">
+                <HoverCard className="glass-card glass-card-hover p-6 h-full">
                   <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-[#00FFE0]/20 rounded-full flex items-center justify-center mb-4">
-                      <span className="text-[#00FFE0] text-2xl font-bold">2</span>
+                    <div className="w-16 h-16 bg-violet-600/20 rounded-full flex items-center justify-center mb-4">
+                      <span className="text-violet-400 text-2xl font-bold">2</span>
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Refer Friends</h3>
-                    <p className="text-white/70 flex-1">
+                    <p className="text-gray-300 flex-1">
                       Share your unique referral link and earn USDC for each friend who mints an NFT.
                     </p>
-                    <Button asChild className="mt-4 bg-[#00FFE0] hover:bg-[#00FFE0]/80 text-black">
+                    <Button asChild className="mt-4 bg-violet-600 hover:bg-violet-700 text-white">
                       <Link href="/referrals">Get Referral Link</Link>
                     </Button>
                   </div>
@@ -124,16 +132,16 @@ export function HomePageContent() {
               </StaggerItem>
 
               <StaggerItem>
-                <HoverCard className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 h-full">
+                <HoverCard className="glass-card glass-card-hover p-6 h-full">
                   <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-[#FFC93C]/20 rounded-full flex items-center justify-center mb-4">
-                      <span className="text-[#FFC93C] text-2xl font-bold">3</span>
+                    <div className="w-16 h-16 bg-indigo-600/20 rounded-full flex items-center justify-center mb-4">
+                      <span className="text-indigo-400 text-2xl font-bold">3</span>
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Complete Quests</h3>
-                    <p className="text-white/70 flex-1">
+                    <p className="text-gray-300 flex-1">
                       Earn additional USDC by completing daily, weekly, and special quests.
                     </p>
-                    <Button asChild className="mt-4 bg-[#FFC93C] hover:bg-[#FFC93C]/80 text-black">
+                    <Button asChild className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white">
                       <Link href="/quests">View Quests</Link>
                     </Button>
                   </div>

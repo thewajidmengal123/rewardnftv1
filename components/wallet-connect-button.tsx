@@ -41,7 +41,7 @@ export function WalletConnectButton({
   return (
     <>
       <Button
-        variant={variant}
+        variant={className.includes('gradient') ? undefined : variant}
         size={size}
         className={`${className} ${fullWidth ? "w-full" : ""} ${isMobile ? "py-6" : ""}`}
         onClick={handleClick}
