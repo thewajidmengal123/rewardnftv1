@@ -14,7 +14,7 @@ const navigationItems = [
   { href: "/mint", label: "Mint" },
   { href: "/referrals", label: "Referrals" },
   { href: "/quests", label: "Quests" },
-  { href: "/airdrop", label: "Airdrop" },
+  { href: "/airdrops", label: "Airdrops" },
   { href: "/mini-game", label: "Mini-Game" },
 ]
 
@@ -46,7 +46,7 @@ export function MobileNav() {
     { href: "/mint", label: "Mint", icon: <Award size={20} /> },
     { href: "/referrals", label: "Referrals", icon: <Users size={20} /> },
     { href: "/quests", label: "Quests", icon: <Gift size={20} /> },
-    { href: "/airdrop", label: "Airdrop", icon: <Gift size={20} /> },
+    { href: "/airdrops", label: "Airdrops", icon: <Gift size={20} /> },
     { href: "/mini-game", label: "Mini-Game", icon: <Trophy size={20} /> },
   ]
 

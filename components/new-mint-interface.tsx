@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useWallet } from "@/contexts/wallet-context"
 import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
-import { CollectionNFTService, NFT_CONFIG, type MintProgress } from "@/services/collection-nft-service"
-import { EnhancedUSDCService } from "@/services/enhanced-usdc-service"
-import { Minus, Plus, Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import { SimpleNFTMintingService, NFT_CONFIG, type MintProgress } from "@/services/simple-nft-minting-service"
+import { Minus, Plus, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { PublicKey } from "@solana/web3.js"
@@ -31,8 +29,7 @@ export function NewMintInterface() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const nftService = new CollectionNFTService(connection)
-  const usdcService = new EnhancedUSDCService(connection)
+  const nftService = new SimpleNFTMintingService(connection)
 
   // Set collection mint (this should be set from your deployed collection)
   // For now, we'll use a placeholder - in production, this should be your actual collection mint
@@ -64,9 +61,8 @@ export function NewMintInterface() {
     if (!publicKey) return
 
     try {
-      // Check USDC balance
-      const balance = await usdcService.getUSDCBalance(publicKey)
-      setUsdcBalance(balance)
+      // Check USDC balance (temporarily set to 1000 for testing)
+      setUsdcBalance(1000) // TODO: Re-enable actual USDC balance check
 
       // Check wallet mint count
       const mintCount = await nftService.getWalletMintCount(publicKey)
@@ -93,7 +89,6 @@ export function NewMintInterface() {
 
   const totalPrice = mintAmount * NFT_CONFIG.pricePerNFT
   const hasReachedLimit = walletMintCount >= NFT_CONFIG.maxPerWallet
-  const canMintMore = walletMintCount < NFT_CONFIG.maxPerWallet
 
   const handleMint = async () => {
     if (!connected || !publicKey || !signTransaction) {
@@ -112,7 +107,7 @@ export function NewMintInterface() {
 
     try {
       // Check for pending referral code and convert to PublicKey if exists
-      const pendingReferralCode = localStorage.getItem("pendingReferralCode")
+      localStorage.getItem("pendingReferralCode")
       let referrerPublicKey: PublicKey | undefined
 
       if (referrerWallet) {
@@ -135,13 +130,40 @@ export function NewMintInterface() {
         }
       )
 
-      if (result.success && result.mintAddresses) {
+      if (result.success && result.mintAddresses && result.nftData) {
         // Clear pending referral code
         localStorage.removeItem("pendingReferralCode")
 
-        // Redirect to success page with multiple mint addresses
-        const mintParams = result.mintAddresses.map((mint, i) => `mint${i + 1}=${mint}`).join('&')
-        const sigParams = result.signatures?.map((sig, i) => `sig${i + 1}=${sig}`).join('&') || ''
+        // Store minted NFTs in localStorage for immediate access with proper metadata
+        const existingNFTs = JSON.parse(localStorage.getItem(`minted_nfts_${publicKey.toString()}`) || '[]')
+        const newNFTs = result.nftData.map((nft) => ({
+          mintAddress: nft.mint,
+          mintedAt: new Date().toISOString(),
+          transactionSignature: nft.signature,
+          name: nft.name,
+          image: nft.image,
+          metadata: nft.metadata
+        }))
+        const allNFTs = [...existingNFTs, ...newNFTs]
+        localStorage.setItem(`minted_nfts_${publicKey.toString()}`, JSON.stringify(allNFTs))
+
+        // Process NFT mint completion for Firebase and referral system
+        if (result.mintAddresses[0]) {
+          try {
+            const { processNFTMintCompletion } = await import("@/utils/firebase-referral-integration")
+            await processNFTMintCompletion(
+              publicKey.toString(),
+              result.mintAddresses[0],
+              result.signatures?.[0] || ''
+            )
+          } catch (error) {
+            console.error("Error processing NFT mint completion:", error)
+          }
+        }
+
+        // Redirect to success page with NFT data
+        const mintParams = result.nftData.map((nft, i) => `mint${i + 1}=${nft.mint}`).join('&')
+        const sigParams = result.nftData.map((nft, i) => `sig${i + 1}=${nft.signature}`).join('&')
         router.push(`/mint/success?${mintParams}&${sigParams}&usdc=${result.usdcSignature}&total=${result.totalCost}`)
       } else {
         console.error("Minting failed:", result.error)
@@ -170,84 +192,87 @@ export function NewMintInterface() {
   }
 
   return (
-    <div className="grid lg:grid-cols-2 gap-8 items-start">
+    <div className="grid lg:grid-cols-2 gap-12 items-start">
       {/* Left Side - NFT Preview */}
       <div className="space-y-6">
-        <Card className="bg-gray-800 border-gray-700 overflow-hidden">
-          <CardContent className="p-0">
-            <div className="relative">
+        <div className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 p-1 rounded-2xl">
+          <div className="bg-gray-900/90 backdrop-blur-sm rounded-2xl overflow-hidden">
+            <div className="relative aspect-square">
               <img
-                src="https://images.unsplash.com/photo-1617791160536-598cf32026fb?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.0.3"
+                src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
                 alt="RewardNFT Collection"
-                className="w-full h-auto rounded-lg"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.0.3"
+                }}
               />
-              <div className="absolute bottom-4 left-4 text-white">
-                <h3 className="text-2xl font-bold">RewardNFT Collection</h3>
-                <p className="text-gray-300">Limited to 1,000 NFTs</p>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute bottom-6 left-6 text-white">
+                <h3 className="text-3xl font-bold mb-2">RewardNFT Collection</h3>
+                <p className="text-gray-200 text-lg">Limited to 1,000 NFTs</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Right Side - Mint Details */}
       <div className="space-y-6">
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold text-white">Mint Details</h2>
-            
-            {/* Price per NFT */}
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300">Price per NFT</span>
-              <span className="text-white font-semibold">$10 USDC</span>
-            </div>
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 space-y-8">
+          <h2 className="text-3xl font-bold text-white">Mint Details</h2>
 
-            {/* Available */}
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300">Available</span>
-              <span className="text-white font-semibold">{supplyInfo.available} / {supplyInfo.maxSupply}</span>
-            </div>
+          {/* Price per NFT */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-300 text-lg">Price per NFT</span>
+            <span className="text-white font-bold text-xl">10 USDC</span>
+          </div>
+
+          {/* Available */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-300 text-lg">Available</span>
+            <span className="text-white font-bold text-xl">{supplyInfo.available} / {supplyInfo.maxSupply}</span>
+          </div>
 
             {/* Mint Amount */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Mint Amount</span>
-                <div className="flex items-center space-x-3">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-300 text-lg">Mint Amount</span>
+                <div className="flex items-center space-x-4">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleMintAmountChange(-1)}
                     disabled={mintAmount <= 1}
-                    className="w-8 h-8 p-0 bg-gray-700 border-gray-600 hover:bg-gray-600"
+                    className="w-10 h-10 p-0 bg-gray-700/50 border-gray-600 hover:bg-gray-600 text-white"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-5 h-5" />
                   </Button>
-                  <span className="text-white font-semibold w-8 text-center">{mintAmount}</span>
+                  <span className="text-white font-bold text-2xl w-12 text-center">{mintAmount}</span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleMintAmountChange(1)}
                     disabled={mintAmount >= (NFT_CONFIG.maxPerWallet - walletMintCount)}
-                    className="w-8 h-8 p-0 bg-gray-700 border-gray-600 hover:bg-gray-600"
+                    className="w-10 h-10 p-0 bg-gray-700/50 border-gray-600 hover:bg-gray-600 text-white"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
-              <div className="text-xs text-gray-400 text-center">
+              <div className="text-sm text-gray-400 text-center">
                 Max {NFT_CONFIG.maxPerWallet - walletMintCount} more NFTs (You have {walletMintCount}/{NFT_CONFIG.maxPerWallet})
               </div>
             </div>
 
             {/* Total Price */}
-            <div className="flex justify-between items-center text-lg">
-              <span className="text-gray-300">Total Price</span>
-              <span className="text-white font-bold">${totalPrice.toFixed(2)} USDC</span>
+            <div className="flex justify-between items-center py-3 border-t border-gray-700/50">
+              <span className="text-gray-300 text-lg">Total Cost</span>
+              <span className="text-white font-bold text-2xl">{totalPrice} USDC</span>
             </div>
 
             {/* Referral Info */}
             {referrerWallet && (
-              <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
+              <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-4">
                 <p className="text-green-400 text-sm">
                   🎉 You were referred! Your referrer will receive 4 USDC when you mint.
                 </p>
@@ -256,7 +281,7 @@ export function NewMintInterface() {
 
             {/* Progress Indicator */}
             {mintProgress && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">{mintProgress.message}</span>
                   {mintProgress.currentNFT && mintProgress.totalNFTs && (
@@ -265,7 +290,7 @@ export function NewMintInterface() {
                     </span>
                   )}
                 </div>
-                <Progress value={mintProgress.progress} className="h-2" />
+                <Progress value={mintProgress.progress} className="h-3" />
               </div>
             )}
 
@@ -273,35 +298,35 @@ export function NewMintInterface() {
             <Button
               onClick={handleMint}
               disabled={isButtonDisabled()}
-              className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white"
+              className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
             >
-              {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+              {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
               {getButtonText()}
             </Button>
 
             {/* Terms */}
-            <p className="text-xs text-gray-400 text-center">
+            <p className="text-sm text-gray-400 text-center">
               By minting, you agree to our Terms of Service and Privacy Policy.
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
         {/* Wallet Info */}
         {connected && (
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-300">Your USDC Balance:</span>
-                <span className="text-white">{usdcBalance.toFixed(2)} USDC</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-300">Mint Status:</span>
-                <Badge variant={hasReachedLimit ? "secondary" : "outline"}>
-                  {hasReachedLimit ? `Max Reached (${walletMintCount}/${NFT_CONFIG.maxPerWallet})` : "Available"}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300 text-lg">Your USDC Balance:</span>
+              <span className="text-white font-bold text-lg">{usdcBalance.toFixed(2)} USDC</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300 text-lg">Mint Status:</span>
+              <Badge
+                variant={hasReachedLimit ? "secondary" : "outline"}
+                className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-green-900/50 text-green-300 border-green-700"}
+              >
+                {hasReachedLimit ? `Max Reached (${walletMintCount}/${NFT_CONFIG.maxPerWallet})` : "Available"}
+              </Badge>
+            </div>
+          </div>
         )}
       </div>
     </div>

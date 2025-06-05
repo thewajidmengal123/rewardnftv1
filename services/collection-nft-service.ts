@@ -33,7 +33,7 @@ export const COLLECTION_CONFIG = {
   seller_fee_basis_points: 500, // 5% royalty
   creators: [
     {
-      address: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", // Treasury wallet
+      address: "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6", // Treasury wallet
       verified: true,
       share: 100,
     },
@@ -58,7 +58,7 @@ export const NFT_CONFIG = {
   maxSupply: 1000,
   pricePerNFT: 10, // USDC
   maxPerWallet: 5, // Allow up to 5 NFTs per wallet
-  treasuryWallet: new PublicKey("9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"),
+  treasuryWallet: new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"),
   referralReward: 4, // USDC to referrer
   treasuryAmount: 6, // USDC to treasury when referred
 }

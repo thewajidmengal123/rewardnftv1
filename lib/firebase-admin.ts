@@ -30,7 +30,7 @@ const adminApp =
   initializeApp(
     {
       credential: cert(serviceAccount as admin.ServiceAccount),
-      projectId: "rewardnft-e01fc",
+      projectId: "rewardnftapp",
     },
     "admin",
   )

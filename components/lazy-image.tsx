@@ -25,7 +25,7 @@ export function LazyImage({ src, alt, width, height, className = "" }: LazyImage
     setImageSrc("/loading-screen-animation.png")
 
     // Create a new image to preload
-    const img = new Image()
+    const img = new window.Image()
     img.src = src
 
     img.onload = () => {

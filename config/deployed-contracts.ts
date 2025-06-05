@@ -5,7 +5,7 @@ export const OFFICIAL_COLLECTION = "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa
 export const CANDY_MACHINE_ID = "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
 
 // Company wallet for receiving payments
-export const COMPANY_WALLET = process.env.NEXT_PUBLIC_PLATFORM_WALLET_ADDRESS || "11111111111111111111111111111111"
+export const COMPANY_WALLET = process.env.NEXT_PUBLIC_PLATFORM_WALLET_ADDRESS || "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"
 
 // Version tracking
 export const CONTRACT_VERSION = "1.0.0"

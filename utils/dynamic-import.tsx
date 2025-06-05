@@ -13,7 +13,7 @@ export function lazyImport<T extends React.ComponentType<any>>(
   ssr = false,
 ) {
   const LazyComponent = dynamic(importFn, {
-    loading: () => <>{loadingComponent || <Skeleton className="w-full h-32" />}</>,
+    loading: () => loadingComponent || <Skeleton className="w-full h-32" />,
     ssr,
   })
 

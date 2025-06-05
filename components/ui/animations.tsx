@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import ReactConfetti from "react-confetti"
 
 // Fade In animation component
-export const FadeIn = ({ children, delay = 0, duration = 500 }) => {
+export const FadeIn = ({ children, delay = 0, duration = 500 }: { children: ReactNode; delay?: number; duration?: number }) => {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {

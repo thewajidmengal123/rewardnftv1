@@ -7,7 +7,7 @@ export const CANDY_MACHINE_ID = new PublicKey("AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7x
 export const COLLECTION_MINT_ID = new PublicKey("EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa")
 
 // Company wallet address
-export const COMPANY_WALLET = new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP")
+export const COMPANY_WALLET = new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6")
 
 // USDC mint address (devnet) - your specific USDC-Dev
 export const USDC_MINT_ADDRESS = new PublicKey("Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr")
