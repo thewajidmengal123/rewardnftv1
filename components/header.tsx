@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { MobileNav } from "@/components/mobile-nav"
+import { AdminAccessIndicator, AdminOnly } from "@/components/admin-access-indicator"
 import { Menu } from "lucide-react"
 
 export function Header() {
@@ -59,10 +60,19 @@ export function Header() {
             >
               Mini-Game
             </Link>
+            <AdminOnly>
+              <Link
+                href="/admin/dashboard"
+                className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium border border-yellow-400/30 px-3 py-1 rounded-md"
+              >
+                Admin
+              </Link>
+            </AdminOnly>
           </nav>
 
-          {/* Connect Wallet Button */}
-          <div className="flex items-center">
+          {/* Connect Wallet Button & Admin Indicator */}
+          <div className="flex items-center gap-3">
+            <AdminAccessIndicator />
             <WalletConnectButton
               className="bg-gradient-to-r from-teal-400 to-green-400 hover:from-teal-500 hover:to-green-500 text-black font-semibold px-6 py-2 rounded-lg transition-all duration-200 border-0"
             />

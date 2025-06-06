@@ -1,54 +1,90 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Download, Users, Coins, Disc, TrendingUp } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
+import { isAdminWallet } from "@/config/admin"
+import { toast } from "@/components/ui/use-toast"
 
-// Mock data for demonstration
-const mintData = [
-  { id: 1, wallet: "0x123...abc", date: "2023-05-01", amount: 10, txHash: "0xabc...123" },
-  { id: 2, wallet: "0x456...def", date: "2023-05-02", amount: 10, txHash: "0xdef...456" },
-  { id: 3, wallet: "0x789...ghi", date: "2023-05-03", amount: 10, txHash: "0xghi...789" },
-  { id: 4, wallet: "0xabc...123", date: "2023-05-04", amount: 10, txHash: "0x123...abc" },
-  { id: 5, wallet: "0xdef...456", date: "2023-05-05", amount: 10, txHash: "0x456...def" },
-]
 
-const referralData = [
-  { id: 1, referrer: "0x123...abc", referred: "0xabc...123", date: "2023-05-02", amount: 4, txHash: "0xabc...123" },
-  { id: 2, referrer: "0x123...abc", referred: "0xdef...456", date: "2023-05-03", amount: 4, txHash: "0xdef...456" },
-  { id: 3, referrer: "0x456...def", referred: "0xghi...789", date: "2023-05-04", amount: 4, txHash: "0xghi...789" },
-  { id: 4, referrer: "0x789...ghi", referred: "0x123...abc", date: "2023-05-05", amount: 4, txHash: "0x123...abc" },
-]
 
 export function AdminDashboardContent() {
-  const { connected } = useWallet()
+  const { connected, publicKey } = useWallet()
   const [searchTerm, setSearchTerm] = useState("")
+  const [adminData, setAdminData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [realTimeStats, setRealTimeStats] = useState<any>(null)
 
-  // Filter data based on search term
-  const filteredMintData = mintData.filter(
-    (item) =>
-      item.wallet.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.txHash.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Check if current wallet is admin
+  const isAdmin = isAdminWallet(publicKey?.toString())
 
-  const filteredReferralData = referralData.filter(
-    (item) =>
-      item.referrer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.referred.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.txHash.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Load admin data when admin wallet connects
+  useEffect(() => {
+    if (connected && isAdmin) {
+      loadAdminData()
+      // Set up real-time updates
+      const interval = setInterval(loadRealTimeStats, 30000) // Update every 30 seconds
+      return () => clearInterval(interval)
+    }
+  }, [connected, isAdmin])
 
-  // Calculate statistics
-  const totalMints = mintData.length
-  const totalReferrals = referralData.length
-  const totalUsdcCollected = mintData.reduce((sum, item) => sum + item.amount, 0)
-  const totalUsdcPaid = referralData.reduce((sum, item) => sum + item.amount, 0)
-  const netRevenue = totalUsdcCollected - totalUsdcPaid
+  const loadAdminData = async () => {
+    if (!publicKey) return
+
+    setLoading(true)
+    try {
+      // Load comprehensive admin data using the new admin API
+      const response = await fetch(`/api/admin/dashboard?wallet=${publicKey.toString()}&action=get-dashboard-data`)
+      const result = await response.json()
+
+      if (result.success) {
+        setAdminData(result.data)
+        setRealTimeStats(result.data.stats)
+
+        toast({
+          title: "Admin Data Loaded",
+          description: "Successfully loaded all admin dashboard data",
+        })
+      } else {
+        throw new Error(result.error || 'Failed to load admin data')
+      }
+    } catch (error) {
+      console.error('Error loading admin data:', error)
+      toast({
+        title: "Error Loading Data",
+        description: error instanceof Error ? error.message : "Failed to load admin dashboard data",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadRealTimeStats = async () => {
+    if (!publicKey) return
+
+    try {
+      const response = await fetch(`/api/admin/dashboard?wallet=${publicKey.toString()}&action=get-real-time-stats`)
+      const result = await response.json()
+      if (result.success) {
+        setRealTimeStats(result.data)
+      }
+    } catch (error) {
+      console.error('Error loading real-time stats:', error)
+    }
+  }
+
+  // Calculate stats from real data
+  const totalUsers = adminData?.users?.length || 0
+  const totalMints = adminData?.nfts?.length || 0
+  const totalReferrals = adminData?.referrals?.length || 0
+  const totalUsdcCollected = adminData?.nfts?.reduce((sum: number, nft: any) => sum + (nft.mintCost || 10), 0) || 0
 
   if (!connected) {
     return (
@@ -56,7 +92,8 @@ export function AdminDashboardContent() {
         <h1 className="text-3xl font-bold mb-8 text-white">Admin Dashboard</h1>
         <Card className="bg-white/10 backdrop-blur-sm border-white/20">
           <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
-            <h2 className="text-xl font-bold text-white">Connect Your Wallet</h2>
+            <Shield className="w-16 h-16 text-yellow-400 mb-4" />
+            <h2 className="text-xl font-bold text-white">Admin Access Required</h2>
             <p className="text-white/60 text-center mb-4">Connect your admin wallet to access the dashboard</p>
             <WalletConnectButton />
           </CardContent>
@@ -65,18 +102,83 @@ export function AdminDashboardContent() {
     )
   }
 
+  if (connected && !isAdmin) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-white">Admin Dashboard</h1>
+        <Card className="bg-red-900/20 backdrop-blur-sm border-red-500/30">
+          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
+            <AlertTriangle className="w-16 h-16 text-red-400 mb-4" />
+            <h2 className="text-xl font-bold text-white">Access Denied</h2>
+            <p className="text-white/60 text-center mb-4">
+              This wallet ({publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}) does not have admin privileges.
+            </p>
+            <p className="text-red-400 text-sm text-center">
+              Only the authorized admin wallet can access this dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-white">Admin Dashboard</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="bg-green-900/50 text-green-300 border-green-700">
+              <Shield className="w-3 h-3 mr-1" />
+              Admin Access
+            </Badge>
+            <span className="text-sm text-gray-400">
+              {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={loadAdminData} disabled={loading} variant="outline">
+            {loading ? "Loading..." : "Refresh Data"}
+          </Button>
+          <Button
+            onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
+            variant="outline"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Data
+          </Button>
+        </div>
+      </div>
 
-      {/* Stats Cards */}
+      {/* Real-time Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="bg-white/10 backdrop-blur-sm border-white/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm">Total Mints</p>
+                <p className="text-white/60 text-sm">Total Users</p>
+                <p className="text-3xl font-bold text-white">{totalUsers}</p>
+                <p className="text-xs text-green-400">
+                  {realTimeStats?.newUsersToday || 0} new today
+                </p>
+              </div>
+              <div className="bg-white/10 p-3 rounded-full">
+                <Users className="h-6 w-6 text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/60 text-sm">Total NFT Mints</p>
                 <p className="text-3xl font-bold text-white">{totalMints}</p>
+                <p className="text-xs text-green-400">
+                  {realTimeStats?.mintsToday || 0} minted today
+                </p>
               </div>
               <div className="bg-white/10 p-3 rounded-full">
                 <Disc className="h-6 w-6 text-cyan-400" />
@@ -91,9 +193,12 @@ export function AdminDashboardContent() {
               <div>
                 <p className="text-white/60 text-sm">Total Referrals</p>
                 <p className="text-3xl font-bold text-white">{totalReferrals}</p>
+                <p className="text-xs text-green-400">
+                  {realTimeStats?.referralsToday || 0} new today
+                </p>
               </div>
               <div className="bg-white/10 p-3 rounded-full">
-                <Users className="h-6 w-6 text-purple-400" />
+                <TrendingUp className="h-6 w-6 text-purple-400" />
               </div>
             </div>
           </CardContent>
@@ -103,8 +208,11 @@ export function AdminDashboardContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm">USDC Collected</p>
+                <p className="text-white/60 text-sm">USDC Revenue</p>
                 <p className="text-3xl font-bold text-white">{totalUsdcCollected}</p>
+                <p className="text-xs text-green-400">
+                  {realTimeStats?.revenueToday || 0} USDC today
+                </p>
               </div>
               <div className="bg-white/10 p-3 rounded-full">
                 <Coins className="h-6 w-6 text-yellow-400" />
@@ -118,7 +226,7 @@ export function AdminDashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-white/60 text-sm">Net Revenue</p>
-                <p className="text-3xl font-bold text-white">{netRevenue}</p>
+                <p className="text-3xl font-bold text-white">{totalUsdcCollected - (totalReferrals * 4)}</p>
               </div>
               <div className="bg-white/10 p-3 rounded-full">
                 <TrendingUp className="h-6 w-6 text-green-400" />
@@ -146,49 +254,120 @@ export function AdminDashboardContent() {
         </Button>
       </div>
 
-      {/* Tabs for Mint and Referral Data */}
-      <Tabs defaultValue="mints" className="w-full">
-        <TabsList className="w-full bg-white/10 mb-6">
-          <TabsTrigger value="mints" className="flex-1 data-[state=active]:bg-white/20 text-white">
-            Mint Transactions
+      {/* Comprehensive Admin Data Tabs */}
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="w-full bg-white/10 mb-6 grid grid-cols-5">
+          <TabsTrigger value="users" className="data-[state=active]:bg-white/20 text-white">
+            <Users className="w-4 h-4 mr-2" />
+            Users
           </TabsTrigger>
-          <TabsTrigger value="referrals" className="flex-1 data-[state=active]:bg-white/20 text-white">
-            Referral Payouts
+          <TabsTrigger value="mints" className="data-[state=active]:bg-white/20 text-white">
+            <Disc className="w-4 h-4 mr-2" />
+            NFT Mints
+          </TabsTrigger>
+          <TabsTrigger value="referrals" className="data-[state=active]:bg-white/20 text-white">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Referrals
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="data-[state=active]:bg-white/20 text-white">
+            <Activity className="w-4 h-4 mr-2" />
+            Transactions
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="data-[state=active]:bg-white/20 text-white">
+            <Database className="w-4 h-4 mr-2" />
+            Analytics
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mints" className="mt-0">
+        {/* Users Tab */}
+        <TabsContent value="users" className="mt-0">
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
             <CardHeader>
-              <CardTitle className="text-white">Mint Transactions</CardTitle>
+              <CardTitle className="text-white">All Users ({totalUsers})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="text-left text-white/60 py-3 px-4">ID</th>
-                      <th className="text-left text-white/60 py-3 px-4">Wallet</th>
-                      <th className="text-left text-white/60 py-3 px-4">Date</th>
-                      <th className="text-right text-white/60 py-3 px-4">Amount (USDC)</th>
-                      <th className="text-left text-white/60 py-3 px-4">Transaction Hash</th>
+                      <th className="text-left text-white/60 py-3 px-4">Wallet Address</th>
+                      <th className="text-left text-white/60 py-3 px-4">Display Name</th>
+                      <th className="text-center text-white/60 py-3 px-4">NFTs Minted</th>
+                      <th className="text-center text-white/60 py-3 px-4">Referrals</th>
+                      <th className="text-right text-white/60 py-3 px-4">Total Earned</th>
+                      <th className="text-left text-white/60 py-3 px-4">Last Active</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMintData.map((item) => (
-                      <tr key={item.id} className="border-b border-white/10 last:border-0">
-                        <td className="py-3 px-4 text-white">{item.id}</td>
-                        <td className="py-3 px-4 text-white">{item.wallet}</td>
-                        <td className="py-3 px-4 text-white">{item.date}</td>
-                        <td className="py-3 px-4 text-white text-right">{item.amount}</td>
+                    {adminData?.users?.filter((user: any) =>
+                      user.walletAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      user.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map((user: any) => (
+                      <tr key={user.walletAddress} className="border-b border-white/10 last:border-0">
+                        <td className="py-3 px-4 text-white font-mono text-sm">
+                          {user.walletAddress?.slice(0, 8)}...{user.walletAddress?.slice(-8)}
+                        </td>
+                        <td className="py-3 px-4 text-white">{user.displayName || 'Anonymous'}</td>
+                        <td className="py-3 px-4 text-white text-center">{user.nftsMinted || 0}</td>
+                        <td className="py-3 px-4 text-white text-center">{user.totalReferrals || 0}</td>
+                        <td className="py-3 px-4 text-white text-right">{user.totalEarned || 0} USDC</td>
+                        <td className="py-3 px-4 text-white text-sm">
+                          {user.lastActive ? new Date(user.lastActive.seconds * 1000).toLocaleDateString() : 'Never'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NFT Mints Tab */}
+        <TabsContent value="mints" className="mt-0">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">NFT Mint Transactions ({totalMints})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left text-white/60 py-3 px-4">Mint Address</th>
+                      <th className="text-left text-white/60 py-3 px-4">Owner Wallet</th>
+                      <th className="text-left text-white/60 py-3 px-4">NFT Name</th>
+                      <th className="text-center text-white/60 py-3 px-4">Cost (USDC)</th>
+                      <th className="text-left text-white/60 py-3 px-4">Minted At</th>
+                      <th className="text-left text-white/60 py-3 px-4">Transaction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminData?.nfts?.filter((nft: any) =>
+                      nft.mintAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      nft.ownerWallet?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      nft.transactionSignature?.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map((nft: any) => (
+                      <tr key={nft.mintAddress} className="border-b border-white/10 last:border-0">
+                        <td className="py-3 px-4 text-white font-mono text-sm">
+                          {nft.mintAddress?.slice(0, 8)}...{nft.mintAddress?.slice(-8)}
+                        </td>
+                        <td className="py-3 px-4 text-white font-mono text-sm">
+                          {nft.ownerWallet?.slice(0, 8)}...{nft.ownerWallet?.slice(-8)}
+                        </td>
+                        <td className="py-3 px-4 text-white">{nft.name || 'RewardNFT'}</td>
+                        <td className="py-3 px-4 text-white text-center">{nft.mintCost || 10}</td>
+                        <td className="py-3 px-4 text-white text-sm">
+                          {nft.mintedAt ? new Date(nft.mintedAt.seconds * 1000).toLocaleDateString() : 'Unknown'}
+                        </td>
                         <td className="py-3 px-4 text-white">
                           <a
-                            href={`https://explorer.solana.com/tx/${item.txHash}?cluster=devnet`}
+                            href={`https://explorer.solana.com/tx/${nft.transactionSignature}?cluster=devnet`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-400 hover:underline"
+                            className="text-blue-400 hover:underline text-sm"
                           >
-                            {item.txHash}
+                            {nft.transactionSignature?.slice(0, 8)}...
                           </a>
                         </td>
                       </tr>
@@ -200,46 +379,150 @@ export function AdminDashboardContent() {
           </Card>
         </TabsContent>
 
+        {/* Referrals Tab */}
         <TabsContent value="referrals" className="mt-0">
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
             <CardHeader>
-              <CardTitle className="text-white">Referral Payouts</CardTitle>
+              <CardTitle className="text-white">Referral System ({totalReferrals})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="text-left text-white/60 py-3 px-4">ID</th>
                       <th className="text-left text-white/60 py-3 px-4">Referrer</th>
-                      <th className="text-left text-white/60 py-3 px-4">Referred</th>
-                      <th className="text-left text-white/60 py-3 px-4">Date</th>
-                      <th className="text-right text-white/60 py-3 px-4">Amount (USDC)</th>
-                      <th className="text-left text-white/60 py-3 px-4">Transaction Hash</th>
+                      <th className="text-left text-white/60 py-3 px-4">Referred User</th>
+                      <th className="text-left text-white/60 py-3 px-4">Referral Code</th>
+                      <th className="text-center text-white/60 py-3 px-4">Status</th>
+                      <th className="text-right text-white/60 py-3 px-4">Reward (USDC)</th>
+                      <th className="text-left text-white/60 py-3 px-4">Created At</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredReferralData.map((item) => (
-                      <tr key={item.id} className="border-b border-white/10 last:border-0">
-                        <td className="py-3 px-4 text-white">{item.id}</td>
-                        <td className="py-3 px-4 text-white">{item.referrer}</td>
-                        <td className="py-3 px-4 text-white">{item.referred}</td>
-                        <td className="py-3 px-4 text-white">{item.date}</td>
-                        <td className="py-3 px-4 text-white text-right">{item.amount}</td>
-                        <td className="py-3 px-4 text-white">
-                          <a
-                            href={`https://explorer.solana.com/tx/${item.txHash}?cluster=devnet`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:underline"
-                          >
-                            {item.txHash}
-                          </a>
+                    {adminData?.referrals?.filter((referral: any) =>
+                      referral.referrerWallet?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      referral.referredWallet?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      referral.referralCode?.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map((referral: any) => (
+                      <tr key={referral.id} className="border-b border-white/10 last:border-0">
+                        <td className="py-3 px-4 text-white font-mono text-sm">
+                          {referral.referrerWallet?.slice(0, 8)}...{referral.referrerWallet?.slice(-8)}
+                        </td>
+                        <td className="py-3 px-4 text-white font-mono text-sm">
+                          {referral.referredWallet?.slice(0, 8)}...{referral.referredWallet?.slice(-8)}
+                        </td>
+                        <td className="py-3 px-4 text-white">{referral.referralCode}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Badge variant={referral.isCompleted ? "default" : "secondary"}>
+                            {referral.isCompleted ? "Completed" : "Pending"}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 text-white text-right">{referral.rewardAmount || 4}</td>
+                        <td className="py-3 px-4 text-white text-sm">
+                          {referral.createdAt ? new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Transactions Tab */}
+        <TabsContent value="transactions" className="mt-0">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">All Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-400">{totalUsdcCollected}</p>
+                        <p className="text-sm text-white/60">Total USDC Collected</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-400">{totalMints}</p>
+                        <p className="text-sm text-white/60">Total Transactions</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-purple-400">{totalReferrals * 4}</p>
+                        <p className="text-sm text-white/60">Referral Rewards Paid</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="text-center text-white/60">
+                  <p>Detailed transaction monitoring coming soon...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="mt-0">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Platform Analytics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-white/5 border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">User Growth</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Total Users:</span>
+                        <span className="text-white">{totalUsers}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/60">NFT Holders:</span>
+                        <span className="text-white">{adminData?.users?.filter((u: any) => u.nftsMinted > 0).length || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Active Referrers:</span>
+                        <span className="text-white">{adminData?.users?.filter((u: any) => u.totalReferrals > 0).length || 0}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Revenue Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Mint Revenue:</span>
+                        <span className="text-white">{totalUsdcCollected} USDC</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Referral Costs:</span>
+                        <span className="text-red-400">-{totalReferrals * 4} USDC</span>
+                      </div>
+                      <div className="flex justify-between border-t border-white/10 pt-2">
+                        <span className="text-white/60">Net Revenue:</span>
+                        <span className="text-green-400">{totalUsdcCollected - (totalReferrals * 4)} USDC</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>
