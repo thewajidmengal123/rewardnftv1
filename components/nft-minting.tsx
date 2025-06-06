@@ -78,8 +78,8 @@ export function NftMinting({ onSuccess, onError }: NftMintingProps) {
       onSuccess && onSuccess()
 
       toast({
-        title: "NFT Minted Successfully",
-        description: "Your NFT has been minted and added to your wallet",
+        title: "🎉 Welcome to RewardNFT Community!",
+        description: "Your exclusive NFT has been minted and added to your wallet! 🚀",
       })
     } catch (error: any) {
       console.error("NFT minting error:", error)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
 
 const COLLECTION_DOC_ID = "main_collection"
 
@@ -19,10 +20,9 @@ export async function POST(request: NextRequest) {
 
     // Update collection mint count
     const collectionRef = adminDb.collection("collections").doc(COLLECTION_DOC_ID)
-    
     await collectionRef.update({
-      totalMinted: adminDb.FieldValue.increment(1),
-      updatedAt: adminDb.FieldValue.serverTimestamp(),
+      totalMinted: FieldValue.increment(1),
+      updatedAt: FieldValue.serverTimestamp(),
     })
 
     return NextResponse.json({

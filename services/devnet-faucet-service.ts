@@ -1,6 +1,7 @@
 import { Connection, type PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js"
 import { getAssociatedTokenAddress } from "@solana/spl-token"
-import { USDC_MINT_ADDRESS, DEFAULT_RPC_ENDPOINT } from "@/config/solana"
+import {  DEFAULT_RPC_ENDPOINT } from "@/config/solana"
+import { USDC_MINT_ADDRESS } from "@/config/candy-machine-v3"
 
 export class DevnetFaucetService {
   private connection: Connection

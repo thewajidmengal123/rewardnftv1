@@ -36,6 +36,12 @@ export function Header() {
               Referrals
             </Link>
             <Link
+              href="/leaderboard"
+              className="text-white hover:text-gray-300 transition-colors font-medium"
+            >
+              Leaderboard
+            </Link>
+            <Link
               href="/quests"
               className="text-white hover:text-gray-300 transition-colors font-medium"
             >

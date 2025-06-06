@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
 
 const COLLECTION_DOC_ID = "main_collection"
 
@@ -62,9 +63,8 @@ export async function POST(request: NextRequest) {
 
     // Store collection data
     const collectionRecord = {
-      ...collectionData,
-      createdAt: adminDb.FieldValue.serverTimestamp(),
-      updatedAt: adminDb.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     }
 
     await collectionRef.set(collectionRecord)

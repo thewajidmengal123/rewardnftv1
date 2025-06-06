@@ -86,9 +86,23 @@ export async function processNFTMintCompletion(
     // Update user's leaderboard position
     await firebaseLeaderboardService.updateUserLeaderboardPosition(walletAddress)
 
+    // Sync user data to ensure consistency
+    try {
+      const { firebaseDataMaintenance } = await import("@/services/firebase-data-maintenance")
+      await firebaseDataMaintenance.syncUserData(walletAddress)
+
+      // If there was a referrer, sync their data too
+      if (referrerWallet) {
+        await firebaseDataMaintenance.syncUserData(referrerWallet)
+      }
+    } catch (error) {
+      console.error("Error syncing user data after mint:", error)
+      // Don't fail the whole process for sync errors
+    }
+
     return {
       success: true,
-      message: referralCompleted 
+      message: referralCompleted
         ? "NFT minted successfully! Referral reward has been processed."
         : "NFT minted successfully!",
       referralCompleted,

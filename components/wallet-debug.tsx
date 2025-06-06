@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useWallet } from "@/contexts/wallet-context"
 import { isPhantomInstalled, checkSolanaNetwork, getPhantomProvider } from "@/utils/phantom-provider"
-import type { SolanaNetwork } from "@/utils/solana-network"
+import { SolanaNetwork } from "@/config/solana"
 
 export function WalletDebug() {
   const { connected, publicKey } = useWallet()

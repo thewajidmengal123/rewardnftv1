@@ -66,7 +66,7 @@ export function usePerformanceMonitor(callback?: (metrics: PerformanceMetrics) =
     // Create a PerformanceObserver to monitor FID
     const fidObserver = new PerformanceObserver((entryList) => {
       const entries = entryList.getEntries()
-      const firstEntry = entries[0]
+      const firstEntry = entries[0] as PerformanceEventTiming
       const fid = firstEntry.processingStart - firstEntry.startTime
 
       const metrics = getCurrentPerformanceMetrics()

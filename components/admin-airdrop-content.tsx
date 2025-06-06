@@ -747,7 +747,7 @@ export function AdminAirdropContent() {
               <div className="space-y-2">
                 {eligibleWallets.map((wallet, index) => (
                   <div key={index} className="flex items-center justify-between p-2 border-b border-white/10">
-                    <WalletAddress address={wallet} />
+                    <WalletAddress  />
 
                     {selectedAirdrop && selectedAirdrop.recipients.length > 0 && (
                       <div className="flex items-center gap-2">

@@ -11,6 +11,8 @@ import { Minus, Plus, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { PublicKey } from "@solana/web3.js"
+import { USDCService } from "@/services/usdc-service"
+import EnhancedUSDCService from "@/services/enhanced-usdc-service"
 
 export function NewMintInterface() {
   const { connected, publicKey, signTransaction, connection } = useWallet()
@@ -28,6 +30,7 @@ export function NewMintInterface() {
   })
   const router = useRouter()
   const searchParams = useSearchParams()
+ const usdcService = new EnhancedUSDCService(connection)
 
   const nftService = new SimpleNFTMintingService(connection)
 
@@ -41,14 +44,68 @@ export function NewMintInterface() {
   // Handle referral codes from URL
   useReferralCodeHandler()
 
-  // Check for referral code in URL
+  // Check for referral code in URL and track referral via API
   useEffect(() => {
     const referralCode = searchParams.get("ref")
     if (referralCode && connected && publicKey) {
-      // Store referral code for later use during minting
-      localStorage.setItem("pendingReferralCode", referralCode)
+      console.log("🔗 Processing referral code from URL:", referralCode)
+
+      // Track referral via API
+      const trackReferralViaAPI = async () => {
+        try {
+          const response = await fetch('/api/referrals/track', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              referralCode,
+              walletAddress: publicKey.toString()
+            })
+          })
+
+          const result = await response.json()
+
+          if (result.success) {
+            console.log("✅ Referral tracked successfully via API:", result.data)
+            setReferrerWallet(result.data.referrer.walletAddress)
+
+            // Remove referral code from URL after successful tracking
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete("ref")
+            window.history.replaceState({}, "", newUrl.toString())
+          } else {
+            console.warn("⚠️ Failed to track referral:", result.error)
+          }
+        } catch (error) {
+          console.error("Error tracking referral via API:", error)
+        }
+      }
+
+      trackReferralViaAPI()
     }
   }, [searchParams, connected, publicKey])
+
+  // Load referrer wallet from API if user was already referred
+  useEffect(() => {
+    if (connected && publicKey && !referrerWallet) {
+      const loadReferrerFromAPI = async () => {
+        try {
+          const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
+          const result = await response.json()
+
+          if (result.success && result.isReferred) {
+            console.log("🔗 User was referred by:", result.referrer.walletAddress)
+            setReferrerWallet(result.referrer.walletAddress)
+          }
+        } catch (error) {
+          console.error("Error loading referrer from API:", error)
+        }
+      }
+
+      loadReferrerFromAPI()
+    }
+  }, [connected, publicKey, referrerWallet])
 
   // Check wallet status
   useEffect(() => {
@@ -62,8 +119,11 @@ export function NewMintInterface() {
 
     try {
       // Check USDC balance (temporarily set to 1000 for testing)
-      setUsdcBalance(1000) // TODO: Re-enable actual USDC balance check
+    const tokenBalances = await usdcService.getAllTokenBalances(publicKey)
 
+      // Get USDC balance specifically
+      const usdcBal = await usdcService.getUSDCBalance(publicKey)
+      setUsdcBalance(usdcBal)
       // Check wallet mint count
       const mintCount = await nftService.getWalletMintCount(publicKey)
       setWalletMintCount(mintCount)
@@ -106,13 +166,29 @@ export function NewMintInterface() {
     setLoading(true)
 
     try {
-      // Check for pending referral code and convert to PublicKey if exists
-      localStorage.getItem("pendingReferralCode")
+      // Get referrer wallet from API (not localStorage or direct Firebase)
       let referrerPublicKey: PublicKey | undefined
 
-      if (referrerWallet) {
+      console.log("🔍 Current referrerWallet state:", referrerWallet)
+
+      // If we don't have referrer wallet in state, check via API
+      if (!referrerWallet) {
+        try {
+          const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
+          const result = await response.json()
+
+          if (result.success && result.isReferred) {
+            console.log("🎯 Found referrer from API:", result.referrer.walletAddress)
+            setReferrerWallet(result.referrer.walletAddress)
+            referrerPublicKey = new PublicKey(result.referrer.walletAddress)
+          }
+        } catch (error) {
+          console.error("Error getting referrer from API:", error)
+        }
+      } else {
         try {
           referrerPublicKey = new PublicKey(referrerWallet)
+          console.log("✅ Using referrer wallet from state:", referrerWallet)
         } catch (error) {
           console.error("Invalid referrer wallet address:", error)
         }
@@ -131,9 +207,6 @@ export function NewMintInterface() {
       )
 
       if (result.success && result.mintAddresses && result.nftData) {
-        // Clear pending referral code
-        localStorage.removeItem("pendingReferralCode")
-
         // Store minted NFTs in localStorage for immediate access with proper metadata
         const existingNFTs = JSON.parse(localStorage.getItem(`minted_nfts_${publicKey.toString()}`) || '[]')
         const newNFTs = result.nftData.map((nft) => ({
@@ -193,10 +266,10 @@ export function NewMintInterface() {
 
   return (
     <div className="grid lg:grid-cols-2 gap-12 items-start">
-      {/* Left Side - NFT Preview */}
+      {/* Left Side - NFT Preview - matching reference design */}
       <div className="space-y-6">
-        <div className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 p-1 rounded-2xl">
-          <div className="bg-gray-900/90 backdrop-blur-sm rounded-2xl overflow-hidden">
+        <div className="relative bg-gradient-to-br from-teal-500/20 via-cyan-500/20 to-teal-600/20 p-1 rounded-2xl">
+          <div className="bg-black/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800/50">
             <div className="relative aspect-square">
               <img
                 src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
@@ -206,44 +279,44 @@ export function NewMintInterface() {
                   e.currentTarget.src = "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.0.3"
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-6 left-6 text-white">
-                <h3 className="text-3xl font-bold mb-2">RewardNFT Collection</h3>
-                <p className="text-gray-200 text-lg">Limited to 1,000 NFTs</p>
+                <h3 className="text-3xl font-bold mb-2 text-white">RewardNFT Collection</h3>
+                <p className="text-gray-300 text-lg">Limited to 1,000 NFTs</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Mint Details */}
+      {/* Right Side - Mint Details - matching reference design */}
       <div className="space-y-6">
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 space-y-8">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-8 space-y-8">
           <h2 className="text-3xl font-bold text-white">Mint Details</h2>
 
           {/* Price per NFT */}
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-300 text-lg">Price per NFT</span>
+            <span className="text-gray-400 text-lg">Price per NFT</span>
             <span className="text-white font-bold text-xl">10 USDC</span>
           </div>
 
           {/* Available */}
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-300 text-lg">Available</span>
+            <span className="text-gray-400 text-lg">Available</span>
             <span className="text-white font-bold text-xl">{supplyInfo.available} / {supplyInfo.maxSupply}</span>
           </div>
 
             {/* Mint Amount */}
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2">
-                <span className="text-gray-300 text-lg">Mint Amount</span>
+                <span className="text-gray-400 text-lg">Mint Amount</span>
                 <div className="flex items-center space-x-4">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleMintAmountChange(-1)}
                     disabled={mintAmount <= 1}
-                    className="w-10 h-10 p-0 bg-gray-700/50 border-gray-600 hover:bg-gray-600 text-white"
+                    className="w-10 h-10 p-0 bg-gray-800/50 border-gray-700 hover:bg-gray-700 text-white hover:border-teal-500/50"
                   >
                     <Minus className="w-5 h-5" />
                   </Button>
@@ -253,27 +326,27 @@ export function NewMintInterface() {
                     size="sm"
                     onClick={() => handleMintAmountChange(1)}
                     disabled={mintAmount >= (NFT_CONFIG.maxPerWallet - walletMintCount)}
-                    className="w-10 h-10 p-0 bg-gray-700/50 border-gray-600 hover:bg-gray-600 text-white"
+                    className="w-10 h-10 p-0 bg-gray-800/50 border-gray-700 hover:bg-gray-700 text-white hover:border-teal-500/50"
                   >
                     <Plus className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
-              <div className="text-sm text-gray-400 text-center">
+              <div className="text-sm text-gray-500 text-center">
                 Max {NFT_CONFIG.maxPerWallet - walletMintCount} more NFTs (You have {walletMintCount}/{NFT_CONFIG.maxPerWallet})
               </div>
             </div>
 
             {/* Total Price */}
-            <div className="flex justify-between items-center py-3 border-t border-gray-700/50">
-              <span className="text-gray-300 text-lg">Total Cost</span>
+            <div className="flex justify-between items-center py-3 border-t border-gray-800/50">
+              <span className="text-gray-400 text-lg">Total Cost</span>
               <span className="text-white font-bold text-2xl">{totalPrice} USDC</span>
             </div>
 
             {/* Referral Info */}
             {referrerWallet && (
-              <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-4">
-                <p className="text-green-400 text-sm">
+              <div className="bg-teal-900/30 border border-teal-700/50 rounded-xl p-4">
+                <p className="text-teal-400 text-sm">
                   🎉 You were referred! Your referrer will receive 4 USDC when you mint.
                 </p>
               </div>
@@ -312,16 +385,16 @@ export function NewMintInterface() {
 
         {/* Wallet Info */}
         {connected && (
-          <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 space-y-4">
+          <div className="bg-gray-900/30 backdrop-blur-sm border border-gray-800/50 rounded-xl p-6 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-gray-300 text-lg">Your USDC Balance:</span>
+              <span className="text-gray-400 text-lg">Your USDC Balance:</span>
               <span className="text-white font-bold text-lg">{usdcBalance.toFixed(2)} USDC</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-300 text-lg">Mint Status:</span>
+              <span className="text-gray-400 text-lg">Mint Status:</span>
               <Badge
                 variant={hasReachedLimit ? "secondary" : "outline"}
-                className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-green-900/50 text-green-300 border-green-700"}
+                className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-teal-900/50 text-teal-300 border-teal-700"}
               >
                 {hasReachedLimit ? `Max Reached (${walletMintCount}/${NFT_CONFIG.maxPerWallet})` : "Available"}
               </Badge>

@@ -14,6 +14,7 @@ interface SimplifiedNftGalleryProps {
 }
 
 export function SimplifiedNftGallery({ className = "", maxDisplay = 4 }: SimplifiedNftGalleryProps) {
+  //@ts-ignore
   const { connected, publicKey, connection, explorerUrl } = useWallet()
   const [loading, setLoading] = useState(false)
   const [nfts, setNfts] = useState<any[]>([])

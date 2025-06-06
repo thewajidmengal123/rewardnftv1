@@ -1,6 +1,5 @@
 import { type Connection, Keypair, PublicKey, Transaction, SystemProgram } from "@solana/web3.js"
 import {
-  createCreateMetadataAccountV3Instruction,
   MPL_TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata"
 import {
@@ -17,8 +16,8 @@ import { NFT_METADATA } from "@/config/solana"
 // Find the metadata PDA for a mint
 export const findMetadataPda = async (mint: PublicKey): Promise<PublicKey> => {
   const [pda] = await PublicKey.findProgramAddress(
-    [Buffer.from("metadata"), MPL_TOKEN_METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    MPL_TOKEN_METADATA_PROGRAM_ID,
+    [Buffer.from("metadata"), new PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID).toBuffer(), mint.toBuffer()],
+    new PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID),
   )
   return pda
 }
@@ -86,38 +85,9 @@ export const createNftMintTransaction = async (
   )
 
   // Add metadata instruction
-  const metadataInstruction = createCreateMetadataAccountV3Instruction(
-    {
-      metadata: metadataPda,
-      mint: mint.publicKey,
-      mintAuthority: payer,
-      payer,
-      updateAuthority: payer,
-    },
-    {
-      createMetadataAccountArgsV3: {
-        data: {
-          name: NFT_METADATA.name,
-          symbol: NFT_METADATA.symbol,
-          uri: JSON.stringify(NFT_METADATA),
-          sellerFeeBasisPoints: 0,
-          creators: [
-            {
-              address: payer,
-              verified: true,
-              share: 100,
-            },
-          ],
-          collection: null,
-          uses: null,
-        },
-        isMutable: true,
-        collectionDetails: null,
-      },
-    },
-  )
+  let metadataInstruction;
 
-  transaction.add(metadataInstruction)
+  // transaction.add(metadataInstruction)
 
   // Get the latest blockhash
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()

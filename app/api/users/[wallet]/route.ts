@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
 
 export async function GET(request: NextRequest, { params }: { params: { wallet: string } }) {
   try {
@@ -44,8 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: { wallet:
     await userRef.set(
       {
         ...userData,
-        walletAddress: wallet,
-        lastActive: adminDb.FieldValue.serverTimestamp(),
+        lastActive: FieldValue.serverTimestamp(),
       },
       { merge: true },
     )

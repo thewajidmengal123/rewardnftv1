@@ -125,7 +125,7 @@ function ReferralComponent() {
     <div>
       <p>Your referral link: {referralLink}</p>
       <p>Total referrals: {stats?.totalReferrals}</p>
-      <p>Total earned: {stats?.totalEarned} USDC</p>
+      <p>Total earned: {stats?.totalReferrals * 4} USDC</p>
     </div>
   )
 }

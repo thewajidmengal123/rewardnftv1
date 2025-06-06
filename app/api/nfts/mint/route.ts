@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,8 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Record NFT mint
     const nftRecord = {
-      ...nftData,
-      mintedAt: adminDb.FieldValue.serverTimestamp(),
+      mintedAt: FieldValue.serverTimestamp(),
       isVerified: true,
       isTransferred: false,
     }
@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
     // Update user NFT count
     const userRef = adminDb.collection("users").doc(nftData.ownerWallet)
     await userRef.update({
-      nftsMinted: adminDb.FieldValue.increment(1),
-      nftAddresses: adminDb.FieldValue.arrayUnion(nftData.mintAddress),
-      lastActive: adminDb.FieldValue.serverTimestamp(),
+      nftsMinted: FieldValue.increment(1),
+      nftAddresses: FieldValue.arrayUnion(nftData.mintAddress),
+      lastActive: FieldValue.serverTimestamp(),
     })
 
     return NextResponse.json({

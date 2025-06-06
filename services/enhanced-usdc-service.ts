@@ -15,6 +15,9 @@ interface TokenBalance {
 }
 
 export class EnhancedUSDCService {
+  transferUSDCWithReferral(minter: PublicKey, treasuryWallet: PublicKey, referrerWallet: PublicKey, treasuryAmount: number, referrerAmount: number, signTransaction: (transaction: Transaction) => Promise<Transaction>) {
+    throw new Error("Method not implemented.")
+  }
   private connection: Connection
   private usdcMintAddress: PublicKey
   private currentNetwork: string

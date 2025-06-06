@@ -11,7 +11,7 @@ export function NetworkIndicator({ className = "" }: NetworkIndicatorProps) {
   // Define colors based on network
   const getNetworkColor = () => {
     switch (CURRENT_NETWORK) {
-      case "mainnet":
+      case "mainnet-beta":
         return "bg-green-500 hover:bg-green-600"
       case "devnet":
         return "bg-blue-500 hover:bg-blue-600"

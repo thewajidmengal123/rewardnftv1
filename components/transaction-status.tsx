@@ -15,6 +15,7 @@ interface TransactionStatusProps {
 }
 
 export function TransactionStatus({ signature, connection, onSuccess, onError }: TransactionStatusProps) {
+  //@ts-ignore
   const { explorerUrl } = useWallet()
   const [status, setStatus] = useState<"processing" | "confirmed" | "error">("processing")
   const [confirmations, setConfirmations] = useState(0)

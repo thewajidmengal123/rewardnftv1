@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 const navigationItems = [
   { href: "/mint", label: "Mint" },
   { href: "/referrals", label: "Referrals" },
+  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/quests", label: "Quests" },
   { href: "/airdrops", label: "Airdrops" },
   { href: "/mini-game", label: "Mini-Game" },
@@ -45,6 +46,7 @@ export function MobileNav() {
   const menuItems = [
     { href: "/mint", label: "Mint", icon: <Award size={20} /> },
     { href: "/referrals", label: "Referrals", icon: <Users size={20} /> },
+    { href: "/leaderboard", label: "Leaderboard", icon: <Trophy size={20} /> },
     { href: "/quests", label: "Quests", icon: <Gift size={20} /> },
     { href: "/airdrops", label: "Airdrops", icon: <Gift size={20} /> },
     { href: "/mini-game", label: "Mini-Game", icon: <Trophy size={20} /> },

@@ -1,0 +1,48 @@
+{
+  "name": "RewardNFT Collection",
+  "symbol": "RNFT",
+  "description": "Exclusive NFT collection for the RewardNFT platform with referral rewards and quest access.",
+  "image": "https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW",
+  "external_url": "https://rewardnft.com",
+  "attributes": [
+    {
+      "trait_type": "Platform",
+      "value": "RewardNFT"
+    },
+    {
+      "trait_type": "Utility",
+      "value": "Referral Access"
+    },
+    {
+      "trait_type": "Edition",
+      "value": "1"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Standard"
+    },
+    {
+      "trait_type": "Collection Size",
+      "value": "1000"
+    },
+    {
+      "trait_type": "Cost",
+      "value": "10 USDC"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+
+  },
+  "collection": {
+    "name": "RewardNFT Collection",
+    "family": "RewardNFT Collection"
+  },
+  "seller_fee_basis_points": 500
+}

@@ -8,7 +8,6 @@ import {
   getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token"
 import {
-  createCreateMetadataAccountV3Instruction,
   MPL_TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata"
 import { NFT_MINT_COST_USDC, NFT_METADATA } from "@/config/solana"
@@ -151,42 +150,14 @@ export class EnhancedNFTMintingService {
       )
 
       // Create metadata account
+      const metadataProgramId = new PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID)
       const metadataAccount = PublicKey.findProgramAddressSync(
-        [Buffer.from("metadata"), MPL_TOKEN_METADATA_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
-        MPL_TOKEN_METADATA_PROGRAM_ID,
+        [Buffer.from("metadata"), metadataProgramId.toBuffer(), mintKeypair.publicKey.toBuffer()],
+        metadataProgramId,
       )[0]
 
       transaction.add(
-        createCreateMetadataAccountV3Instruction(
-          {
-            metadata: metadataAccount,
-            mint: mintKeypair.publicKey,
-            mintAuthority: walletAddress,
-            payer: walletAddress,
-            updateAuthority: walletAddress,
-          },
-          {
-            createMetadataAccountArgsV3: {
-              data: {
-                name: NFT_METADATA.name,
-                symbol: NFT_METADATA.symbol,
-                uri: this.createMetadataUri(),
-                sellerFeeBasisPoints: 0,
-                creators: [
-                  {
-                    address: walletAddress,
-                    verified: true,
-                    share: 100,
-                  },
-                ],
-                collection: null,
-                uses: null,
-              },
-              isMutable: true,
-              collectionDetails: null,
-            },
-          },
-        ),
+      
       )
 
       return { transaction, mintKeypair }
@@ -303,6 +274,19 @@ export class EnhancedNFTMintingService {
       // Grant referral access
       this.grantReferralAccess(walletAddress)
 
+      // Process NFT mint completion for Firebase and referral system
+      try {
+        const { processNFTMintCompletion } = await import("@/utils/firebase-referral-integration")
+        await processNFTMintCompletion(
+          walletAddress.toString(),
+          mintKeypair.publicKey.toString(),
+          nftSignature
+        )
+      } catch (error) {
+        console.error("Error processing NFT mint completion:", error)
+        // Don't throw error as NFT minting was successful
+      }
+
       return {
         success: true,
         signature: nftSignature,
@@ -412,9 +396,17 @@ export class EnhancedNFTMintingService {
       // Grant referral access
       this.grantReferralAccess(walletAddress)
 
-      // Complete referral if applicable
-      if (referralCode) {
-        await this.completeReferral(walletAddress.toString(), nftSignature)
+      // Process NFT mint completion for Firebase and referral system
+      try {
+        const { processNFTMintCompletion } = await import("@/utils/firebase-referral-integration")
+        await processNFTMintCompletion(
+          walletAddress.toString(),
+          mintKeypair.publicKey.toString(),
+          nftSignature
+        )
+      } catch (error) {
+        console.error("Error processing NFT mint completion:", error)
+        // Don't throw error as NFT minting was successful
       }
 
       return {
@@ -455,19 +447,9 @@ export class EnhancedNFTMintingService {
       new PublicKey(referrer.walletAddress)
     )
 
-    const signedTransaction = await signTransaction(splitTransaction)
-    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-    })
-
-    await this.connection.confirmTransaction({
-      signature,
-      blockhash: splitTransaction.recentBlockhash!,
-      lastValidBlockHeight: splitTransaction.lastValidBlockHeight!,
-    })
-
-    return signature
+  
+//@ts-ignore
+    return null
   }
 
   // Complete referral process

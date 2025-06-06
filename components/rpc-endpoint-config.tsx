@@ -79,8 +79,8 @@ export function RpcEndpointConfig({ currentEndpoint, onEndpointChange }: RpcEndp
             <Label>Predefined Endpoints</Label>
             <div className="grid grid-cols-1 gap-2">
               <Button
-                variant={endpoint === SOLANA_RPC_ENDPOINTS.mainnet ? "default" : "outline"}
-                onClick={() => handleSelectEndpoint(SOLANA_RPC_ENDPOINTS.mainnet)}
+                variant={endpoint === SOLANA_RPC_ENDPOINTS["mainnet-beta"] ? "default" : "outline"}
+                onClick={() => handleSelectEndpoint(SOLANA_RPC_ENDPOINTS["mainnet-beta"])}
                 className="justify-start"
               >
                 Mainnet

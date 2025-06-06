@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { useWallet } from "@/contexts/wallet-context"
 import { Button } from "@/components/ui/button"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
+import { firebaseUserService } from "@/services/firebase-user-service"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -29,13 +30,28 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
       }
 
       try {
-        // Check localStorage for minted NFTs
-        const mintedNFTsData = localStorage.getItem(`minted_nfts_${publicKey.toString()}`)
-        const nfts = mintedNFTsData ? JSON.parse(mintedNFTsData) : []
-        setHasNFT(nfts.length > 0)
+        // Check Firebase for user's NFT count
+        const user = await firebaseUserService.getUserByWallet(publicKey.toString())
+        const hasNFTs = user && user.nftsMinted > 0
+        setHasNFT(hasNFTs || false)
+
+        // Also check localStorage as fallback
+        if (!hasNFTs) {
+          const mintedNFTsData = localStorage.getItem(`minted_nfts_${publicKey.toString()}`)
+          const nfts = mintedNFTsData ? JSON.parse(mintedNFTsData) : []
+          setHasNFT(nfts.length > 0)
+        }
       } catch (error) {
         console.error("Error checking NFT ownership:", error)
-        setHasNFT(false)
+        // Fallback to localStorage check
+        try {
+          const mintedNFTsData = localStorage.getItem(`minted_nfts_${publicKey.toString()}`)
+          const nfts = mintedNFTsData ? JSON.parse(mintedNFTsData) : []
+          setHasNFT(nfts.length > 0)
+        } catch (localError) {
+          console.error("Error checking localStorage:", localError)
+          setHasNFT(false)
+        }
       } finally {
         setIsLoading(false)
       }

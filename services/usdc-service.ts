@@ -12,6 +12,9 @@ import { getCurrentUSDCAddress, CURRENT_NETWORK, PLATFORM_WALLET_ADDRESS } from 
 import { rpcConnectionService } from "@/services/rpc-connection-service"
 
 export class USDCService {
+  createSplitUSDCTransfer(walletAddress: PublicKey, arg1: number, arg2: number, arg3: PublicKey) {
+    throw new Error("Method not implemented.")
+  }
   private connection: Connection
   private usdcMintAddress: PublicKey
 

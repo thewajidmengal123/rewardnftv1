@@ -9,28 +9,40 @@ import { ReferralHistory } from "@/components/referral-history"
 import { useWallet } from "@/contexts/wallet-context"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
+import { useUserReferrals } from "@/hooks/use-user-referrals"
 import { FirebaseLeaderboard } from "@/components/firebase-leaderboard"
-
-import { runAllFirebaseTests } from "@/utils/firebase-test"
 
 export function ReferralsPageContent() {
   const { connected, publicKey } = useWallet()
   const [copied, setCopied] = useState(false)
-  const [testing, setTesting] = useState(false)
   const [testResults, setTestResults] = useState<any>(null)
+  const [testing, setTesting] = useState(false)
 
-  // Use Firebase hooks
+  // Use comprehensive user referrals hook
   const {
-    referralLink,
+    data: userReferralData,
     stats,
     history,
-    error,
-    refreshData,
+    referredUsers,
     loading,
+    error,
+    refresh,
+    getReferralLink,
+  } = useUserReferrals(publicKey?.toString() || null)
+
+  // Use Firebase hooks for referral link and code handling
+  const {
+    referralLink: fallbackReferralLink,
+    refreshData,
   } = useFirebaseReferrals()
 
   // Handle referral codes in URL
   useReferralCodeHandler()
+
+  // Use the referral link from the comprehensive hook or fallback
+  const referralLink = userReferralData?.user?.referralCode
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/mint?ref=${userReferralData.user.referralCode}`
+    : fallbackReferralLink
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink)
@@ -39,32 +51,154 @@ export function ReferralsPageContent() {
   }
 
   const handleRefresh = async () => {
-    await refreshData()
+    await refresh()
+    await refreshData() // Also refresh the fallback data
   }
 
-  const handleTest = async () => {
+
+
+  // Add test referral data for debugging
+  const handleAddTestReferral = async () => {
+    if (!publicKey) return
+
+    try {
+      const response = await fetch("/api/test-referrals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "create-test-referral",
+          walletAddress: publicKey.toString(),
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log("Test referral added successfully:", result)
+        await refreshData() // Refresh to show new data
+      } else {
+        console.error("Failed to add test referral:", result.error)
+      }
+    } catch (err) {
+      console.error("Error adding test referral:", err)
+    }
+  }
+
+  // Test Firebase connection
+  const handleTestConnection = async () => {
     if (!publicKey) return
 
     setTesting(true)
     try {
-      const results = await runAllFirebaseTests(publicKey.toString())
-      setTestResults(results)
-      console.log("Firebase test results:", results)
+      const response = await fetch(`/api/test-referrals?wallet=${publicKey.toString()}`)
+      const result = await response.json()
+
+      console.log("Firebase connection test result:", result)
+      setTestResults(result)
     } catch (err) {
-      console.error("Test failed:", err)
+      console.error("Error testing connection:", err)
       setTestResults({ error: err instanceof Error ? err.message : "Test failed" })
     } finally {
       setTesting(false)
     }
   }
 
-  // Format recent referrals for the history component
-  const recentReferrals = history.map((ref) => ({
-    address: ref.referredWallet,
-    date: ref.createdAt.toDate().toLocaleDateString(),
-    status: ref.status === "rewarded" ? ("completed" as const) : ("pending" as const),
-    points: ref.rewardAmount,
-  }))
+  // Complete test referral
+  const handleCompleteTestReferral = async () => {
+    if (!publicKey) return
+
+    try {
+      const response = await fetch("/api/test-referrals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "complete-test-referral",
+          walletAddress: publicKey.toString(),
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log("Test referral completed successfully:", result)
+        await refreshData() // Refresh to show new data
+      } else {
+        console.error("Failed to complete test referral:", result.error)
+      }
+    } catch (err) {
+      console.error("Error completing test referral:", err)
+    }
+  }
+
+  // Debug referrals calculation
+  const handleDebugReferrals = async () => {
+    if (!publicKey) return
+
+    try {
+      const response = await fetch("/api/test-referrals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "debug-referrals",
+          walletAddress: publicKey.toString(),
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log("Debug referrals result:", result.debug)
+        setTestResults(result.debug)
+      } else {
+        console.error("Failed to debug referrals:", result.error)
+      }
+    } catch (err) {
+      console.error("Error debugging referrals:", err)
+    }
+  }
+
+  // Format recent referrals for the history component using history data directly
+  const recentReferrals = history.map((historyEntry) => {
+    // Find corresponding user data if available
+    const userData = referredUsers.find(user => user.walletAddress === historyEntry.referredWallet)
+
+    return {
+      address: historyEntry.referredWallet,
+      displayName: userData?.displayName || `User ${historyEntry.referredWallet.slice(0, 8)}`,
+      date: historyEntry.createdAt?.toDate ? historyEntry.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString(),
+      status: historyEntry.status === "rewarded" || historyEntry.status === "completed" ? "completed" as const : "pending" as const,
+      points: historyEntry.rewardAmount || 4,
+      nftsMinted: userData?.nftsMinted || 0,
+      totalEarned: userData?.totalEarned || 0,
+      lastActive: userData?.lastActive,
+      referralId: historyEntry.id,
+      referralStatus: historyEntry.status,
+    }
+  })
+
+  // Debug logging
+  console.log("Referral data debug:", {
+    connected,
+    publicKey: publicKey?.toString(),
+    stats,
+    historyCount: history.length,
+    referredUsersCount: referredUsers.length,
+    recentReferralsCount: recentReferrals.length,
+    error,
+    loading,
+    userReferralData,
+    rawHistory: history,
+    rawReferredUsers: referredUsers,
+    formattedReferrals: recentReferrals
+  })
+
+  console.log("🔍 Formatted referrals for display:", recentReferrals)
 
   return (
     <ProtectedRoute requiresNFT={true}>
@@ -99,7 +233,7 @@ export function ReferralsPageContent() {
                     <div className="glass-card glass-card-hover p-6">
                       <div className="text-center">
                         <div className="text-3xl md:text-4xl font-bold text-teal-400 mb-2">
-                          {stats?.totalEarned || 0} USDC
+                          {(stats?.totalEarned * 4 || 0).toFixed(2)} USDC
                         </div>
                         <div className="text-sm text-gray-400 uppercase tracking-wide">Total Earned</div>
                       </div>
@@ -114,7 +248,18 @@ export function ReferralsPageContent() {
 
                   {/* Referral Link Card */}
                   <div className="glass-card p-6">
-                    <h2 className="text-xl font-semibold text-white mb-4">Your Referral Link</h2>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-white">Your Referral Link</h2>
+                      <Button
+                        onClick={handleRefresh}
+                        size="sm"
+                        variant="outline"
+                        disabled={loading}
+                        className="bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/50"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-gray-800/50 rounded-lg border border-gray-700 px-4 py-3 text-gray-300 text-sm font-mono overflow-hidden">
                         {referralLink || "Loading..."}
@@ -150,13 +295,144 @@ export function ReferralsPageContent() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={handleTest}
+                          onClick={handleTestConnection}
                           disabled={testing}
                           className="bg-blue-600/20 border-blue-500/30 text-blue-400 hover:bg-blue-600/30"
                         >
                           <Bug className={`h-4 w-4 mr-2 ${testing ? 'animate-pulse' : ''}`} />
-                          Test Firebase
+                          Test Connection
                         </Button>
+                        {process.env.NODE_ENV === 'development' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleAddTestReferral}
+                              className="bg-green-600/20 border-green-500/30 text-green-400 hover:bg-green-600/30"
+                            >
+                              Add Test Referral
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCompleteTestReferral}
+                              className="bg-orange-600/20 border-orange-500/30 text-orange-400 hover:bg-orange-600/30"
+                            >
+                              Complete Test Referral
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleDebugReferrals}
+                              className="bg-purple-600/20 border-purple-500/30 text-purple-400 hover:bg-purple-600/30"
+                            >
+                              Debug Calculation
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (publicKey) {
+                                  try {
+                                    const response = await fetch('/api/admin/data-maintenance', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        action: 'sync-single-user',
+                                        walletAddress: publicKey.toString()
+                                      })
+                                    })
+                                    const result = await response.json()
+                                    console.log('Sync result:', result)
+                                    await handleRefresh()
+                                  } catch (err) {
+                                    console.error('Sync error:', err)
+                                  }
+                                }
+                              }}
+                              className="bg-cyan-600/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-600/30"
+                            >
+                              Sync User Data
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (publicKey) {
+                                  try {
+                                    const response = await fetch(`/api/debug/referral-status?wallet=${encodeURIComponent(publicKey.toString())}`)
+                                    const result = await response.json()
+                                    console.log('🔍 Referral Debug Result:', result)
+                                    setTestResults(result.debug)
+                                  } catch (err) {
+                                    console.error('Debug error:', err)
+                                  }
+                                }
+                              }}
+                              className="bg-pink-600/20 border-pink-500/30 text-pink-400 hover:bg-pink-600/30"
+                            >
+                              Debug Referral Status
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (publicKey) {
+                                  try {
+                                    const response = await fetch('/api/debug/referral-status', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        action: 'fix-user-profile',
+                                        walletAddress: publicKey.toString()
+                                      })
+                                    })
+                                    const result = await response.json()
+                                    console.log('🔧 Fix Result:', result)
+                                    if (result.success) {
+                                      await handleRefresh()
+                                    }
+                                  } catch (err) {
+                                    console.error('Fix error:', err)
+                                  }
+                                }
+                              }}
+                              className="bg-yellow-600/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-600/30"
+                            >
+                              Fix Referral Link
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (publicKey && userReferralData?.user?.referralCode) {
+                                  const testWallet = "TestWallet" + Date.now()
+                                  try {
+                                    const response = await fetch('/api/debug/referral-status', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        action: 'track-referral',
+                                        walletAddress: testWallet,
+                                        referralCode: userReferralData.user.referralCode
+                                      })
+                                    })
+                                    const result = await response.json()
+                                    console.log('🧪 Test Track Result:', result)
+                                    if (result.success) {
+                                      await handleRefresh()
+                                    }
+                                  } catch (err) {
+                                    console.error('Test track error:', err)
+                                  }
+                                }
+                              }}
+                              className="bg-indigo-600/20 border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/30"
+                            >
+                              Test Track Referral
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -215,8 +491,73 @@ export function ReferralsPageContent() {
 
                   {/* Referral History */}
                   <div className="glass-card p-6">
-                    <h2 className="text-xl font-semibold text-white mb-4">Recent Referrals</h2>
                     <ReferralHistory referrals={recentReferrals} />
+
+                    {/* Debug info for development */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="mt-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <p className="text-xs text-gray-400 mb-2">Debug Info:</p>
+                        <p className="text-xs text-gray-300">
+                          History items: {history.length} |
+                          Referred users: {referredUsers.length} |
+                          Formatted referrals: {recentReferrals.length} |
+                          Loading: {loading ? 'Yes' : 'No'} |
+                          Error: {error || 'None'}
+                        </p>
+                        <p className="text-xs text-gray-300 mt-1">
+                          User referredBy: {userReferralData?.user?.referredBy || 'None'} |
+                          Total Earned: ${(stats?.totalEarned || 0).toFixed(2)} |
+                          API Data: {userReferralData ? 'Loaded' : 'Not loaded'}
+                        </p>
+                        <div className="mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (publicKey) {
+                                try {
+                                  const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
+                                  const result = await response.json()
+                                  console.log('🔍 Current Referral Status:', result)
+                                } catch (err) {
+                                  console.error('Check status error:', err)
+                                }
+                              }
+                            }}
+                            className="bg-blue-600/20 border-blue-500/30 text-blue-400 hover:bg-blue-600/30 text-xs"
+                          >
+                            Check Referral Status
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (publicKey) {
+                                try {
+                                  const response = await fetch(`/api/debug/referral-perspective?wallet=${encodeURIComponent(publicKey.toString())}`)
+                                  const result = await response.json()
+                                  console.log('🔍 Referral Perspective Debug:', result.debug)
+                                  setTestResults(result.debug)
+                                } catch (err) {
+                                  console.error('Perspective debug error:', err)
+                                }
+                              }
+                            }}
+                            className="bg-purple-600/20 border-purple-500/30 text-purple-400 hover:bg-purple-600/30 text-xs ml-2"
+                          >
+                            Debug Perspective
+                          </Button>
+                        </div>
+                        {recentReferrals.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-400 mb-1">Sample Referral Data:</p>
+                            <pre className="text-xs bg-gray-800 p-2 rounded overflow-auto max-h-32">
+                              {JSON.stringify(recentReferrals[0], null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                 </div>

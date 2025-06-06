@@ -64,8 +64,8 @@ export function EnhancedMintButtonWithProgress({ onSuccess, className = "" }: En
 
       if (result.success) {
         toast({
-          title: "🎉 NFT Minted Successfully!",
-          description: "Your NFT has been minted and referral access granted!",
+          title: "🎉 Welcome to RewardNFT Community!",
+          description: "Your exclusive NFT has been minted! Referral access unlocked! 🚀",
         })
 
         if (onSuccess && result.signature && result.mintAddress) {

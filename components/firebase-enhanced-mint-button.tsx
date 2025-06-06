@@ -70,8 +70,8 @@ export function FirebaseEnhancedMintButton() {
       await firebaseUserService.updateUserNFTData(publicKey.toString(), mintAddress)
 
       toast({
-        title: "NFT Minted Successfully!",
-        description: "Your RewardNFT has been minted and recorded",
+        title: "🎉 Welcome to RewardNFT Community!",
+        description: "Your exclusive RewardNFT has been minted and recorded! You're now part of our exclusive community! 🚀",
       })
 
       // Redirect to success page

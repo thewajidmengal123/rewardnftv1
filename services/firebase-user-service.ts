@@ -9,6 +9,8 @@ import {
   getDocs,
   serverTimestamp,
   increment,
+  orderBy,
+  limit,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { UserProfile } from "@/types/firebase"
@@ -105,6 +107,77 @@ export class FirebaseUserService {
     })
   }
 
+  // Get all users for leaderboard (with pagination)
+  async getAllUsers(limitCount: number = 100): Promise<UserProfile[]> {
+    try {
+      const usersQuery = query(
+        collection(db, this.COLLECTION),
+        orderBy("totalReferrals", "desc"),
+        limit(limitCount)
+      )
+
+      const usersSnapshot = await getDocs(usersQuery)
+      const users: UserProfile[] = []
+
+      usersSnapshot.docs.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() } as UserProfile)
+      })
+
+      return users
+    } catch (error) {
+      console.error("Error getting all users:", error)
+      return []
+    }
+  }
+
+  // Get users by referral count (for leaderboard)
+  async getUsersByReferrals(limitCount: number = 50): Promise<UserProfile[]> {
+    try {
+      const usersQuery = query(
+        collection(db, this.COLLECTION),
+        where("totalReferrals", ">", 0),
+        orderBy("totalReferrals", "desc"),
+        limit(limitCount)
+      )
+
+      const usersSnapshot = await getDocs(usersQuery)
+      const users: UserProfile[] = []
+
+      usersSnapshot.docs.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() } as UserProfile)
+      })
+
+      return users
+    } catch (error) {
+      console.error("Error getting users by referrals:", error)
+      return []
+    }
+  }
+
+  // Get users by earnings (for leaderboard)
+  async getUsersByEarnings(limitCount: number = 50): Promise<UserProfile[]> {
+    try {
+      const usersQuery = query(
+        collection(db, this.COLLECTION),
+        where("totalEarned", ">", 0),
+        orderBy("totalEarned", "desc"),
+        limit(limitCount)
+      )
+
+      const usersSnapshot = await getDocs(usersQuery)
+      const users: UserProfile[] = []
+
+      usersSnapshot.docs.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() } as UserProfile)
+      })
+
+      return users
+    } catch (error) {
+      console.error("Error getting users by earnings:", error)
+      return []
+    }
+  }
+
   // Update referral count
   async incrementReferralCount(walletAddress: string): Promise<void> {
     const userRef = doc(db, this.COLLECTION, walletAddress)
@@ -140,6 +213,55 @@ export class FirebaseUserService {
         dailyStreak: isConsecutive ? increment(1) : 1,
         lastActive: serverTimestamp(),
       })
+    }
+  }
+
+  // Sync user data with referral records (ensure consistency)
+  async syncUserReferralData(walletAddress: string): Promise<void> {
+    try {
+      // Import referral service dynamically to avoid circular dependency
+      const { firebaseReferralService } = await import("./firebase-referral-service")
+
+      // Get actual referral stats from referrals collection
+      const stats = await firebaseReferralService.getReferralStats(walletAddress)
+
+      // Update user profile with accurate data
+      const userRef = doc(db, this.COLLECTION, walletAddress)
+      await updateDoc(userRef, {
+        totalReferrals: stats.totalReferrals,
+        totalEarned: stats.totalEarned,
+        lastActive: serverTimestamp(),
+      })
+
+      console.log(`Synced user data for ${walletAddress}:`, stats)
+    } catch (error) {
+      console.error("Error syncing user referral data:", error)
+    }
+  }
+
+  // Get user's referred users list
+  async getUserReferredList(walletAddress: string): Promise<UserProfile[]> {
+    try {
+      // Import referral service dynamically
+      const { firebaseReferralService } = await import("./firebase-referral-service")
+
+      // Get referral history
+      const referralHistory = await firebaseReferralService.getReferralHistory(walletAddress)
+
+      // Get user profiles for all referred users
+      const referredUsers: UserProfile[] = []
+
+      for (const referral of referralHistory) {
+        const user = await this.getUserByWallet(referral.referredWallet)
+        if (user) {
+          referredUsers.push(user)
+        }
+      }
+
+      return referredUsers
+    } catch (error) {
+      console.error("Error getting user referred list:", error)
+      return []
     }
   }
 

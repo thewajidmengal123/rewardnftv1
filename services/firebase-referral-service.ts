@@ -200,6 +200,9 @@ export class FirebaseReferralService {
         this.REFERRAL_REWARD_AMOUNT
       )
 
+      // Sync referrer's data to ensure consistency
+      await firebaseUserService.syncUserReferralData(referralData.referrerWallet)
+
       console.log(`Referral reward processed for: ${referredWallet}`)
       return true
     } catch (error) {
@@ -213,6 +216,8 @@ export class FirebaseReferralService {
    */
   async getReferralStats(walletAddress: string): Promise<ReferralStats> {
     try {
+      console.log("Getting referral stats for wallet:", walletAddress)
+
       const referralQuery = query(
         collection(db, this.REFERRALS_COLLECTION),
         where("referrerWallet", "==", walletAddress)
@@ -224,27 +229,57 @@ export class FirebaseReferralService {
       let totalEarned = 0
       let pendingRewards = 0
 
+      console.log("Stats query results for referrerWallet:", {
+        empty: referralSnapshot.empty,
+        size: referralSnapshot.size,
+        docs: referralSnapshot.docs.length
+      })
+
+      // Also check if this wallet appears as a referredWallet (for debugging)
+      const referredQuery = query(
+        collection(db, this.REFERRALS_COLLECTION),
+        where("referredWallet", "==", walletAddress)
+      )
+      const referredSnapshot = await getDocs(referredQuery)
+
+      console.log("🔍 DEBUG: This wallet as referredWallet in stats:", {
+        empty: referredSnapshot.empty,
+        size: referredSnapshot.size,
+        docs: referredSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
+      })
+
       referralSnapshot.docs.forEach((doc) => {
         const referral = doc.data() as ReferralRecord
+        console.log("Processing referral for stats:", {
+          id: doc.id,
+          status: referral.status,
+          rewardAmount: referral.rewardAmount,
+          referredWallet: referral.referredWallet
+        })
+
         totalReferrals++
 
         if (referral.status === "completed" || referral.status === "rewarded") {
           completedReferrals++
+          // Count both completed and rewarded as earned since completed means the referral was successful
+          totalEarned += referral.rewardAmount
         }
 
-        if (referral.status === "rewarded") {
-          totalEarned += referral.rewardAmount
-        } else if (referral.status === "completed") {
+        if (referral.status === "completed") {
+          // Pending rewards are those that are completed but not yet paid out
           pendingRewards += referral.rewardAmount
         }
       })
 
-      return {
+      const stats = {
         totalReferrals,
         totalEarned,
         pendingRewards,
         completedReferrals,
       }
+
+      console.log("Final calculated stats:", stats)
+      return stats
     } catch (error) {
       console.error("Error getting referral stats:", error)
       return {
@@ -261,6 +296,8 @@ export class FirebaseReferralService {
    */
   async getReferralHistory(walletAddress: string): Promise<ReferralWithUser[]> {
     try {
+      console.log("Getting referral history for wallet:", walletAddress)
+
       const referralQuery = query(
         collection(db, this.REFERRALS_COLLECTION),
         where("referrerWallet", "==", walletAddress),
@@ -268,11 +305,31 @@ export class FirebaseReferralService {
       )
       const referralSnapshot = await getDocs(referralQuery)
 
+      console.log("Referral query results for referrerWallet:", {
+        empty: referralSnapshot.empty,
+        size: referralSnapshot.size,
+        docs: referralSnapshot.docs.length
+      })
+
+      // Also check if this wallet appears as a referredWallet (for debugging)
+      const referredQuery = query(
+        collection(db, this.REFERRALS_COLLECTION),
+        where("referredWallet", "==", walletAddress)
+      )
+      const referredSnapshot = await getDocs(referredQuery)
+
+      console.log("🔍 DEBUG: This wallet as referredWallet:", {
+        empty: referredSnapshot.empty,
+        size: referredSnapshot.size,
+        docs: referredSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
+      })
+
       const referrals: ReferralWithUser[] = []
 
       for (const doc of referralSnapshot.docs) {
         const referralData = doc.data() as ReferralRecord
-        
+        console.log("Processing referral doc:", { id: doc.id, data: referralData })
+
         // Get referred user profile
         const referredUser = await firebaseUserService.getUserByWallet(referralData.referredWallet)
 
@@ -288,6 +345,7 @@ export class FirebaseReferralService {
         })
       }
 
+      console.log("Final referrals array:", referrals)
       return referrals
     } catch (error) {
       console.error("Error getting referral history:", error)

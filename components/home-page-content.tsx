@@ -32,10 +32,10 @@ export function HomePageContent() {
             <SlideInLeft delay={0.2}>
               <div className="space-y-8">
                 <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-                  <span className="text-green-400">Mint Your</span>{" "}
-                  <span className="bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text text-transparent">NFT</span>
+                  <span className="text-white">Mint Your</span>{" "}
+                  <span className="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">NFT</span>
                   <br />
-                  <span className="text-white">Unlock the Future</span>
+                  <span className="text-gray-300">Unlock the Future</span>
                 </h1>
                 <p className="text-xl text-gray-300 max-w-lg">
                   Join the RewardNFT ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
@@ -54,18 +54,18 @@ export function HomePageContent() {
                   </Button>
                 </div>
 
-                {/* Stats */}
+                {/* Stats - matching reference design */}
                 <div className="flex gap-8 pt-4">
                   <div>
-                    <div className="text-2xl md:text-3xl font-bold text-green-400">500+</div>
+                    <div className="text-2xl md:text-3xl font-bold text-teal-400">500+</div>
                     <div className="text-sm text-gray-400 uppercase tracking-wide">NFTs Minted</div>
                   </div>
                   <div>
-                    <div className="text-2xl md:text-3xl font-bold text-yellow-400">50K+</div>
+                    <div className="text-2xl md:text-3xl font-bold text-cyan-400">50K+</div>
                     <div className="text-sm text-gray-400 uppercase tracking-wide">USDC Earned</div>
                   </div>
                   <div>
-                    <div className="text-2xl md:text-3xl font-bold text-red-400">1000+</div>
+                    <div className="text-2xl md:text-3xl font-bold text-teal-300">1000+</div>
                     <div className="text-sm text-gray-400 uppercase tracking-wide">Active Users</div>
                   </div>
                 </div>

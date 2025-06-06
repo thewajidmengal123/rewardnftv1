@@ -50,8 +50,8 @@ export function MintNftButton({ onSuccess, className = "" }: MintNftButtonProps)
       }
 
       toast({
-        title: "NFT Minted Successfully",
-        description: "Your NFT has been minted and added to your wallet",
+        title: "🎉 Welcome to RewardNFT Community!",
+        description: "Your exclusive NFT has been minted and added to your wallet! 🚀",
       })
 
       // Call the onSuccess callback if provided

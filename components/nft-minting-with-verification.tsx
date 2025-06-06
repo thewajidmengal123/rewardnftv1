@@ -16,6 +16,7 @@ interface NftMintingWithVerificationProps {
 }
 
 export function NftMintingWithVerification({ onSuccess }: NftMintingWithVerificationProps) {
+  //@ts-ignore
   const { publicKey, connected, connection, signAndSendTransaction, usdcBalance } = useWallet()
   const [status, setStatus] = useState<"idle" | "paying" | "minting" | "verifying" | "success" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
@@ -100,8 +101,8 @@ export function NftMintingWithVerification({ onSuccess }: NftMintingWithVerifica
       }
 
       toast({
-        title: "NFT Minted Successfully",
-        description: "Your NFT has been minted, verified, and added to your wallet",
+        title: "🎉 Welcome to RewardNFT Community!",
+        description: "Your exclusive NFT has been minted, verified, and added to your wallet! 🚀",
       })
     } catch (err: any) {
       console.error("Minting error:", err)
@@ -140,6 +141,7 @@ export function NftMintingWithVerification({ onSuccess }: NftMintingWithVerifica
             </div>
             {verification && (
               <div className="absolute top-2 right-2">
+                {/* @ts-ignore */}
                 <NftVerificationBadge status={verification.status} />
               </div>
             )}

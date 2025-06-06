@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 interface ResponsiveContainerProps {
   children: ReactNode
   className?: string
-  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "full"
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "7xl" | "full"
   padding?: "none" | "sm" | "md" | "lg"
 }
 

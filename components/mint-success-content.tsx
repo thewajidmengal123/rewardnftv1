@@ -102,10 +102,12 @@ export function MintSuccessContent() {
               <CheckCircle className="w-16 h-16 text-white" />
             </div>
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-green-400 to-teal-400 bg-clip-text text-transparent">
-              🎉 Minting Successful!
+              🎉 Welcome to RewardNFT!
             </h1>
             <p className="text-xl text-gray-300 mb-6">
-              {mintedNFTs.length === 1 ? 'Your NFT has' : `Your ${mintedNFTs.length} NFTs have`} been successfully minted for {totalCost} USDC!
+              Congratulations! {mintedNFTs.length === 1 ? 'Your exclusive RewardNFT has' : `Your ${mintedNFTs.length} exclusive RewardNFTs have`} been successfully minted for {totalCost} USDC!
+              <br />
+              <span className="text-teal-400 font-semibold">You're now part of our exclusive community! 🚀</span>
             </p>
             <div className="flex justify-center gap-4">
               <Badge variant="default" className="bg-green-600 text-white px-4 py-2 text-lg">

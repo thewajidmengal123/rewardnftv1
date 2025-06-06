@@ -122,7 +122,7 @@ export function EnhancedMintButton() {
       if (result.success && result.mintAddress) {
         updateProgress("complete")
         setMintedNFT(result.mintAddress)
-        setSuccess(`🎉 NFT minted successfully! Mint: ${result.mintAddress}`)
+        setSuccess(`🎉 Welcome to RewardNFT Community! Your exclusive NFT: ${result.mintAddress} 🚀`)
         setHasAlreadyMinted(true)
 
         await checkAllTokenBalances()

@@ -182,3 +182,7 @@ export function setupCrossTabSync(onSessionChange: () => void): () => void {
   window.addEventListener("storage", handleStorageChange)
   return () => window.removeEventListener("storage", handleStorageChange)
 }
+
+export function saveConnectionPreferences(prefs: any) {
+  throw new Error("Function not implemented.")
+}

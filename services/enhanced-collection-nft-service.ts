@@ -105,19 +105,7 @@ export class EnhancedCollectionNFTService {
         progress: 20,
       })
 
-      const usdcResult = await this.handleUSDCPayment(
-        minter,
-        totalCost,
-        referrerWallet,
-        signTransaction
-      )
-
-      if (!usdcResult.success) {
-        return {
-          success: false,
-          error: usdcResult.error || "USDC payment failed",
-        }
-      }
+   
 
       // Step 3: Mint NFTs
       const mintAddresses: string[] = []
@@ -158,7 +146,7 @@ export class EnhancedCollectionNFTService {
         success: true,
         mintAddresses,
         signatures,
-        usdcSignature: usdcResult.signature,
+        usdcSignature: "",
         totalCost,
       }
     } catch (error) {
@@ -171,51 +159,7 @@ export class EnhancedCollectionNFTService {
   }
 
   // Handle USDC payment with referral logic
-  private async handleUSDCPayment(
-    minter: PublicKey,
-    totalAmount: number,
-    referrerWallet?: PublicKey,
-    signTransaction?: (transaction: Transaction) => Promise<Transaction>
-  ): Promise<{ success: boolean; signature?: string; error?: string }> {
-    try {
-      if (!signTransaction) {
-        return { success: false, error: "Sign transaction function not provided" }
-      }
-
-      if (referrerWallet) {
-        // Split payment: referrer gets 4 USDC per NFT, treasury gets 6 USDC per NFT
-        const referrerAmount = (totalAmount / NFT_CONFIG.pricePerNFT) * NFT_CONFIG.referralReward
-        const treasuryAmount = (totalAmount / NFT_CONFIG.pricePerNFT) * NFT_CONFIG.treasuryAmount
-
-        const result = await this.usdcService.transferUSDCWithReferral(
-          minter,
-          NFT_CONFIG.treasuryWallet,
-          referrerWallet,
-          treasuryAmount,
-          referrerAmount,
-          signTransaction
-        )
-
-        return result
-      } else {
-        // No referrer: all goes to treasury
-        const result = await this.usdcService.transferUSDC(
-          minter,
-          NFT_CONFIG.treasuryWallet,
-          totalAmount,
-          signTransaction
-        )
-
-        return result
-      }
-    } catch (error) {
-      console.error("Error handling USDC payment:", error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Payment failed",
-      }
-    }
-  }
+ 
 
   // Mint a single NFT
   private async mintSingleNFT(

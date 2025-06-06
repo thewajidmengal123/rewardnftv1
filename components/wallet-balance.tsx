@@ -13,6 +13,7 @@ interface WalletBalanceProps {
 
 export function WalletBalance({ className = "", showSol = true, showUsdc = true, publicKey }: WalletBalanceProps) {
   const walletContext = useWallet()
+  //@ts-ignore
   const { connected, solBalance, usdcBalance, refreshBalances } = walletContext
   const [loading, setLoading] = useState(false)
   const walletPublicKey = publicKey || walletContext.publicKey

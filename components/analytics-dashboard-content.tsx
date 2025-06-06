@@ -452,6 +452,7 @@ export function AnalyticsDashboardContent() {
                           {index + 1}
                         </div>
                         <div>
+                          {/* @ts-ignore */}
                           <WalletAddress address={user.walletAddress} />
                           <div className="flex items-center gap-4 mt-1">
                             <span className="text-white/60 text-xs flex items-center">

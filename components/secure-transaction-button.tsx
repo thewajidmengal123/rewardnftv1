@@ -9,7 +9,7 @@ import { Loader2, AlertCircle, Shield, CheckCircle } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import type { TransactionVerificationOptions } from "@/utils/transaction-verification"
 
-interface SecureTransactionButtonProps extends ButtonProps {
+interface SecureTransactionButtonProps extends Omit<ButtonProps, "onError"> {
   createTransaction: () => Promise<Transaction>
   onSuccess?: (signature: string) => void
   onError?: (error: Error) => void

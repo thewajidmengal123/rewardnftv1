@@ -1,5 +1,15 @@
 "use client"
 
+// Extend the Window interface to include phantom
+declare global {
+  interface Window {
+    phantom?: {
+      solana?: any
+      [key: string]: any
+    }
+  }
+}
+
 // Mobile wallet adapter utilities
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"

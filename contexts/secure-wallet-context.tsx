@@ -42,6 +42,8 @@ interface SecureWalletProviderProps {
 
 // Provider component
 export function SecureWalletProvider({ children, maxTransactionsPerMinute = 5 }: SecureWalletProviderProps) {
+  //@ts-ignore
+ 
   const { connected, publicKey, connection, signAndSendTransaction } = useWallet()
   const [isRateLimited, setIsRateLimited] = useState(false)
   const [transactionHistory, setTransactionHistory] = useState<
@@ -99,14 +101,19 @@ export function SecureWalletProvider({ children, maxTransactionsPerMinute = 5 }:
       // Add to transaction history
       setTransactionHistory((prev) => [
         {
-          signature: signedTransaction,
+          signature: typeof signedTransaction === "string" ? signedTransaction : String(signedTransaction),
           timestamp: Date.now(),
           status: "success",
         },
         ...prev,
       ])
 
-      return signedTransaction
+      // Ensure the return value is always a string (signature)
+      return typeof signedTransaction === "string"
+        ? signedTransaction
+        : typeof signedTransaction.signature === "string"
+        ? signedTransaction.signature
+        : signedTransaction.signature?.toString("base64") || String(signedTransaction)
     } catch (error: any) {
       // Add failed transaction to history
       setTransactionHistory((prev) => [

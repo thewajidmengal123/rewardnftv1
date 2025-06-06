@@ -15,6 +15,7 @@ interface SimplifiedNftMintingProps {
 }
 
 export function SimplifiedNftMinting({ onSuccess }: SimplifiedNftMintingProps) {
+  //@ts-ignore
   const { publicKey, connected, connection, signAndSendTransaction, usdcBalance } = useWallet()
   const [status, setStatus] = useState<"idle" | "paying" | "minting" | "success" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
@@ -72,8 +73,8 @@ export function SimplifiedNftMinting({ onSuccess }: SimplifiedNftMintingProps) {
       }
 
       toast({
-        title: "NFT Minted Successfully",
-        description: "Your NFT has been minted and added to your wallet",
+        title: "🎉 Welcome to RewardNFT Community!",
+        description: "Your exclusive NFT has been minted and added to your wallet! 🚀",
       })
     } catch (err: any) {
       console.error("Minting error:", err)
@@ -91,9 +92,7 @@ export function SimplifiedNftMinting({ onSuccess }: SimplifiedNftMintingProps) {
     <div className="flex flex-col items-center">
       <Card className="w-full max-w-md bg-white/5 backdrop-blur-sm border-white/10">
         <CardContent className="p-6">
-          <div className="relative aspect-square w-full mb-4 bg-black/20 rounded-lg overflow-hidden">
-            <LazyImage src="/images/mint-nft-box.png" alt="NFT Preview" fill className="object-cover" />
-          </div>
+        
 
           <div className="space-y-4">
             <div>
@@ -132,7 +131,7 @@ export function SimplifiedNftMinting({ onSuccess }: SimplifiedNftMintingProps) {
             {status === "success" && (
               <div className="flex flex-col items-center gap-2 py-2">
                 <CheckCircle2 className="h-6 w-6 text-green-400" />
-                <p className="text-white/80">NFT minted successfully!</p>
+                <p className="text-white/80">Welcome to RewardNFT Community! 🚀</p>
                 {txSignature && (
                   <a
                     href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}

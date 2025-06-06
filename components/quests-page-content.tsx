@@ -328,7 +328,7 @@ export function QuestsPageContent() {
   }
 
   return (
-    <ProtectedRoute requireNft={true}>
+    <ProtectedRoute requiresNFT={true}>
       {/* Existing quests page content */}
       <div className="min-h-screen flex flex-col">
         {/* Your existing quests content */}

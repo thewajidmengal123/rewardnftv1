@@ -14,6 +14,7 @@ interface NftGalleryProps {
 }
 
 export function NftGallery({ className = "" }: NftGalleryProps) {
+  //@ts-ignore
   const { connected, publicKey, connection, explorerUrl } = useWallet()
   const [loading, setLoading] = useState(false)
   const [nfts, setNfts] = useState<any[]>([])

@@ -74,6 +74,7 @@ export function useFirebaseReferrals(): UseFirebaseReferralsReturn {
 
   // Load referral data
   const loadReferralData = useCallback(async (walletAddress: string) => {
+    console.log("Loading referral data for wallet:", walletAddress)
     setLoading(true)
     setError(null)
 
@@ -84,8 +85,11 @@ export function useFirebaseReferrals(): UseFirebaseReferralsReturn {
         firebaseReferralService.getReferralHistory(walletAddress),
       ])
 
+      console.log("Referral data loaded:", { statsData, historyData })
+
       // Handle stats result
       if (statsData.status === 'fulfilled') {
+        console.log("Stats loaded successfully:", statsData.value)
         setStats(statsData.value)
       } else {
         console.error("Error loading stats:", statsData.reason)
@@ -99,6 +103,7 @@ export function useFirebaseReferrals(): UseFirebaseReferralsReturn {
 
       // Handle history result
       if (historyData.status === 'fulfilled') {
+        console.log("History loaded successfully:", historyData.value)
         setHistory(historyData.value)
       } else {
         console.error("Error loading history:", historyData.reason)
