@@ -27,7 +27,7 @@ if (hasServiceAccount) {
   adminApp = getApps().find((app) => app.name === "admin") ||
     initializeApp(
       {
-        credential: cert(serviceAccount),
+        credential: cert(serviceAccount as any),
         projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "rainbow-nft-bc02e",
       },
       "admin",

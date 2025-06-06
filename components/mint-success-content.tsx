@@ -355,7 +355,7 @@ function MintSuccessContentInner() {
                 </Card>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Action Cards */}
           <motion.div

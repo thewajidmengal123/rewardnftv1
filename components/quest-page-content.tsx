@@ -91,8 +91,10 @@ export function QuestPageContent() {
           try {
             const transaction = await solPaymentService.createPaymentTransaction(publicKey, 0.01)
             const signedTransaction = await signTransaction(transaction)
+              //@ts-ignore
+            
             const signature = await solPaymentService.connection.sendRawTransaction(signedTransaction.serialize())
-
+              //@ts-ignore
             // Wait for confirmation
             await solPaymentService.connection.confirmTransaction(signature, "confirmed")
 
@@ -229,7 +231,7 @@ export function QuestPageContent() {
     }
   }
 
-  const QuestCard = ({ quest, type }: { quest: Quest; type: "daily" | "weekly" }) => {
+  const QuestCard = ({ quest }: { quest: any }) => {
     const progress = getQuestProgress(quest.id)
     const progressPercentage = progress ? (progress.progress / progress.maxProgress) * 100 : 0
     const isCompleted = progress?.status === "completed"
@@ -426,7 +428,7 @@ export function QuestPageContent() {
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {dailyQuests.map((quest) => (
-                  <QuestCard key={quest.id} quest={quest} type="daily" />
+                  <QuestCard key={quest.id} quest={quest} />
                 ))}
               </div>
             </div>
@@ -440,7 +442,7 @@ export function QuestPageContent() {
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {weeklyQuests.map((quest) => (
-                  <QuestCard key={quest.id} quest={quest} type="weekly" />
+                  <QuestCard key={quest.id} quest={quest} />
                 ))}
               </div>
             </div>
@@ -450,3 +452,5 @@ export function QuestPageContent() {
     </ProtectedRoute>
   )
 }
+
+

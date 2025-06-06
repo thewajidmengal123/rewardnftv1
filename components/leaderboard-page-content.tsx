@@ -145,7 +145,7 @@ export function LeaderboardPageContent() {
               <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 rounded-xl p-6 border border-green-700/30 backdrop-blur-sm">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-green-400 mb-2">
-                    ${stats?.totalEarned?.toFixed(0) || 0}
+                    ${stats?.totalRewards?.toFixed(0) || 0}
                   </div>
                   <div className="text-gray-300 text-sm font-medium">Total USDC Earned</div>
                 </div>

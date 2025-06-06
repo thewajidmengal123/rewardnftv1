@@ -49,9 +49,24 @@ export async function GET(request: NextRequest) {
       nftQuery = query(nftQuery, limit(100))
     }
 
+    // Define NFT type
+    type NFT = {
+      id: string
+      mintAddress?: string
+      ownerWallet?: string
+      name?: string
+      symbol?: string
+      mintCost?: number
+      usdcRevenue?: number
+      mintedAt?: any
+      transactionSignature?: string
+      isVerified?: boolean
+      attributes?: any
+    }
+
     // Get NFT data
     const nftSnapshot = await getDocs(nftQuery)
-    const nfts = nftSnapshot.docs.map(doc => ({
+    const nfts: NFT[] = nftSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }))

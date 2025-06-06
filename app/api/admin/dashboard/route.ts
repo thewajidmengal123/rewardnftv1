@@ -55,17 +55,38 @@ export async function GET(request: NextRequest) {
 
         console.log(`Loaded: ${usersSnapshot.docs.length} users, ${nftsSnapshot.docs.length} NFTs, ${referralsSnapshot.docs.length} referrals, ${questsSnapshot.docs.length} quests, ${userXPSnapshot.docs.length} XP records`)
 
-        const users = usersSnapshot.docs.map(doc => ({
+        type User = {
+          id: string
+          createdAt?: any
+          [key: string]: any
+        }
+
+        const users: User[] = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
 
-        const nfts = nftsSnapshot.docs.map(doc => ({
+        type NFT = {
+          id: string
+          mintCost?: number
+          usdcRevenue?: number
+          ownerWallet?: string
+          mintedAt?: any
+          [key: string]: any
+        }
+
+        const nfts: NFT[] = nftsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
 
-        const referrals = referralsSnapshot.docs.map(doc => ({
+        type Referral = {
+          id: string
+          createdAt?: any
+          [key: string]: any
+        }
+
+        const referrals: Referral[] = referralsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
@@ -75,7 +96,12 @@ export async function GET(request: NextRequest) {
           ...doc.data()
         }))
 
-        const userXPData = userXPSnapshot.docs.map(doc => ({
+        type UserXP = {
+          id: string
+          totalXP?: number
+          [key: string]: any
+        }
+        const userXPData: UserXP[] = userXPSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
@@ -85,7 +111,12 @@ export async function GET(request: NextRequest) {
           console.error("Error loading quest progress:", err)
           return { docs: [] }
         })
-        const questProgress = questProgressSnapshot.docs.map(doc => ({
+        type QuestProgress = {
+          id: string
+          status?: string
+          [key: string]: any
+        }
+        const questProgress: QuestProgress[] = questProgressSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
