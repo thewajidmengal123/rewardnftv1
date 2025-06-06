@@ -44,7 +44,7 @@ export const NFT_CONFIG = {
   maxSupply: 1000,
   pricePerNFT: 10, // 🎯 EXACTLY 10 USDC per NFT (EACH NFT costs 10 USDC)
   maxPerWallet: 5, // Allow up to 5 NFTs per wallet
-  treasuryWallet: new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"), // Updated treasury wallet
+  treasuryWallet: new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP"), // Updated treasury wallet
   referralReward: 4, // USDC to referrer per NFT (when referred: 4 to referrer + 6 to treasury = 10 per NFT)
   treasuryAmount: 6, // USDC to treasury per NFT when referred (when no referrer: full 10 to treasury per NFT)
   usdcDecimals: 6, // USDC has 6 decimal places
