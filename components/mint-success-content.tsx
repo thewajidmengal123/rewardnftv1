@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,20 @@ import { toast } from "@/components/ui/use-toast"
 import { DEFAULT_SOLANA_EXPLORER_URL, NFT_IPFS_URLS } from "@/config/solana"
 import Image from "next/image"
 
-export function MintSuccessContent() {
+// Loading component for Suspense fallback
+function MintSuccessLoading() {
+  return (
+    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-400 mx-auto mb-4"></div>
+        <p className="text-gray-400">Loading mint details...</p>
+      </div>
+    </div>
+  )
+}
+
+// Component that uses useSearchParams
+function MintSuccessContentInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [copied, setCopied] = useState<string | null>(null)
@@ -351,5 +364,14 @@ export function MintSuccessContent() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main export component with Suspense boundary
+export function MintSuccessContent() {
+  return (
+    <Suspense fallback={<MintSuccessLoading />}>
+      <MintSuccessContentInner />
+    </Suspense>
   )
 }

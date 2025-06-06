@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -14,7 +14,33 @@ import { PublicKey } from "@solana/web3.js"
 import { USDCService } from "@/services/usdc-service"
 import EnhancedUSDCService from "@/services/enhanced-usdc-service"
 
-export function NewMintInterface() {
+// Loading component for Suspense fallback
+function NewMintInterfaceLoading() {
+  return (
+    <div className="grid lg:grid-cols-2 gap-12 items-start">
+      <div className="space-y-6">
+        <div className="relative bg-gradient-to-br from-teal-500/20 via-cyan-500/20 to-teal-600/20 p-1 rounded-2xl">
+          <div className="bg-black/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800/50">
+            <div className="relative aspect-square animate-pulse bg-gray-800"></div>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-6">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-8 space-y-8">
+          <div className="h-8 bg-gray-800 rounded animate-pulse"></div>
+          <div className="space-y-4">
+            <div className="h-6 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-6 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-14 bg-gray-800 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Component that uses useSearchParams
+function NewMintInterfaceInner() {
   const { connected, publicKey, signTransaction, connection } = useWallet()
   const { user } = useFirebaseReferrals()
   const [mintAmount, setMintAmount] = useState(1)
@@ -30,7 +56,7 @@ export function NewMintInterface() {
   })
   const router = useRouter()
   const searchParams = useSearchParams()
- const usdcService = new EnhancedUSDCService(connection)
+  const usdcService = new EnhancedUSDCService(connection)
 
   const nftService = new SimpleNFTMintingService(connection)
 
@@ -403,5 +429,14 @@ export function NewMintInterface() {
         )}
       </div>
     </div>
+  )
+}
+
+// Main export component with Suspense boundary
+export function NewMintInterface() {
+  return (
+    <Suspense fallback={<NewMintInterfaceLoading />}>
+      <NewMintInterfaceInner />
+    </Suspense>
   )
 }
