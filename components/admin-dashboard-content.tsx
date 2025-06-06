@@ -11,6 +11,7 @@ import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { isAdminWallet } from "@/config/admin"
 import { toast } from "@/components/ui/use-toast"
+import { getExplorerUrl } from "@/config/solana"
 
 
 
@@ -142,6 +143,25 @@ export function AdminDashboardContent() {
             {loading ? "Loading..." : "Refresh Data"}
           </Button>
           <Button
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/quests/initialize', { method: 'POST' })
+                const result = await response.json()
+                if (result.success) {
+                  toast({ title: "Success", description: "Default quests initialized" })
+                } else {
+                  toast({ title: "Error", description: result.error, variant: "destructive" })
+                }
+              } catch (error) {
+                toast({ title: "Error", description: "Failed to initialize quests", variant: "destructive" })
+              }
+            }}
+            variant="outline"
+          >
+            <Activity className="w-4 h-4 mr-2" />
+            Init Quests
+          </Button>
+          <Button
             onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
             variant="outline"
           >
@@ -209,9 +229,12 @@ export function AdminDashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-white/60 text-sm">USDC Revenue</p>
-                <p className="text-3xl font-bold text-white">{totalUsdcCollected}</p>
+                <p className="text-3xl font-bold text-white">{realTimeStats?.totalRevenue || totalUsdcCollected}</p>
                 <p className="text-xs text-green-400">
                   {realTimeStats?.revenueToday || 0} USDC today
+                </p>
+                <p className="text-xs text-white/40">
+                  Net: {realTimeStats?.netRevenue || 0} USDC
                 </p>
               </div>
               <div className="bg-white/10 p-3 rounded-full">
@@ -256,7 +279,7 @@ export function AdminDashboardContent() {
 
       {/* Comprehensive Admin Data Tabs */}
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="w-full bg-white/10 mb-6 grid grid-cols-5">
+        <TabsList className="w-full bg-white/10 mb-6 grid grid-cols-6">
           <TabsTrigger value="users" className="data-[state=active]:bg-white/20 text-white">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -269,8 +292,12 @@ export function AdminDashboardContent() {
             <TrendingUp className="w-4 h-4 mr-2" />
             Referrals
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="data-[state=active]:bg-white/20 text-white">
+          <TabsTrigger value="quests" className="data-[state=active]:bg-white/20 text-white">
             <Activity className="w-4 h-4 mr-2" />
+            Quests & XP
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="data-[state=active]:bg-white/20 text-white">
+            <Coins className="w-4 h-4 mr-2" />
             Transactions
           </TabsTrigger>
           <TabsTrigger value="analytics" className="data-[state=active]:bg-white/20 text-white">
@@ -330,6 +357,41 @@ export function AdminDashboardContent() {
               <CardTitle className="text-white">NFT Mint Transactions ({totalMints})</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* NFT Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-cyan-400">{totalMints}</p>
+                      <p className="text-sm text-white/60">Total NFTs Minted</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-400">{realTimeStats?.totalRevenue || totalUsdcCollected}</p>
+                      <p className="text-sm text-white/60">Total Revenue (USDC)</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-400">{realTimeStats?.uniqueMinters || 0}</p>
+                      <p className="text-sm text-white/60">Unique Minters</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-yellow-400">{realTimeStats?.averageRevenuePerMint || 10}</p>
+                      <p className="text-sm text-white/60">Avg Revenue/Mint</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -362,7 +424,7 @@ export function AdminDashboardContent() {
                         </td>
                         <td className="py-3 px-4 text-white">
                           <a
-                            href={`https://explorer.solana.com/tx/${nft.transactionSignature}?cluster=devnet`}
+                            href={getExplorerUrl(nft.transactionSignature!, "tx")}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-400 hover:underline text-sm"
@@ -425,6 +487,138 @@ export function AdminDashboardContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Quests & XP Tab */}
+        <TabsContent value="quests" className="mt-0">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Quest System & XP Tracking</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* XP Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-purple-400">{realTimeStats?.totalXPAwarded || 0}</p>
+                        <p className="text-sm text-white/60">Total XP Awarded</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-400">{realTimeStats?.activeQuests || 0}</p>
+                        <p className="text-sm text-white/60">Active Quests</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-400">{Math.round(realTimeStats?.averageXPPerUser || 0)}</p>
+                        <p className="text-sm text-white/60">Avg XP per User</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-yellow-400">{adminData?.userXPData?.length || 0}</p>
+                        <p className="text-sm text-white/60">XP Leaders</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Top XP Users */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Top XP Leaders</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/20">
+                          <th className="text-left text-white/60 py-3 px-4">Rank</th>
+                          <th className="text-left text-white/60 py-3 px-4">Wallet Address</th>
+                          <th className="text-center text-white/60 py-3 px-4">Level</th>
+                          <th className="text-center text-white/60 py-3 px-4">Total XP</th>
+                          <th className="text-center text-white/60 py-3 px-4">Quests Completed</th>
+                          <th className="text-left text-white/60 py-3 px-4">Last Active</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminData?.userXPData?.map((user: any, index: number) => (
+                          <tr key={user.id} className="border-b border-white/10 last:border-0">
+                            <td className="py-3 px-4 text-white font-bold">#{index + 1}</td>
+                            <td className="py-3 px-4 text-white font-mono text-sm">
+                              {user.walletAddress?.slice(0, 8)}...{user.walletAddress?.slice(-8)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <Badge variant="outline" className="text-purple-400 border-purple-400">
+                                Level {user.level || 1}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4 text-white text-center font-bold">{user.totalXP || 0}</td>
+                            <td className="py-3 px-4 text-white text-center">{user.questsCompleted || 0}</td>
+                            <td className="py-3 px-4 text-white text-sm">
+                              {user.lastActive ? new Date(user.lastActive.seconds * 1000).toLocaleDateString() : 'Unknown'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Quest Progress */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Recent Quest Activity</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/20">
+                          <th className="text-left text-white/60 py-3 px-4">User</th>
+                          <th className="text-left text-white/60 py-3 px-4">Quest ID</th>
+                          <th className="text-center text-white/60 py-3 px-4">Status</th>
+                          <th className="text-center text-white/60 py-3 px-4">Progress</th>
+                          <th className="text-center text-white/60 py-3 px-4">XP Reward</th>
+                          <th className="text-left text-white/60 py-3 px-4">Started At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminData?.quests?.slice(0, 10).map((quest: any) => (
+                          <tr key={quest.id} className="border-b border-white/10 last:border-0">
+                            <td className="py-3 px-4 text-white font-mono text-sm">
+                              {quest.userId?.slice(0, 8)}...{quest.userId?.slice(-8)}
+                            </td>
+                            <td className="py-3 px-4 text-white">{quest.questId}</td>
+                            <td className="py-3 px-4 text-center">
+                              <Badge variant={
+                                quest.status === "completed" ? "default" :
+                                quest.status === "claimed" ? "secondary" :
+                                "outline"
+                              }>
+                                {quest.status}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4 text-white text-center">
+                              {quest.progress}/{quest.maxProgress}
+                            </td>
+                            <td className="py-3 px-4 text-white text-center">{quest.rewardXP || 0}</td>
+                            <td className="py-3 px-4 text-white text-sm">
+                              {quest.startedAt ? new Date(quest.startedAt.seconds * 1000).toLocaleDateString() : 'Unknown'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

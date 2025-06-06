@@ -11,7 +11,7 @@ import { EnhancedUSDCService } from "@/services/enhanced-usdc-service"
 import { EnhancedNFTMintingService } from "@/services/enhanced-nft-minting-service"
 import { Loader2, CheckCircle, AlertCircle, Coins, Gift, ExternalLink, RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { getNetworkInfo } from "@/config/solana"
+import { getNetworkInfo, getExplorerUrl } from "@/config/solana"
 
 interface TokenBalance {
   mint: string
@@ -141,7 +141,7 @@ export function EnhancedMintButton() {
   }
 
   const getExplorerLink = (address: string) => {
-    return `https://explorer.solana.com/address/${address}?cluster=devnet`
+    return getExplorerUrl(address, "address")
   }
 
   if (!connected) {

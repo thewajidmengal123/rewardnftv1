@@ -57,6 +57,10 @@ const config = {
         "theme-cyan": "#00FFE0",
         "theme-yellow": "#FFC93C",
         "theme-pink": "#FF2E63",
+        // Brand colors matching reference design
+        "brand-cyan": "#00FFE0",
+        "brand-pink": "#FF2E63",
+        "brand-yellow": "#FFC93C",
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -11,6 +11,7 @@ import { CandyMachineService } from "@/services/candy-machine-service"
 import { PublicKey } from "@solana/web3.js"
 import { Loader2, CheckCircle, AlertCircle, Zap, Package, Coins, ExternalLink } from "lucide-react"
 import { CANDY_MACHINE_CONFIG, COMPANY_WALLET } from "@/config/candy-machine"
+import { getExplorerUrl } from "@/config/solana"
 
 export function CandyMachineManager() {
   const { connected, publicKey, signTransaction, connection } = useWallet()
@@ -121,7 +122,7 @@ export function CandyMachineManager() {
   }
 
   const getExplorerLink = (address: string, type: "address" | "tx" = "address") => {
-    return `https://explorer.solana.com/${type}/${address}?cluster=devnet`
+    return getExplorerUrl(address, type)
   }
 
   return (

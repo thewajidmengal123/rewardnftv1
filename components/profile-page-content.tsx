@@ -11,6 +11,7 @@ import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { NavigationBar } from "@/components/navigation-bar"
 import profileService, { type UserProfile } from "@/services/profile-service"
 import { Loader2, Trophy, Gift, Users, Star, ExternalLink } from "lucide-react"
+import { getExplorerUrl } from "@/config/solana"
 
 export function ProfilePageContent() {
   const { connected, publicKey, connecting } = useWallet()
@@ -47,7 +48,7 @@ export function ProfilePageContent() {
   }
 
   const getExplorerLink = (address: string) => {
-    return `https://explorer.solana.com/address/${address}?cluster=devnet`
+    return getExplorerUrl(address, "address")
   }
 
   if (!connected && !connecting) {

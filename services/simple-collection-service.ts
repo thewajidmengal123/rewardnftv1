@@ -16,7 +16,7 @@ export const SIMPLE_COLLECTION_CONFIG = {
   symbol: "RNFT",
   maxSupply: 1000,
   pricePerNFT: 10, // USDC
-  maxPerWallet: 5,
+  maxPerWallet: 1,
   treasuryWallet: "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6",
 }
 

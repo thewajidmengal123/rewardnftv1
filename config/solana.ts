@@ -28,8 +28,8 @@ export const DEFAULT_RPC_ENDPOINT =
 /** EXPLORER CONFIGURATION **/
 export const SOLANA_EXPLORER_URLS = {
   "mainnet-beta": "https://explorer.solana.com",
-  devnet: "https://explorer.solana.com?cluster=devnet",
-  testnet: "https://explorer.solana.com?cluster=testnet",
+  devnet: "https://explorer.solana.com",
+  testnet: "https://explorer.solana.com",
 }
 
 export const DEFAULT_SOLANA_EXPLORER_URL =
@@ -117,6 +117,13 @@ export const getNetworkInfo = () => ({
 /** HELPER FUNCTIONS **/
 export const getExplorerUrl = (address: string, type: "address" | "tx" = "address") => {
   const baseUrl = DEFAULT_SOLANA_EXPLORER_URL
+  const cluster = CURRENT_NETWORK !== "mainnet-beta" ? `?cluster=${CURRENT_NETWORK}` : ""
+  return `${baseUrl}/${type}/${address}${cluster}`
+}
+
+// Alternative explorer URLs for better reliability
+export const getAlternativeExplorerUrl = (address: string, type: "address" | "tx" = "address") => {
+  const baseUrl = "https://solscan.io"
   const cluster = CURRENT_NETWORK !== "mainnet-beta" ? `?cluster=${CURRENT_NETWORK}` : ""
   return `${baseUrl}/${type}/${address}${cluster}`
 }

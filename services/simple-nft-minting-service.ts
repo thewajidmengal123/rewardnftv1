@@ -43,7 +43,7 @@ const USDC_MINT_ADDRESSES = {
 export const NFT_CONFIG = {
   maxSupply: 1000,
   pricePerNFT: 10, // 🎯 EXACTLY 10 USDC per NFT (EACH NFT costs 10 USDC)
-  maxPerWallet: 5, // Allow up to 5 NFTs per wallet
+  maxPerWallet: 1, // Allow only 1 NFT per wallet
   treasuryWallet: new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP"), // Updated treasury wallet
   referralReward: 4, // USDC to referrer per NFT (when referred: 4 to referrer + 6 to treasury = 10 per NFT)
   treasuryAmount: 6, // USDC to treasury per NFT when referred (when no referrer: full 10 to treasury per NFT)
@@ -245,6 +245,85 @@ export class SimpleNFTMintingService {
       })
 
       console.log(`🎉 SUCCESS: All ${quantity} NFTs minted! Total paid: ${totalCost} USDC`)
+
+      // Record NFT data in database
+      onProgress?.({
+        step: "recording",
+        message: "Recording NFT data in database...",
+        progress: 98,
+      })
+
+      try {
+        // Record each minted NFT in the database
+        for (let i = 0; i < mintAddresses.length; i++) {
+          const mintAddress = mintAddresses[i]
+          const signature = signatures[i]
+          const nft = nftData[i]
+
+          const response = await fetch("/api/nfts/mint", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              mintAddress,
+              ownerWallet: minter.toString(),
+              transactionSignature: signature,
+              name: nft.name || `RewardNFT Collection #${i + 1}`,
+              symbol: "RNFT",
+              description: "Exclusive NFT from RewardNFT Platform",
+              image: nft.image || "/nft-reward-token.png",
+              attributes: [
+                { trait_type: "Platform", value: "RewardNFT" },
+                { trait_type: "Utility", value: "Membership" },
+                { trait_type: "Rarity", value: "Common" },
+                { trait_type: "Collection", value: "Genesis" }
+              ],
+              mintCost: NFT_CONFIG.pricePerNFT,
+              collectionAddress: collectionResult.collectionMint,
+              metadata: nft.metadata,
+            }),
+          })
+
+          if (!response.ok) {
+            console.error(`Failed to record NFT ${mintAddress} in database`)
+          } else {
+            console.log(`✅ Recorded NFT ${mintAddress} in database`)
+          }
+        }
+      } catch (error) {
+        console.error("Error recording NFT data:", error)
+        // Don't fail the entire mint process if database recording fails
+      }
+
+      // Handle referral rewards if applicable
+      if (referrerWallet && referrerWallet.toString() !== minter.toString()) {
+        try {
+          const referralReward = quantity * 4 // 4 USDC per NFT for referrer
+
+          const response = await fetch("/api/referrals/reward", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              referrerWallet: referrerWallet.toString(),
+              referredWallet: minter.toString(),
+              rewardAmount: referralReward,
+              nftsMinted: quantity,
+              mintSignatures: signatures,
+            }),
+          })
+
+          if (response.ok) {
+            console.log(`✅ Processed referral reward: ${referralReward} USDC to ${referrerWallet.toString()}`)
+          } else {
+            console.error("Failed to process referral reward")
+          }
+        } catch (error) {
+          console.error("Error processing referral reward:", error)
+        }
+      }
 
       return {
         success: true,

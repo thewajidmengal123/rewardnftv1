@@ -1,7 +1,7 @@
 // Admin configuration
 export const ADMIN_CONFIG = {
   // Admin wallet address
-  ADMIN_WALLET: "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ",
+  ADMIN_WALLET: "9gQMg6z6A3FroStYWc6BVYVNBnk8XyrsDjoimxJTCEKr",
   
   // Admin permissions
   PERMISSIONS: {

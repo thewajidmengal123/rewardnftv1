@@ -113,6 +113,56 @@ body {
   .gradient-button:active {
     transform: translateY(0);
   }
+
+  /* Enhanced success page styling */
+  .success-gradient-bg {
+    background: linear-gradient(135deg,
+      rgba(0, 0, 0, 0.95) 0%,
+      rgba(17, 24, 39, 0.9) 25%,
+      rgba(0, 0, 0, 0.95) 50%,
+      rgba(17, 24, 39, 0.9) 75%,
+      rgba(0, 0, 0, 0.95) 100%);
+  }
+
+  .nft-card-glow {
+    box-shadow:
+      0 0 20px rgba(20, 184, 166, 0.1),
+      0 0 40px rgba(20, 184, 166, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .nft-card-glow:hover {
+    box-shadow:
+      0 0 30px rgba(20, 184, 166, 0.2),
+      0 0 60px rgba(20, 184, 166, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  /* Animated gradient borders */
+  .animated-border {
+    position: relative;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border-radius: 16px;
+  }
+
+  .animated-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2);
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    animation: borderRotate 3s linear infinite;
+  }
+
+  @keyframes borderRotate {
+    0% { background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2); }
+    33% { background: linear-gradient(135deg, #06b6d4, #0891b2, #14b8a6); }
+    66% { background: linear-gradient(135deg, #0891b2, #14b8a6, #06b6d4); }
+    100% { background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2); }
+  }
 }
 
 @layer base {

@@ -457,7 +457,7 @@ export function ReferralsPageContent() {
                         className="bg-[#1DA1F2] hover:bg-[#1DA1F2]/90 text-white border-0 h-12"
                         onClick={() =>
                           window.open(
-                            `https://twitter.com/intent/tweet?text=Join me on RewardNFT and earn rewards! ${encodeURIComponent(referralLink)}`,
+                            `https://x.com/intent/tweet?text=Join me on RewardNFT and earn rewards! ${encodeURIComponent(referralLink)} @RewardNFT_ #RewardNFT #NFT #Solana`,
                             "_blank",
                           )
                         }

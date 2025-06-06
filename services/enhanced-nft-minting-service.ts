@@ -274,6 +274,51 @@ export class EnhancedNFTMintingService {
       // Grant referral access
       this.grantReferralAccess(walletAddress)
 
+      // Record NFT data in database via API
+      try {
+        await fetch("/api/nfts/mint", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mintAddress: mintKeypair.publicKey.toString(),
+            ownerWallet: walletAddress.toString(),
+            transactionSignature: nftSignature,
+            name: "RewardNFT Collection",
+            symbol: "RNFT",
+            description: "Exclusive NFT from RewardNFT Platform",
+            image: "/nft-reward-token.png",
+            attributes: [
+              { trait_type: "Platform", value: "RewardNFT" },
+              { trait_type: "Utility", value: "Membership" },
+              { trait_type: "Rarity", value: "Common" },
+              { trait_type: "Collection", value: "Genesis" }
+            ],
+            mintCost: NFT_MINT_COST_USDC,
+            metadata: {
+              name: "RewardNFT Collection",
+              symbol: "RNFT",
+              description: "Exclusive NFT from RewardNFT Platform",
+              image: "/nft-reward-token.png",
+              external_url: "https://rewardnft.com",
+              seller_fee_basis_points: 500,
+              creators: [
+                {
+                  address: walletAddress.toString(),
+                  verified: true,
+                  share: 100,
+                },
+              ],
+            },
+          }),
+        })
+        console.log(`✅ Recorded NFT ${mintKeypair.publicKey.toString()} in database`)
+      } catch (error) {
+        console.error("Error recording NFT data:", error)
+        // Don't fail the entire mint process if database recording fails
+      }
+
       // Process NFT mint completion for Firebase and referral system
       try {
         const { processNFTMintCompletion } = await import("@/utils/firebase-referral-integration")
@@ -395,6 +440,51 @@ export class EnhancedNFTMintingService {
 
       // Grant referral access
       this.grantReferralAccess(walletAddress)
+
+      // Record NFT data in database via API
+      try {
+        await fetch("/api/nfts/mint", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mintAddress: mintKeypair.publicKey.toString(),
+            ownerWallet: walletAddress.toString(),
+            transactionSignature: nftSignature,
+            name: "RewardNFT Collection",
+            symbol: "RNFT",
+            description: "Exclusive NFT from RewardNFT Platform",
+            image: "/nft-reward-token.png",
+            attributes: [
+              { trait_type: "Platform", value: "RewardNFT" },
+              { trait_type: "Utility", value: "Membership" },
+              { trait_type: "Rarity", value: "Common" },
+              { trait_type: "Collection", value: "Genesis" }
+            ],
+            mintCost: NFT_MINT_COST_USDC,
+            metadata: {
+              name: "RewardNFT Collection",
+              symbol: "RNFT",
+              description: "Exclusive NFT from RewardNFT Platform",
+              image: "/nft-reward-token.png",
+              external_url: "https://rewardnft.com",
+              seller_fee_basis_points: 500,
+              creators: [
+                {
+                  address: walletAddress.toString(),
+                  verified: true,
+                  share: 100,
+                },
+              ],
+            },
+          }),
+        })
+        console.log(`✅ Recorded NFT ${mintKeypair.publicKey.toString()} in database`)
+      } catch (error) {
+        console.error("Error recording NFT data:", error)
+        // Don't fail the entire mint process if database recording fails
+      }
 
       // Process NFT mint completion for Firebase and referral system
       try {

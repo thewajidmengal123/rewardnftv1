@@ -9,7 +9,7 @@ import { ExternalLink, Info } from "lucide-react"
 import { NftVerificationBadge } from "@/components/nft-verification-badge"
 import { fetchAndVerifyNftMetadata } from "@/utils/nft-verification"
 import { Connection } from "@solana/web3.js"
-import { DEFAULT_RPC_ENDPOINT, DEFAULT_SOLANA_EXPLORER_URL } from "@/config/solana"
+import { DEFAULT_RPC_ENDPOINT, getExplorerUrl } from "@/config/solana"
 
 interface VerifiedNftCardProps {
   mintAddress: string
@@ -92,7 +92,7 @@ export function VerifiedNftCard({ mintAddress, onVerificationComplete }: Verifie
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`${DEFAULT_SOLANA_EXPLORER_URL}/address/${mintAddress}`, "_blank")}
+            onClick={() => window.open(getExplorerUrl(mintAddress, "address"), "_blank")}
           >
             <ExternalLink className="h-4 w-4" />
           </Button>
@@ -125,7 +125,7 @@ export function VerifiedNftCard({ mintAddress, onVerificationComplete }: Verifie
           variant="outline"
           size="sm"
           className="text-xs"
-          onClick={() => window.open(`${DEFAULT_SOLANA_EXPLORER_URL}/address/${mintAddress}`, "_blank")}
+          onClick={() => window.open(getExplorerUrl(mintAddress, "address"), "_blank")}
         >
           View on Explorer
         </Button>

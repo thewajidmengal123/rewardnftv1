@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, ExternalLink } from "lucide-react"
-import { DEFAULT_SOLANA_EXPLORER_URL } from "@/config/solana"
+import { getExplorerUrl } from "@/config/solana"
 
 interface TransactionConfirmationDialogProps {
   isOpen: boolean
@@ -48,7 +48,7 @@ export function TransactionConfirmationDialog({
   }, [status, isOpen])
 
   const getExplorerLink = (signature: string) => {
-    return `${DEFAULT_SOLANA_EXPLORER_URL}/tx/${signature}`
+    return getExplorerUrl(signature, "tx")
   }
 
   return (

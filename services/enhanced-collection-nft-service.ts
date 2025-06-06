@@ -21,7 +21,7 @@ import { EnhancedUSDCService } from "./enhanced-usdc-service"
 export const NFT_CONFIG = {
   maxSupply: 1000,
   pricePerNFT: 10, // USDC
-  maxPerWallet: 5, // Allow up to 5 NFTs per wallet
+  maxPerWallet: 1, // Allow only 1 NFT per wallet
   treasuryWallet: new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"),
   referralReward: 4, // USDC to referrer
   treasuryAmount: 6, // USDC to treasury when referred
@@ -133,6 +133,104 @@ export class EnhancedCollectionNFTService {
             success: false,
             error: nftResult.error || `Failed to mint NFT ${i + 1}`,
           }
+        }
+      }
+
+      // Step 4: Record NFT data in database
+      onProgress?.({
+        step: "recording",
+        message: "Recording NFT data in database...",
+        progress: 95,
+      })
+
+      try {
+        // Record each minted NFT in the database
+        for (let i = 0; i < mintAddresses.length; i++) {
+          const mintAddress = mintAddresses[i]
+          const signature = signatures[i]
+
+          const response = await fetch("/api/nfts/mint", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              mintAddress,
+              ownerWallet: minter.toString(),
+              transactionSignature: signature,
+              name: `RewardNFT Collection #${i + 1}`,
+              symbol: "RNFT",
+              description: "Exclusive NFT from RewardNFT Platform",
+              image: "/nft-reward-token.png",
+              attributes: [
+                { trait_type: "Platform", value: "RewardNFT" },
+                { trait_type: "Utility", value: "Membership" },
+                { trait_type: "Rarity", value: "Common" },
+                { trait_type: "Collection", value: "Genesis" }
+              ],
+              mintCost: NFT_CONFIG.pricePerNFT,
+              collectionAddress: collectionMint.toString(),
+              metadata: {
+                name: `RewardNFT Collection #${i + 1}`,
+                symbol: "RNFT",
+                description: "Exclusive NFT from RewardNFT Platform",
+                image: "/nft-reward-token.png",
+                attributes: [
+                  { trait_type: "Platform", value: "RewardNFT" },
+                  { trait_type: "Utility", value: "Membership" },
+                  { trait_type: "Rarity", value: "Common" },
+                  { trait_type: "Collection", value: "Genesis" }
+                ],
+                external_url: "https://rewardnft.com",
+                seller_fee_basis_points: 500,
+                creators: [
+                  {
+                    address: minter.toString(),
+                    verified: true,
+                    share: 100,
+                  },
+                ],
+              },
+            }),
+          })
+
+          if (!response.ok) {
+            console.error(`Failed to record NFT ${mintAddress} in database`)
+          } else {
+            console.log(`✅ Recorded NFT ${mintAddress} in database`)
+          }
+        }
+      } catch (error) {
+        console.error("Error recording NFT data:", error)
+        // Don't fail the entire mint process if database recording fails
+      }
+
+      // Step 5: Handle referral rewards if applicable
+      if (referrerWallet && referrerWallet.toString() !== minter.toString()) {
+        try {
+          const referralReward = quantity * 4 // 4 USDC per NFT for referrer
+
+          const response = await fetch("/api/referrals/reward", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              referrerWallet: referrerWallet.toString(),
+              referredWallet: minter.toString(),
+              rewardAmount: referralReward,
+              nftsMinted: quantity,
+              mintSignatures: signatures,
+            }),
+          })
+
+          if (response.ok) {
+            console.log(`✅ Processed referral reward: ${referralReward} USDC to ${referrerWallet.toString()}`)
+          } else {
+            console.error("Failed to process referral reward")
+          }
+        } catch (error) {
+          console.error("Error processing referral reward:", error)
         }
       }
 

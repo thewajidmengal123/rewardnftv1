@@ -23,6 +23,8 @@ export interface LeaderboardEntry {
   totalEarned: number
   questsCompleted: number
   nftsMinted: number
+  totalXP: number
+  level: number
   score: number
   lastActive: Date
 }
@@ -34,7 +36,7 @@ export interface LeaderboardStats {
   topReferrer: LeaderboardEntry | null
 }
 
-export type LeaderboardType = "referrals" | "earnings" | "quests" | "overall"
+export type LeaderboardType = "referrals" | "earnings" | "quests" | "xp" | "overall"
 
 export class FirebaseLeaderboardService {
   private readonly LEADERBOARD_COLLECTION = "leaderboard"
@@ -48,10 +50,48 @@ export class FirebaseLeaderboardService {
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
     try {
-      // Determine sort field based on type
+      // For XP leaderboard, query the userXP collection directly
+      if (type === "xp") {
+        const xpQuery = query(
+          collection(db, "userXP"),
+          orderBy("totalXP", "desc"),
+          limit(limitCount)
+        )
+
+        const xpSnapshot = await getDocs(xpQuery)
+        const leaderboard: LeaderboardEntry[] = []
+
+        for (let i = 0; i < xpSnapshot.docs.length; i++) {
+          const xpDoc = xpSnapshot.docs[i]
+          const xpData = xpDoc.data()
+
+          // Get user profile data
+          const userDoc = await getDoc(doc(db, "users", xpData.walletAddress))
+          const userData = userDoc.exists() ? userDoc.data() as UserProfile : null
+
+          const entry: LeaderboardEntry = {
+            rank: i + 1,
+            walletAddress: xpData.walletAddress,
+            displayName: userData?.displayName || `User ${xpData.walletAddress.slice(0, 8)}`,
+            totalReferrals: userData?.totalReferrals || 0,
+            totalEarned: userData?.totalEarned || 0,
+            questsCompleted: userData?.questsCompleted || 0,
+            nftsMinted: userData?.nftsMinted || 0,
+            totalXP: xpData.totalXP || 0,
+            level: xpData.level || 1,
+            score: xpData.totalXP || 0,
+            lastActive: userData?.lastActive?.toDate() || new Date(),
+          }
+
+          leaderboard.push(entry)
+        }
+
+        return leaderboard
+      }
+
+      // For other leaderboard types, use the users collection
       const sortField = this.getSortField(type)
-      
-      // Query users with the specified criteria
+
       const usersQuery = query(
         collection(db, "users"),
         where(sortField, ">", 0),
@@ -64,7 +104,7 @@ export class FirebaseLeaderboardService {
 
       usersSnapshot.docs.forEach((doc, index) => {
         const userData = doc.data() as UserProfile
-        
+
         const entry: LeaderboardEntry = {
           rank: index + 1,
           walletAddress: userData.walletAddress,
@@ -73,6 +113,8 @@ export class FirebaseLeaderboardService {
           totalEarned: userData.totalEarned || 0,
           questsCompleted: userData.questsCompleted || 0,
           nftsMinted: userData.nftsMinted || 0,
+          totalXP: 0, // Will be populated if needed
+          level: 1, // Will be populated if needed
           score: this.calculateScore(userData, type),
           lastActive: userData.lastActive?.toDate() || new Date(),
         }
@@ -144,6 +186,8 @@ export class FirebaseLeaderboardService {
             totalEarned: userData.totalEarned || 0,
             questsCompleted: userData.questsCompleted || 0,
             nftsMinted: userData.nftsMinted || 0,
+            totalXP: 0,
+            level: 1,
             score: userData.totalReferrals || 0,
             lastActive: userData.lastActive?.toDate() || new Date(),
           }
@@ -286,6 +330,8 @@ export class FirebaseLeaderboardService {
         return "totalEarned"
       case "quests":
         return "questsCompleted"
+      case "xp":
+        return "totalXP" // This won't be used since XP queries userXP collection
       case "overall":
         return "totalEarned" // Use earnings as overall score
       default:
@@ -304,6 +350,8 @@ export class FirebaseLeaderboardService {
         return user.totalEarned || 0
       case "quests":
         return user.questsCompleted || 0
+      case "xp":
+        return 0 // XP score is handled separately in the XP query
       case "overall":
         // Weighted score: referrals * 10 + earnings + quests * 2
         return (user.totalReferrals || 0) * 10 + (user.totalEarned || 0) + (user.questsCompleted || 0) * 2

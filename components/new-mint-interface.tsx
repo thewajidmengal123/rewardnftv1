@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { useWallet } from "@/contexts/wallet-context"
 import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
 import { SimpleNFTMintingService, NFT_CONFIG, type MintProgress } from "@/services/simple-nft-minting-service"
-import { Minus, Plus, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { PublicKey } from "@solana/web3.js"
@@ -43,7 +43,7 @@ function NewMintInterfaceLoading() {
 function NewMintInterfaceInner() {
   const { connected, publicKey, signTransaction, connection } = useWallet()
   const { user } = useFirebaseReferrals()
-  const [mintAmount, setMintAmount] = useState(1)
+  const mintAmount = 1 // Fixed to 1 NFT per wallet
   const [usdcBalance, setUsdcBalance] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [mintProgress, setMintProgress] = useState<MintProgress | null>(null)
@@ -167,11 +167,7 @@ function NewMintInterfaceInner() {
     }
   }
 
-  const handleMintAmountChange = (delta: number) => {
-    const maxAllowed = NFT_CONFIG.maxPerWallet - walletMintCount
-    const newAmount = Math.max(1, Math.min(maxAllowed, mintAmount + delta))
-    setMintAmount(newAmount)
-  }
+
 
   const totalPrice = mintAmount * NFT_CONFIG.pricePerNFT
   const hasReachedLimit = walletMintCount >= NFT_CONFIG.maxPerWallet
@@ -279,11 +275,10 @@ function NewMintInterfaceInner() {
 
   const getButtonText = () => {
     if (!connected) return "Connect Wallet"
-    if (hasReachedLimit) return `Max Reached (${walletMintCount}/${NFT_CONFIG.maxPerWallet})`
+    if (hasReachedLimit) return `Already Minted (${walletMintCount}/1)`
     if (usdcBalance < totalPrice) return `Insufficient USDC (${usdcBalance.toFixed(2)}/${totalPrice})`
     if (loading) return mintProgress ? mintProgress.message : "Minting..."
-    if (mintAmount > 1) return `Mint ${mintAmount} NFTs`
-    return "Mint NFT"
+    return "Mint NFT (10 USDC)"
   }
 
   const isButtonDisabled = () => {
@@ -296,11 +291,11 @@ function NewMintInterfaceInner() {
       <div className="space-y-6">
         <div className="relative bg-gradient-to-br from-teal-500/20 via-cyan-500/20 to-teal-600/20 p-1 rounded-2xl">
           <div className="bg-black/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800/50">
-            <div className="relative aspect-square">
+            <div className="relative aspect-[4/5]">
               <img
                 src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
                 alt="RewardNFT Collection"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 onError={(e) => {
                   e.currentTarget.src = "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.0.3"
                 }}
@@ -326,88 +321,63 @@ function NewMintInterfaceInner() {
             <span className="text-white font-bold text-xl">10 USDC</span>
           </div>
 
-          {/* Available */}
+          {/* Minted */}
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-400 text-lg">Available</span>
-            <span className="text-white font-bold text-xl">{supplyInfo.available} / {supplyInfo.maxSupply}</span>
+            <span className="text-gray-400 text-lg">Minted</span>
+            <span className="text-white font-bold text-xl">{supplyInfo.totalSupply}</span>
           </div>
 
-            {/* Mint Amount */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2">
-                <span className="text-gray-400 text-lg">Mint Amount</span>
-                <div className="flex items-center space-x-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleMintAmountChange(-1)}
-                    disabled={mintAmount <= 1}
-                    className="w-10 h-10 p-0 bg-gray-800/50 border-gray-700 hover:bg-gray-700 text-white hover:border-teal-500/50"
-                  >
-                    <Minus className="w-5 h-5" />
-                  </Button>
-                  <span className="text-white font-bold text-2xl w-12 text-center">{mintAmount}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleMintAmountChange(1)}
-                    disabled={mintAmount >= (NFT_CONFIG.maxPerWallet - walletMintCount)}
-                    className="w-10 h-10 p-0 bg-gray-800/50 border-gray-700 hover:bg-gray-700 text-white hover:border-teal-500/50"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </Button>
-                </div>
-              </div>
-              <div className="text-sm text-gray-500 text-center">
-                Max {NFT_CONFIG.maxPerWallet - walletMintCount} more NFTs (You have {walletMintCount}/{NFT_CONFIG.maxPerWallet})
-              </div>
-            </div>
-
-            {/* Total Price */}
-            <div className="flex justify-between items-center py-3 border-t border-gray-800/50">
-              <span className="text-gray-400 text-lg">Total Cost</span>
-              <span className="text-white font-bold text-2xl">{totalPrice} USDC</span>
-            </div>
-
-            {/* Referral Info */}
-            {referrerWallet && (
-              <div className="bg-teal-900/30 border border-teal-700/50 rounded-xl p-4">
-                <p className="text-teal-400 text-sm">
-                  🎉 You were referred! Your referrer will receive 4 USDC when you mint.
-                </p>
-              </div>
-            )}
-
-            {/* Progress Indicator */}
-            {mintProgress && (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300">{mintProgress.message}</span>
-                  {mintProgress.currentNFT && mintProgress.totalNFTs && (
-                    <span className="text-teal-400">
-                      {mintProgress.currentNFT}/{mintProgress.totalNFTs}
-                    </span>
-                  )}
-                </div>
-                <Progress value={mintProgress.progress} className="h-3" />
-              </div>
-            )}
-
-            {/* Mint Button */}
-            <Button
-              onClick={handleMint}
-              disabled={isButtonDisabled()}
-              className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
-            >
-              {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
-              {getButtonText()}
-            </Button>
-
-            {/* Terms */}
-            <p className="text-sm text-gray-400 text-center">
-              By minting, you agree to our Terms of Service and Privacy Policy.
-            </p>
+          {/* Mint Limit Info */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-400 text-lg">Mint Limit</span>
+            <span className="text-white font-bold text-xl">1 NFT per wallet</span>
           </div>
+
+          {/* Total Price */}
+          <div className="flex justify-between items-center py-3 border-t border-gray-800/50">
+            <span className="text-gray-400 text-lg">Total Cost</span>
+            <span className="text-white font-bold text-2xl">{totalPrice} USDC</span>
+          </div>
+
+          {/* Referral Info */}
+          {referrerWallet && (
+            <div className="bg-teal-900/30 border border-teal-700/50 rounded-xl p-4">
+              <p className="text-teal-400 text-sm">
+                🎉 You were referred! Your referrer will receive 4 USDC when you mint.
+              </p>
+            </div>
+          )}
+
+          {/* Progress Indicator */}
+          {mintProgress && (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">{mintProgress.message}</span>
+                {mintProgress.currentNFT && mintProgress.totalNFTs && (
+                  <span className="text-teal-400">
+                    {mintProgress.currentNFT}/{mintProgress.totalNFTs}
+                  </span>
+                )}
+              </div>
+              <Progress value={mintProgress.progress} className="h-3" />
+            </div>
+          )}
+
+          {/* Mint Button */}
+          <Button
+            onClick={handleMint}
+            disabled={isButtonDisabled()}
+            className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
+          >
+            {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
+            {getButtonText()}
+          </Button>
+
+          {/* Terms */}
+          <p className="text-sm text-gray-400 text-center">
+            By minting, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </div>
 
         {/* Wallet Info */}
         {connected && (
@@ -422,7 +392,7 @@ function NewMintInterfaceInner() {
                 variant={hasReachedLimit ? "secondary" : "outline"}
                 className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-teal-900/50 text-teal-300 border-teal-700"}
               >
-                {hasReachedLimit ? `Max Reached (${walletMintCount}/${NFT_CONFIG.maxPerWallet})` : "Available"}
+                {hasReachedLimit ? `Already Minted (${walletMintCount}/1)` : "Available to Mint"}
               </Badge>
             </div>
           </div>

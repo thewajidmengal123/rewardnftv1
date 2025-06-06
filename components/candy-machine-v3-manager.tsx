@@ -12,6 +12,7 @@ import { CandyMachineV3Service } from "@/services/candy-machine-v3-service"
 import { PublicKey } from "@solana/web3.js"
 import { Loader2, CheckCircle, AlertCircle, Zap, Package, Coins, ExternalLink, Rocket, Settings } from "lucide-react"
 import { CANDY_MACHINE_V3_CONFIG, COLLECTION_CONFIG } from "@/config/candy-machine-v3"
+import { getExplorerUrl } from "@/config/solana"
 
 interface DeploymentStep {
   id: string
@@ -137,7 +138,7 @@ export function CandyMachineV3Manager() {
   }
 
   const getExplorerLink = (address: string, type: "address" | "tx" = "address") => {
-    return `https://explorer.solana.com/${type}/${address}?cluster=devnet`
+    return getExplorerUrl(address, type)
   }
 
   const allStepsCompleted = steps.every((step) => step.completed)

@@ -212,6 +212,75 @@ export class FirebaseReferralService {
   }
 
   /**
+   * Process direct referral reward from minting services
+   */
+  async processDirectReferralReward(
+    referrerWallet: string,
+    referredWallet: string,
+    rewardAmount: number,
+    nftsMinted: number,
+    mintSignatures: string[]
+  ): Promise<boolean> {
+    try {
+      // Create referral record
+      const referralId = `${referrerWallet}_${referredWallet}_${Date.now()}`
+      const referralData = {
+        referrerWallet,
+        referredWallet,
+        referralCode: "", // Not applicable for direct rewards
+        status: "rewarded" as const,
+        nftMinted: true,
+        rewardPaid: true,
+        rewardAmount,
+        nftsMinted,
+        mintSignatures,
+        createdAt: serverTimestamp() as Timestamp,
+        completedAt: serverTimestamp() as Timestamp,
+        rewardedAt: serverTimestamp() as Timestamp,
+        type: "nft_mint_referral"
+      }
+
+      await setDoc(doc(db, this.REFERRALS_COLLECTION, referralId), referralData)
+
+      // Update referrer's total earned and referral count
+      await firebaseUserService.updateUserEarnings(referrerWallet, rewardAmount)
+      await firebaseUserService.incrementReferralCount(referrerWallet)
+
+      // Update referred user's NFT count
+      const referredUserRef = doc(db, "users", referredWallet)
+      const referredUserDoc = await getDoc(referredUserRef)
+
+      if (referredUserDoc.exists()) {
+        await updateDoc(referredUserRef, {
+          nftsMinted: increment(nftsMinted),
+          lastActive: serverTimestamp(),
+        })
+      } else {
+        // Create referred user profile if it doesn't exist
+        await setDoc(referredUserRef, {
+          walletAddress: referredWallet,
+          displayName: `User ${referredWallet.slice(0, 8)}`,
+          totalEarned: 0,
+          totalReferrals: 0,
+          nftsMinted: nftsMinted,
+          questsCompleted: 0,
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp(),
+        })
+      }
+
+      // Sync referrer's data to ensure consistency
+      await firebaseUserService.syncUserReferralData(referrerWallet)
+
+      console.log(`Direct referral reward processed: ${rewardAmount} USDC to ${referrerWallet} for ${nftsMinted} NFTs`)
+      return true
+    } catch (error) {
+      console.error("Error processing direct referral reward:", error)
+      return false
+    }
+  }
+
+  /**
    * Get referral stats for a user
    */
   async getReferralStats(walletAddress: string): Promise<ReferralStats> {
@@ -298,10 +367,10 @@ export class FirebaseReferralService {
     try {
       console.log("Getting referral history for wallet:", walletAddress)
 
+      // Remove orderBy to avoid index requirement for now
       const referralQuery = query(
         collection(db, this.REFERRALS_COLLECTION),
-        where("referrerWallet", "==", walletAddress),
-        orderBy("createdAt", "desc")
+        where("referrerWallet", "==", walletAddress)
       )
       const referralSnapshot = await getDocs(referralQuery)
 
@@ -346,6 +415,14 @@ export class FirebaseReferralService {
       }
 
       console.log("Final referrals array:", referrals)
+
+      // Sort by createdAt descending (client-side sorting)
+      referrals.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0)
+        const bTime = b.createdAt?.toDate?.() || new Date(0)
+        return bTime.getTime() - aTime.getTime()
+      })
+
       return referrals
     } catch (error) {
       console.error("Error getting referral history:", error)

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { useWallet } from "@/contexts/wallet-context"
 import { SimpleCollectionService } from "@/services/simple-collection-service"
 import { Copy, ExternalLink, RefreshCw } from "lucide-react"
+import { getExplorerUrl } from "@/config/solana"
 
 interface CollectionInfo {
   collectionMint: string
@@ -78,7 +79,7 @@ export function CollectionAdminContent() {
   }
 
   const openInExplorer = (signature: string) => {
-    window.open(`https://explorer.solana.com/tx/${signature}?cluster=devnet`, "_blank")
+    window.open(getExplorerUrl(signature, "tx"), "_blank")
   }
 
   return (

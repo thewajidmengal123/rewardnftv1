@@ -17,8 +17,10 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-yellow-400">
-              RewardNFT
+            <Link href="/" className="text-xl font-bold">
+              <span className="bg-gradient-to-r from-yellow-300 via-orange-400 via-red-400 to-pink-500 bg-clip-text text-transparent animate-gradient-x bg-400%">
+                RewardNFT
+              </span>
             </Link>
           </div>
 
