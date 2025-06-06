@@ -19,9 +19,11 @@ export const SOLANA_RPC_ENDPOINTS = {
   testnet: process.env.NEXT_PUBLIC_SOLANA_TESTNET_RPC || "https://api.testnet.solana.com",
 }
 
-// Use custom RPC endpoint if provided, otherwise use network-specific endpoint
+// Use reliable RPC endpoint - prefer QuickNode or Helius for better performance
 export const DEFAULT_RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_RPC_ENDPOINT || process.env.NEXT_PUBLIC_SOLANA_RPC || SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK]
+  process.env.NEXT_PUBLIC_SOLANA_RPC ||
+  process.env.NEXT_PUBLIC_RPC_ENDPOINT ||
+  "https://api.devnet.solana.com"
 
 /** EXPLORER CONFIGURATION **/
 export const SOLANA_EXPLORER_URLS = {

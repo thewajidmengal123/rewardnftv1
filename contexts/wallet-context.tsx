@@ -210,9 +210,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       // Check if wallet is installed
       const providers = detectWalletProviders()
+
+      // For development, allow connection even if provider detection fails
+      if (providers.length === 0 && typeof window !== 'undefined') {
+        console.warn('No wallet providers detected, attempting connection anyway...')
+      }
+
       const provider = providers.find((p) => p.name === walletToConnect)
 
-      if (!provider?.installed) {
+      if (providers.length > 0 && !provider?.installed) {
         toast({
           title: "Wallet Not Found",
           description: `${walletToConnect} is not installed. Please install it first.`,

@@ -1,0 +1,25 @@
+{
+  "name": "Reward NFT Platform",
+  "description": "Mint NFTs, earn rewards, and build your network on Solana",
+  "url": "https://rainbownft.netlify.app",
+  "icon": "/images/logo.png",
+  "version": "1.0.0",
+  "network": "devnet",
+  "features": {
+    "nft_minting": true,
+    "referral_system": true,
+    "rewards": true
+  },
+  "permissions": {
+    "connect": true,
+    "sign_transactions": true,
+    "sign_messages": false
+  },
+  "security": {
+    "content_security_policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
+    "trusted_domains": [
+      "localhost:3000",
+      "https://rainbownft.netlify.app"
+    ]
+  }
+}

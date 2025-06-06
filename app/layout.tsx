@@ -13,7 +13,28 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Reward NFT Platform",
   description: "Mint NFTs, earn rewards, and build your network on Solana",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  keywords: "NFT, Solana, Rewards, Referrals, Blockchain",
+  authors: [{ name: "Reward NFT Team" }],
+  creator: "Reward NFT Platform",
+  publisher: "Reward NFT Platform",
+  robots: "index, follow",
+  openGraph: {
+    title: "Reward NFT Platform",
+    description: "Mint NFTs, earn rewards, and build your network on Solana",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Reward NFT Platform",
+    description: "Mint NFTs, earn rewards, and build your network on Solana",
+  },
+  verification: {
+    other: {
+      "wallet-verification": "reward-nft-platform"
+    }
+  }
 }
 
 export default function RootLayout({
