@@ -87,36 +87,44 @@ export function QuestPageContent() {
           break
 
         case "login_streak":
-          // Handle SOL payment for daily login
+          // Handle SOL payment for daily login using improved service
           try {
-            const transaction = await solPaymentService.createPaymentTransaction(publicKey, 0.01)
-            const signedTransaction = await signTransaction(transaction)
-              //@ts-ignore
-            
-            const signature = await solPaymentService.connection.sendRawTransaction(signedTransaction.serialize())
-              //@ts-ignore
-            // Wait for confirmation
-            await solPaymentService.connection.confirmTransaction(signature, "confirmed")
+            const paymentResult = await solPaymentService.processPayment(publicKey, 0.01, signTransaction)
 
-            // Verify the transaction
-            const isValid = await solPaymentService.verifyTransaction(signature, 0.01)
+            if (paymentResult.success) {
+              // Record payment in treasury API
+              try {
+                await fetch('/api/treasury/sol-payments', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    walletAddress: publicKey.toString(),
+                    signature: paymentResult.signature,
+                    amount: 0.01,
+                    questId,
+                    treasuryWallet: solPaymentService.treasuryWalletAddress
+                  })
+                })
+              } catch (recordError) {
+                console.warn("Failed to record payment in treasury API:", recordError)
+              }
 
-            if (isValid) {
               // Update quest progress with verification
               const success = await updateQuestProgress(questId, 1, {
-                solPaymentSignature: signature,
+                solPaymentSignature: paymentResult.signature,
                 amount: 0.01,
-                verified: true
+                verified: true,
+                treasuryWallet: solPaymentService.treasuryWalletAddress
               })
 
               if (success) {
                 toast({
                   title: "Daily Login Complete!",
-                  description: "0.01 SOL paid successfully! You earned 100 XP",
+                  description: `0.01 SOL paid successfully to treasury! You earned 100 XP`,
                 })
               }
             } else {
-              throw new Error("Transaction verification failed")
+              throw new Error(paymentResult.error || "Payment failed")
             }
           } catch (error) {
             console.error("Payment error:", error)
@@ -265,7 +273,7 @@ export function QuestPageContent() {
     const getQuestDescription = (questType: string, requirements: any) => {
       switch (questType) {
         case "connect_discord": return "Click to open Discord and connect"
-        case "login_streak": return "Pay 0.01 SOL to complete daily login"
+        case "login_streak": return "Pay 0.01 SOL to treasury to complete daily login"
         case "share_twitter": return "Share on Twitter with #RewardNFT hashtag"
         case "refer_friends": return `Get ${requirements.count} friends to mint NFTs`
         case "play_minigame": return `Score ${requirements.count}+ points in mini-game`

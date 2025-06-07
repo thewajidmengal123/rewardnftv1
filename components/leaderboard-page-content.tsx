@@ -14,7 +14,7 @@ export function LeaderboardPageContent() {
   const [selectedTab, setSelectedTab] = useState<"referrals" | "xp">("referrals")
   const [timeframe, setTimeframe] = useState("all")
 
-  // Firebase leaderboard hooks for different types
+  // Firebase leaderboard hooks for different types - increased limit to show all users
   const {
     leaderboard: referralLeaderboard,
     stats,
@@ -23,7 +23,7 @@ export function LeaderboardPageContent() {
     refreshing: referralRefreshing,
     refresh: refreshReferrals,
     error: referralError,
-  } = useFirebaseLeaderboard("referrals", 50)
+  } = useFirebaseLeaderboard("referrals", 100) // Increased limit to show more users
 
   // For XP leaderboard, we'll use xp data
   const {
@@ -32,7 +32,7 @@ export function LeaderboardPageContent() {
     refreshing: xpRefreshing,
     refresh: refreshXP,
     error: xpError,
-  } = useFirebaseLeaderboard("xp", 50)
+  } = useFirebaseLeaderboard("xp", 100) // Increased limit to show more users
 
   // Filter leaderboard based on search term
   const filteredReferralLeaderboard = useMemo(() => {
@@ -328,7 +328,7 @@ export function LeaderboardPageContent() {
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   🏆 Complete Leaderboard
                   <span className="text-sm text-gray-400 font-normal">
-                    (Showing positions 4+)
+                    (All users ranked by {selectedTab === "referrals" ? "referrals" : "XP"})
                   </span>
                 </h3>
               </div>
@@ -383,7 +383,7 @@ export function LeaderboardPageContent() {
                         </tr>
                       ))
                     ) : getCurrentLeaderboard().length > 0 ? (
-                      getCurrentLeaderboard().slice(3).map((user, index) => {
+                      getCurrentLeaderboard().map((user, index) => {
                         const isTopTen = user.rank <= 10
                         const earnedPerReferral = user.totalReferrals > 0 ? user.totalEarned / user.totalReferrals : 0
 
@@ -470,10 +470,10 @@ export function LeaderboardPageContent() {
                           <div className="space-y-4">
                             <div className="text-6xl">🏆</div>
                             <div className="text-gray-400 text-lg">
-                              No data available yet. Be the first to join!
+                              No users found. Connect your wallet to join the leaderboard!
                             </div>
                             <div className="text-gray-500 text-sm">
-                              Start referring users to appear on the leaderboard
+                              All users are shown here, including those with 0 referrals
                             </div>
                           </div>
                         </td>

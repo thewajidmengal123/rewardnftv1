@@ -494,70 +494,7 @@ export function ReferralsPageContent() {
                     <ReferralHistory referrals={recentReferrals} />
 
                     {/* Debug info for development */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="mt-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <p className="text-xs text-gray-400 mb-2">Debug Info:</p>
-                        <p className="text-xs text-gray-300">
-                          History items: {history.length} |
-                          Referred users: {referredUsers.length} |
-                          Formatted referrals: {recentReferrals.length} |
-                          Loading: {loading ? 'Yes' : 'No'} |
-                          Error: {error || 'None'}
-                        </p>
-                        <p className="text-xs text-gray-300 mt-1">
-                          User referredBy: {userReferralData?.user?.referredBy || 'None'} |
-                          Total Earned: ${(stats?.totalEarned || 0).toFixed(2)} |
-                          API Data: {userReferralData ? 'Loaded' : 'Not loaded'}
-                        </p>
-                        <div className="mt-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              if (publicKey) {
-                                try {
-                                  const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
-                                  const result = await response.json()
-                                  console.log('🔍 Current Referral Status:', result)
-                                } catch (err) {
-                                  console.error('Check status error:', err)
-                                }
-                              }
-                            }}
-                            className="bg-blue-600/20 border-blue-500/30 text-blue-400 hover:bg-blue-600/30 text-xs"
-                          >
-                            Check Referral Status
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              if (publicKey) {
-                                try {
-                                  const response = await fetch(`/api/debug/referral-perspective?wallet=${encodeURIComponent(publicKey.toString())}`)
-                                  const result = await response.json()
-                                  console.log('🔍 Referral Perspective Debug:', result.debug)
-                                  setTestResults(result.debug)
-                                } catch (err) {
-                                  console.error('Perspective debug error:', err)
-                                }
-                              }
-                            }}
-                            className="bg-purple-600/20 border-purple-500/30 text-purple-400 hover:bg-purple-600/30 text-xs ml-2"
-                          >
-                            Debug Perspective
-                          </Button>
-                        </div>
-                        {recentReferrals.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-xs text-gray-400 mb-1">Sample Referral Data:</p>
-                            <pre className="text-xs bg-gray-800 p-2 rounded overflow-auto max-h-32">
-                              {JSON.stringify(recentReferrals[0], null, 2)}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    )}
+               
                   </div>
 
                 </div>

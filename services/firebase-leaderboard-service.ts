@@ -50,83 +50,123 @@ export class FirebaseLeaderboardService {
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
     try {
-      // For XP leaderboard, query the userXP collection directly
-      if (type === "xp") {
-        const xpQuery = query(
-          collection(db, "userXP"),
-          orderBy("totalXP", "desc"),
-          limit(limitCount)
-        )
+      // Try Firebase first
+      return await this.getLeaderboardFromFirebase(type, limitCount)
+    } catch (error) {
+      console.error("Error getting leaderboard from Firebase, trying API fallback:", error)
 
-        const xpSnapshot = await getDocs(xpQuery)
-        const leaderboard: LeaderboardEntry[] = []
-
-        for (let i = 0; i < xpSnapshot.docs.length; i++) {
-          const xpDoc = xpSnapshot.docs[i]
-          const xpData = xpDoc.data()
-
-          // Get user profile data
-          const userDoc = await getDoc(doc(db, "users", xpData.walletAddress))
-          const userData = userDoc.exists() ? userDoc.data() as UserProfile : null
-
-          const entry: LeaderboardEntry = {
-            rank: i + 1,
-            walletAddress: xpData.walletAddress,
-            displayName: userData?.displayName || `User ${xpData.walletAddress.slice(0, 8)}`,
-            totalReferrals: userData?.totalReferrals || 0,
-            totalEarned: userData?.totalEarned || 0,
-            questsCompleted: userData?.questsCompleted || 0,
-            nftsMinted: userData?.nftsMinted || 0,
-            totalXP: xpData.totalXP || 0,
-            level: xpData.level || 1,
-            score: xpData.totalXP || 0,
-            lastActive: userData?.lastActive?.toDate() || new Date(),
-          }
-
-          leaderboard.push(entry)
-        }
-
-        return leaderboard
+      // Fallback to API endpoint
+      try {
+        return await this.getLeaderboardFromAPI(type, limitCount)
+      } catch (apiError) {
+        console.error("Error getting leaderboard from API:", apiError)
+        return []
       }
+    }
+  }
 
-      // For other leaderboard types, use the users collection
-      const sortField = this.getSortField(type)
-
-      const usersQuery = query(
-        collection(db, "users"),
-        where(sortField, ">", 0),
-        orderBy(sortField, "desc"),
+  /**
+   * Get leaderboard data from Firebase
+   */
+  private async getLeaderboardFromFirebase(
+    type: LeaderboardType = "referrals",
+    limitCount = 10
+  ): Promise<LeaderboardEntry[]> {
+    // For XP leaderboard, query the userXP collection directly
+    if (type === "xp") {
+      const xpQuery = query(
+        collection(db, "userXP"),
+        orderBy("totalXP", "desc"),
         limit(limitCount)
       )
 
-      const usersSnapshot = await getDocs(usersQuery)
+      const xpSnapshot = await getDocs(xpQuery)
       const leaderboard: LeaderboardEntry[] = []
 
-      usersSnapshot.docs.forEach((doc, index) => {
-        const userData = doc.data() as UserProfile
+      for (let i = 0; i < xpSnapshot.docs.length; i++) {
+        const xpDoc = xpSnapshot.docs[i]
+        const xpData = xpDoc.data()
+
+        // Get user profile data
+        const userDoc = await getDoc(doc(db, "users", xpData.walletAddress))
+        const userData = userDoc.exists() ? userDoc.data() as UserProfile : null
 
         const entry: LeaderboardEntry = {
-          rank: index + 1,
-          walletAddress: userData.walletAddress,
-          displayName: userData.displayName || `User ${userData.walletAddress.slice(0, 8)}`,
-          totalReferrals: userData.totalReferrals || 0,
-          totalEarned: userData.totalEarned || 0,
-          questsCompleted: userData.questsCompleted || 0,
-          nftsMinted: userData.nftsMinted || 0,
-          totalXP: 0, // Will be populated if needed
-          level: 1, // Will be populated if needed
-          score: this.calculateScore(userData, type),
-          lastActive: userData.lastActive?.toDate() || new Date(),
+          rank: i + 1,
+          walletAddress: xpData.walletAddress,
+          displayName: userData?.displayName || `User ${xpData.walletAddress.slice(0, 8)}`,
+          totalReferrals: userData?.totalReferrals || 0,
+          totalEarned: userData?.totalEarned || 0,
+          questsCompleted: userData?.questsCompleted || 0,
+          nftsMinted: userData?.nftsMinted || 0,
+          totalXP: xpData.totalXP || 0,
+          level: xpData.level || 1,
+          score: xpData.totalXP || 0,
+          lastActive: userData?.lastActive?.toDate() || new Date(),
         }
 
         leaderboard.push(entry)
-      })
+      }
 
       return leaderboard
-    } catch (error) {
-      console.error("Error getting leaderboard:", error)
-      return []
     }
+
+    // For other leaderboard types, use the users collection
+    const sortField = this.getSortField(type)
+
+    // Get ALL users, including those with 0 referrals
+    const usersQuery = query(
+      collection(db, "users"),
+      orderBy(sortField, "desc"),
+      limit(limitCount)
+    )
+
+    const usersSnapshot = await getDocs(usersQuery)
+    const leaderboard: LeaderboardEntry[] = []
+
+    usersSnapshot.docs.forEach((doc, index) => {
+      const userData = doc.data() as UserProfile
+
+      const entry: LeaderboardEntry = {
+        rank: index + 1,
+        walletAddress: userData.walletAddress,
+        displayName: userData.displayName || `User ${userData.walletAddress.slice(0, 8)}`,
+        totalReferrals: userData.totalReferrals || 0,
+        totalEarned: userData.totalEarned || 0,
+        questsCompleted: userData.questsCompleted || 0,
+        nftsMinted: userData.nftsMinted || 0,
+        totalXP: 0, // Will be populated if needed
+        level: 1, // Will be populated if needed
+        score: this.calculateScore(userData, type),
+        lastActive: userData.lastActive?.toDate() || new Date(),
+      }
+
+      leaderboard.push(entry)
+    })
+
+    return leaderboard
+  }
+
+  /**
+   * Get leaderboard data from API (fallback)
+   */
+  private async getLeaderboardFromAPI(
+    type: LeaderboardType = "referrals",
+    limitCount = 10
+  ): Promise<LeaderboardEntry[]> {
+    const response = await fetch(`/api/leaderboard/all-users?type=${type}&limit=${limitCount}`)
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      throw new Error(data.error || "API request failed")
+    }
+
+    return data.data.leaderboard || []
   }
 
   /**
@@ -159,55 +199,94 @@ export class FirebaseLeaderboardService {
    */
   async getLeaderboardStats(): Promise<LeaderboardStats> {
     try {
-      // Get all users
-      const usersQuery = query(collection(db, "users"))
-      const usersSnapshot = await getDocs(usersQuery)
-
-      let totalUsers = 0
-      let totalReferrals = 0
-      let totalRewards = 0
-      let topReferrer: LeaderboardEntry | null = null
-      let maxReferrals = 0
-
-      usersSnapshot.docs.forEach((doc) => {
-        const userData = doc.data() as UserProfile
-        totalUsers++
-        totalReferrals += userData.totalReferrals || 0
-        totalRewards += userData.totalEarned || 0
-
-        // Track top referrer
-        if ((userData.totalReferrals || 0) > maxReferrals) {
-          maxReferrals = userData.totalReferrals || 0
-          topReferrer = {
-            rank: 1,
-            walletAddress: userData.walletAddress,
-            displayName: userData.displayName || `User ${userData.walletAddress.slice(0, 8)}`,
-            totalReferrals: userData.totalReferrals || 0,
-            totalEarned: userData.totalEarned || 0,
-            questsCompleted: userData.questsCompleted || 0,
-            nftsMinted: userData.nftsMinted || 0,
-            totalXP: 0,
-            level: 1,
-            score: userData.totalReferrals || 0,
-            lastActive: userData.lastActive?.toDate() || new Date(),
-          }
-        }
-      })
-
-      return {
-        totalUsers,
-        totalReferrals,
-        totalRewards,
-        topReferrer,
-      }
+      // Try Firebase first
+      return await this.getLeaderboardStatsFromFirebase()
     } catch (error) {
-      console.error("Error getting leaderboard stats:", error)
-      return {
-        totalUsers: 0,
-        totalReferrals: 0,
-        totalRewards: 0,
-        topReferrer: null,
+      console.error("Error getting leaderboard stats from Firebase, trying API fallback:", error)
+
+      // Fallback to API endpoint
+      try {
+        return await this.getLeaderboardStatsFromAPI()
+      } catch (apiError) {
+        console.error("Error getting leaderboard stats from API:", apiError)
+        return {
+          totalUsers: 0,
+          totalReferrals: 0,
+          totalRewards: 0,
+          topReferrer: null,
+        }
       }
+    }
+  }
+
+  /**
+   * Get leaderboard statistics from Firebase
+   */
+  private async getLeaderboardStatsFromFirebase(): Promise<LeaderboardStats> {
+    // Get all users
+    const usersQuery = query(collection(db, "users"))
+    const usersSnapshot = await getDocs(usersQuery)
+
+    let totalUsers = 0
+    let totalReferrals = 0
+    let totalRewards = 0
+    let topReferrer: LeaderboardEntry | null = null
+    let maxReferrals = 0
+
+    usersSnapshot.docs.forEach((doc) => {
+      const userData = doc.data() as UserProfile
+      totalUsers++
+      totalReferrals += userData.totalReferrals || 0
+      totalRewards += userData.totalEarned || 0
+
+      // Track top referrer (including those with 0 referrals)
+      if ((userData.totalReferrals || 0) >= maxReferrals) {
+        maxReferrals = userData.totalReferrals || 0
+        topReferrer = {
+          rank: 1,
+          walletAddress: userData.walletAddress,
+          displayName: userData.displayName || `User ${userData.walletAddress.slice(0, 8)}`,
+          totalReferrals: userData.totalReferrals || 0,
+          totalEarned: userData.totalEarned || 0,
+          questsCompleted: userData.questsCompleted || 0,
+          nftsMinted: userData.nftsMinted || 0,
+          totalXP: 0,
+          level: 1,
+          score: userData.totalReferrals || 0,
+          lastActive: userData.lastActive?.toDate() || new Date(),
+        }
+      }
+    })
+
+    return {
+      totalUsers,
+      totalReferrals,
+      totalRewards,
+      topReferrer,
+    }
+  }
+
+  /**
+   * Get leaderboard statistics from API (fallback)
+   */
+  private async getLeaderboardStatsFromAPI(): Promise<LeaderboardStats> {
+    const response = await fetch('/api/leaderboard/all-users?type=referrals&limit=1')
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      throw new Error(data.error || "API request failed")
+    }
+
+    return data.data.stats || {
+      totalUsers: 0,
+      totalReferrals: 0,
+      totalRewards: 0,
+      topReferrer: null,
     }
   }
 

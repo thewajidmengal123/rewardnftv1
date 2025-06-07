@@ -19,10 +19,8 @@ function NewMintInterfaceLoading() {
   return (
     <div className="grid lg:grid-cols-2 gap-12 items-start">
       <div className="space-y-6">
-        <div className="relative bg-gradient-to-br from-teal-500/20 via-cyan-500/20 to-teal-600/20 p-1 rounded-2xl">
-          <div className="bg-black/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800/50">
-            <div className="relative aspect-square animate-pulse bg-gray-800"></div>
-          </div>
+        <div className="relative rounded-2xl overflow-hidden">
+          <div className="relative h-96 animate-pulse bg-gray-800"></div>
         </div>
       </div>
       <div className="space-y-6">
@@ -287,24 +285,22 @@ function NewMintInterfaceInner() {
 
   return (
     <div className="grid lg:grid-cols-2 gap-12 items-start">
-      {/* Left Side - NFT Preview - matching reference design */}
+      {/* Left Side - NFT Preview - Full Size Image */}
       <div className="space-y-6">
-        <div className="relative bg-gradient-to-br from-teal-500/20 via-cyan-500/20 to-teal-600/20 p-1 rounded-2xl">
-          <div className="bg-black/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800/50">
-            <div className="relative aspect-[4/5]">
-              <img
-                src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
-                alt="RewardNFT Collection"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=1528&auto=format&fit=crop&ixlib=rb-4.0.3"
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 text-white">
-                <h3 className="text-3xl font-bold mb-2 text-white">RewardNFT Collection</h3>
-                <p className="text-gray-300 text-lg">Limited to 1,000 NFTs</p>
-              </div>
+        <div className="relative rounded-2xl overflow-hidden">
+          <div className="relative">
+            <img
+              src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
+              alt="RewardNFT Collection"
+              className="w-full h-auto"
+              onError={(e) => {
+                e.currentTarget.src = "https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-6 left-6 text-white">
+              <h3 className="text-3xl font-bold mb-2 text-white">RewardNFT Collection</h3>
+              <p className="text-gray-300 text-lg">Exclusive Rare Reward NFT</p>
             </div>
           </div>
         </div>

@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
 
-export async function GET(request: NextRequest, { params }: { params: { wallet: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   try {
-    const { wallet } = params
+    const { wallet } = await params
 
     const userRef = adminDb.collection("users").doc(wallet)
     const userSnap = await userRef.get()
@@ -35,9 +35,9 @@ export async function GET(request: NextRequest, { params }: { params: { wallet: 
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { wallet: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ wallet: string }> }) {
   try {
-    const { wallet } = params
+    const { wallet } = await params
     const userData = await request.json()
 
     const userRef = adminDb.collection("users").doc(wallet)

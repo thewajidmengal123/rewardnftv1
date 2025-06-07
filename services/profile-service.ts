@@ -33,95 +33,68 @@ export interface UserProfile {
 
 export class ProfileService {
   async getUserProfile(publicKey: PublicKey): Promise<UserProfile> {
-    // Mock data for development
     const address = publicKey.toString()
 
-    return {
-      address,
-      nfts: [
-        {
-          mint: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-          name: "Reward NFT #001",
-          image: "/nft-reward-token.png",
-          attributes: [
-            { trait_type: "Rarity", value: "Common" },
-            { trait_type: "Type", value: "Reward" },
-            { trait_type: "Level", value: "1" },
-          ],
+    try {
+      // Use the dedicated profile API endpoint
+      const response = await fetch(`/api/profile/${address}`)
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        console.log('Profile data loaded successfully for:', address, data.data)
+        return data.data
+      } else {
+        throw new Error(data.error || "Failed to fetch profile")
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error)
+
+      // Try to create a basic profile with sample data for development
+      const fallbackProfile: UserProfile = {
+        address,
+        nfts: [],
+        stats: {
+          totalNFTs: 0,
+          questsCompleted: 0,
+          referrals: 0,
+          points: 0,
+          rank: 0,
         },
-        {
-          mint: "8yKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsV",
-          name: "Achievement NFT #002",
-          image: "/mystery-box.png",
-          attributes: [
-            { trait_type: "Rarity", value: "Rare" },
-            { trait_type: "Type", value: "Achievement" },
-            { trait_type: "Level", value: "2" },
-          ],
+        activities: [
+          {
+            id: 'welcome',
+            type: 'reward',
+            title: 'Welcome to RewardNFT!',
+            description: 'Your profile has been created. Start minting NFTs and referring friends to earn rewards!',
+            timestamp: new Date().toISOString(),
+            points: 0,
+          }
+        ],
+        referralCode: `REF${address.slice(0, 8).toUpperCase()}`,
+        referralStats: {
+          totalReferrals: 0,
+          activeReferrals: 0,
+          totalEarned: 0,
         },
-      ],
-      stats: {
-        totalNFTs: 2,
-        questsCompleted: 5,
-        referrals: 3,
-        points: 1250,
-        rank: 42,
-      },
-      activities: [
-        {
-          id: "1",
-          type: "mint",
-          title: "NFT Minted",
-          description: "Successfully minted Reward NFT #001",
-          timestamp: "2024-01-15T10:30:00Z",
-          points: 100,
-        },
-        {
-          id: "2",
-          type: "quest",
-          title: "Daily Check-in",
-          description: "Completed daily GM check-in",
-          timestamp: "2024-01-15T09:00:00Z",
-          points: 50,
-        },
-        {
-          id: "3",
-          type: "referral",
-          title: "Friend Referred",
-          description: "Successfully referred a new user",
-          timestamp: "2024-01-14T16:45:00Z",
-          points: 200,
-        },
-        {
-          id: "4",
-          type: "reward",
-          title: "Bonus Points",
-          description: "Received bonus points for activity",
-          timestamp: "2024-01-14T14:20:00Z",
-          points: 75,
-        },
-        {
-          id: "5",
-          type: "mint",
-          title: "Achievement Unlocked",
-          description: "Minted Achievement NFT #002",
-          timestamp: "2024-01-13T11:15:00Z",
-          points: 150,
-        },
-      ],
-      referralCode: `REF${address.slice(0, 8).toUpperCase()}`,
-      referralStats: {
-        totalReferrals: 3,
-        activeReferrals: 2,
-        totalEarned: 45.5,
-      },
+      }
+
+      return fallbackProfile
     }
   }
 
+
+
   async updateUserProfile(publicKey: PublicKey, updates: Partial<UserProfile>): Promise<UserProfile> {
-    // In a real implementation, this would update the user's profile
-    const currentProfile = await this.getUserProfile(publicKey)
-    return { ...currentProfile, ...updates }
+    // For now, just return the current profile since we don't have an update API endpoint
+    // In a real implementation, this would call an API to update the user profile
+    const address = publicKey.toString()
+    console.log(`Update user profile for ${address}:`, updates)
+    return await this.getUserProfile(publicKey)
   }
 
   async getUserNFTs(publicKey: PublicKey): Promise<UserProfile["nfts"]> {
@@ -134,19 +107,37 @@ export class ProfileService {
     return profile.stats
   }
 
-  async getUserActivities(publicKey: PublicKey): Promise<UserProfile["activities"]> {
-    const profile = await this.getUserProfile(publicKey)
-    return profile.activities
-  }
-
   async generateReferralCode(publicKey: PublicKey): Promise<string> {
     const address = publicKey.toString()
-    return `REF${address.slice(0, 8).toUpperCase()}`
+    try {
+      const response = await fetch(`/api/profile/${address}`)
+      const data = await response.json()
+      return data.success && data.data?.referralCode ? data.data.referralCode : `REF${address.slice(0, 8).toUpperCase()}`
+    } catch (error) {
+      console.error("Error generating referral code:", error)
+      return `REF${address.slice(0, 8).toUpperCase()}`
+    }
   }
 
   async getReferralStats(publicKey: PublicKey): Promise<UserProfile["referralStats"]> {
-    const profile = await this.getUserProfile(publicKey)
-    return profile.referralStats
+    const address = publicKey.toString()
+    try {
+      const response = await fetch(`/api/profile/${address}`)
+      const data = await response.json()
+      const stats = data.success ? data.data.referralStats : null
+      return {
+        totalReferrals: stats?.totalReferrals || 0,
+        activeReferrals: stats?.activeReferrals || 0,
+        totalEarned: stats?.totalEarned || 0,
+      }
+    } catch (error) {
+      console.error("Error fetching referral stats:", error)
+      return {
+        totalReferrals: 0,
+        activeReferrals: 0,
+        totalEarned: 0,
+      }
+    }
   }
 }
 

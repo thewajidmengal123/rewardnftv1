@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { NavigationBar } from "@/components/navigation-bar"
+
 import profileService, { type UserProfile } from "@/services/profile-service"
-import { Loader2, Trophy, Gift, Users, Star, ExternalLink } from "lucide-react"
+import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy } from "lucide-react"
 import { getExplorerUrl } from "@/config/solana"
 
 export function ProfilePageContent() {
@@ -51,10 +51,18 @@ export function ProfilePageContent() {
     return getExplorerUrl(address, "address")
   }
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      // You could add a toast notification here
+    } catch (err) {
+      console.error("Failed to copy text: ", err)
+    }
+  }
+
   if (!connected && !connecting) {
     return (
       <div className="min-h-screen text-white">
-        <NavigationBar />
         <div className="container mx-auto px-4 py-16 flex flex-col items-center justify-center">
           <h1 className="text-3xl font-bold mb-6">Connect Your Wallet</h1>
           <p className="text-gray-400 mb-8 text-center max-w-md">
@@ -69,7 +77,6 @@ export function ProfilePageContent() {
   if (loading) {
     return (
       <div className="min-h-screen text-white">
-        <NavigationBar />
         <div className="container mx-auto px-4 py-16 flex flex-col items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin mb-4" />
           <p className="text-gray-400">Loading your profile...</p>
@@ -81,7 +88,6 @@ export function ProfilePageContent() {
   if (error) {
     return (
       <div className="min-h-screen text-white">
-        <NavigationBar />
         <div className="container mx-auto px-4 py-16 flex flex-col items-center justify-center">
           <p className="text-red-400 mb-4">{error}</p>
           <Button onClick={loadProfile}>Retry</Button>
@@ -92,8 +98,6 @@ export function ProfilePageContent() {
 
   return (
     <div className="min-h-screen flex flex-col text-white">
-      <NavigationBar />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Profile Header */}
@@ -127,7 +131,7 @@ export function ProfilePageContent() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
             <TabsList className="grid grid-cols-3 md:grid-cols-5 mb-8">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="nfts">My NFTs</TabsTrigger>
+              {/* <TabsTrigger value="nfts">My NFTs</TabsTrigger> */}
               <TabsTrigger value="quests">Quests</TabsTrigger>
               <TabsTrigger value="referrals">Referrals</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -189,22 +193,30 @@ export function ProfilePageContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {profile?.activities.slice(0, 5).map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                        <div>
-                          <p className="font-medium">{activity.title}</p>
-                          <p className="text-sm text-gray-400">{activity.description}</p>
-                          <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                    {profile?.activities && profile.activities.length > 0 ? (
+                      profile.activities.slice(0, 5).map((activity) => (
+                        <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                          <div>
+                            <p className="font-medium">{activity.title}</p>
+                            <p className="text-sm text-gray-400">{activity.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(activity.timestamp).toLocaleDateString()} {new Date(activity.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                          {activity.points && <Badge variant="secondary">+{activity.points} pts</Badge>}
                         </div>
-                        {activity.points && <Badge variant="secondary">+{activity.points} pts</Badge>}
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-400">No recent activity</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="nfts">
+            {/* <TabsContent value="nfts">
               <Card>
                 <CardHeader>
                   <CardTitle>My NFT Collection</CardTitle>
@@ -252,16 +264,37 @@ export function ProfilePageContent() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             <TabsContent value="quests">
               <Card>
                 <CardHeader>
                   <CardTitle>Quest Progress</CardTitle>
-                  <CardDescription>Complete quests to earn rewards and points</CardDescription>
+                  <CardDescription>Complete quests to earn XP and rewards</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-400">Quest system coming soon...</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="text-center p-4 bg-gray-800 rounded-lg">
+                        <p className="text-2xl font-bold text-yellow-400">{profile?.stats.points || 0}</p>
+                        <p className="text-sm text-gray-400">Total XP</p>
+                      </div>
+                      <div className="text-center p-4 bg-gray-800 rounded-lg">
+                        <p className="text-2xl font-bold text-green-400">{profile?.stats.questsCompleted || 0}</p>
+                        <p className="text-sm text-gray-400">Quests Completed</p>
+                      </div>
+                      <div className="text-center p-4 bg-gray-800 rounded-lg">
+                        <p className="text-2xl font-bold text-blue-400">Level {Math.floor((profile?.stats.points || 0) / 500) + 1}</p>
+                        <p className="text-sm text-gray-400">Current Level</p>
+                      </div>
+                    </div>
+                    <div className="text-center py-4">
+                      <p className="text-gray-400 mb-4">Visit the Quests page to start earning XP!</p>
+                      <Button asChild>
+                        <a href="/quests">View All Quests</a>
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -276,7 +309,17 @@ export function ProfilePageContent() {
                   <div className="space-y-4">
                     <div className="p-4 bg-gray-800 rounded-lg">
                       <p className="text-sm text-gray-400 mb-2">Your Referral Code</p>
-                      <p className="font-mono text-lg">{profile?.referralCode || "Loading..."}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-lg flex-1">{profile?.referralCode || "Loading..."}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(profile?.referralCode || "")}
+                          disabled={!profile?.referralCode}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="text-center">
@@ -292,6 +335,11 @@ export function ProfilePageContent() {
                         <p className="text-sm text-gray-400">USDC Earned</p>
                       </div>
                     </div>
+                    <div className="text-center pt-4">
+                      <Button asChild>
+                        <a href="/referrals">View Referral Details</a>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -305,16 +353,24 @@ export function ProfilePageContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {profile?.activities.map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                        <div>
-                          <p className="font-medium">{activity.title}</p>
-                          <p className="text-sm text-gray-400">{activity.description}</p>
-                          <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                    {profile?.activities && profile.activities.length > 0 ? (
+                      profile.activities.map((activity) => (
+                        <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                          <div>
+                            <p className="font-medium">{activity.title}</p>
+                            <p className="text-sm text-gray-400">{activity.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(activity.timestamp).toLocaleDateString()} {new Date(activity.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                          {activity.points && <Badge variant="secondary">+{activity.points} pts</Badge>}
                         </div>
-                        {activity.points && <Badge variant="secondary">+{activity.points} pts</Badge>}
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-400">No activity history available</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
