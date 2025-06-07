@@ -275,7 +275,7 @@ export function ReferralsPageContent() {
                   </div>
 
                   {/* Error Display */}
-                  {error && (
+                  {/* {error && (
                     <div className="glass-card p-6 border-red-500/20 bg-red-500/5">
                       <div className="text-red-400 mb-3">
                         <div className="font-semibold mb-2">⚠️ Connection Error</div>
@@ -435,7 +435,7 @@ export function ReferralsPageContent() {
                         )}
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   {/* Test Results Display */}
                   {testResults && (

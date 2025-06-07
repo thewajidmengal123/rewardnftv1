@@ -13,7 +13,7 @@ export function MiniGamePageContent() {
   const { connected, publicKey } = useWallet()
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameOver'>('menu')
   const [score, setScore] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(30)
+  const [timeLeft, setTimeLeft] = useState(20)
   const [clicks, setClicks] = useState(0)
   const [gameInterval, setGameInterval] = useState<NodeJS.Timeout | null>(null)
   const [questCompleted, setQuestCompleted] = useState(false)
@@ -24,7 +24,7 @@ export function MiniGamePageContent() {
     if (pendingQuestId) {
       toast({
         title: "Quest Active!",
-        description: "Score 1000+ points to complete the mini-game quest!",
+        description: "Score 1500+ points in 20 seconds to complete the mini-game quest!",
       })
     }
   }, [])
@@ -33,7 +33,7 @@ export function MiniGamePageContent() {
     setGameState('playing')
     setScore(0)
     setClicks(0)
-    setTimeLeft(30)
+    setTimeLeft(20) // Reduced from 30 to 20 seconds
     setQuestCompleted(false)
 
     const interval = setInterval(() => {
@@ -56,9 +56,9 @@ export function MiniGamePageContent() {
       setGameInterval(null)
     }
 
-    // Check if quest should be completed
+    // Check if quest should be completed (increased target to 1500)
     const pendingQuestId = localStorage.getItem('pendingQuestId')
-    if (pendingQuestId && score >= 1000 && !questCompleted) {
+    if (pendingQuestId && score >= 1500 && !questCompleted) {
       completeQuest(pendingQuestId, score)
     }
   }, [gameInterval, score, questCompleted])
@@ -99,8 +99,27 @@ export function MiniGamePageContent() {
   const handleClick = () => {
     if (gameState !== 'playing') return
 
-    const points = Math.floor(Math.random() * 50) + 10 // 10-60 points per click
-    setScore(prev => prev + points)
+    // More challenging scoring system
+    // Base points: 5-25 (reduced from 10-60)
+    // Bonus for consecutive clicks within 1 second
+    const basePoints = Math.floor(Math.random() * 21) + 5 // 5-25 points per click
+
+    // Time-based multiplier (more points early in the game)
+    const timeMultiplier = timeLeft > 15 ? 1.5 : timeLeft > 10 ? 1.2 : 1.0
+
+    // Click speed bonus (if clicking fast)
+    const now = Date.now()
+    const lastClickTime = localStorage.getItem('lastClickTime')
+    let speedBonus = 1.0
+
+    if (lastClickTime && now - parseInt(lastClickTime) < 500) {
+      speedBonus = 1.3 // 30% bonus for fast clicking
+    }
+
+    localStorage.setItem('lastClickTime', now.toString())
+
+    const finalPoints = Math.floor(basePoints * timeMultiplier * speedBonus)
+    setScore(prev => prev + finalPoints)
     setClicks(prev => prev + 1)
   }
 
@@ -108,7 +127,7 @@ export function MiniGamePageContent() {
     setGameState('menu')
     setScore(0)
     setClicks(0)
-    setTimeLeft(30)
+    setTimeLeft(20) // Updated to match new game time
     setQuestCompleted(false)
     if (gameInterval) {
       clearInterval(gameInterval)
@@ -150,7 +169,7 @@ export function MiniGamePageContent() {
                   Challenge
                 </span>
               </h1>
-              <p className="text-gray-300">Click as fast as you can to score points! Get 1000+ points to complete the quest!</p>
+              <p className="text-gray-300">Click as fast as you can to score points! Get 1500+ points in 20 seconds to complete the quest!</p>
             </div>
 
             {/* Game Area */}
@@ -180,7 +199,7 @@ export function MiniGamePageContent() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-300">Quest Target:</span>
-                      <span className="text-lg font-bold text-purple-400">1000+</span>
+                      <span className="text-lg font-bold text-purple-400">1500+</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -191,7 +210,7 @@ export function MiniGamePageContent() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2">
                         <Star className="w-5 h-5 text-purple-400" />
-                        <span className="text-purple-300">Quest Active: Score 1000+ points!</span>
+                        <span className="text-purple-300">Quest Active: Score 1500+ points in 20 seconds!</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -206,7 +225,7 @@ export function MiniGamePageContent() {
                       <CardTitle className="text-white text-center">Ready to Play?</CardTitle>
                     </CardHeader>
                     <CardContent className="text-center space-y-4">
-                      <p className="text-gray-300">Click the button as many times as you can in 30 seconds!</p>
+                      <p className="text-gray-300">Click the button as many times as you can in 20 seconds!</p>
                       <Button
                         onClick={startGame}
                         size="lg"
@@ -243,7 +262,7 @@ export function MiniGamePageContent() {
                       <div className="text-3xl font-bold text-yellow-400">Final Score: {score}</div>
                       <div className="text-lg text-gray-300">Clicks: {clicks}</div>
 
-                      {score >= 1000 ? (
+                      {score >= 1500 ? (
                         <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
                           <div className="text-green-400 font-bold">🎉 Excellent! Quest Target Reached!</div>
                           {questCompleted && (
@@ -252,7 +271,7 @@ export function MiniGamePageContent() {
                         </div>
                       ) : (
                         <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-4">
-                          <div className="text-orange-400">Need {1000 - score} more points for quest completion</div>
+                          <div className="text-orange-400">Need {1500 - score} more points for quest completion</div>
                         </div>
                       )}
 
