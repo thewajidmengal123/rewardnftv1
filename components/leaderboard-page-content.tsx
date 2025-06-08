@@ -349,9 +349,6 @@ export function LeaderboardPageContent() {
                       <th className="text-center text-gray-300 py-4 px-6 font-semibold text-sm uppercase tracking-wide">
                         USDC Earned
                       </th>
-                      <th className="text-center text-gray-300 py-4 px-6 font-semibold text-sm uppercase tracking-wide">
-                        Performance
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -377,15 +374,11 @@ export function LeaderboardPageContent() {
                           <td className="py-5 px-6">
                             <div className="bg-gray-600 h-6 w-20 rounded mx-auto"></div>
                           </td>
-                          <td className="py-5 px-6">
-                            <div className="bg-gray-600 h-4 w-24 rounded mx-auto"></div>
-                          </td>
                         </tr>
                       ))
                     ) : getCurrentLeaderboard().length > 0 ? (
                       getCurrentLeaderboard().map((user, index) => {
                         const isTopTen = user.rank <= 10
-                        const earnedPerReferral = user.totalReferrals > 0 ? user.totalEarned / user.totalReferrals : 0
 
                         return (
                           <tr
@@ -444,20 +437,10 @@ export function LeaderboardPageContent() {
                             <td className="text-center py-5 px-6">
                               <div className="space-y-1">
                                 <div className="text-teal-400 font-bold text-lg">
-                                  ${user.totalEarned.toFixed(2)}
+                                  ${(user.totalReferrals * 4).toFixed(2)}
                                 </div>
                                 <div className="text-gray-400 text-xs">
-                                  total earned
-                                </div>
-                              </div>
-                            </td>
-                            <td className="text-center py-5 px-6">
-                              <div className="space-y-1">
-                                <div className="text-green-400 font-medium">
-                                  ${earnedPerReferral.toFixed(2)}
-                                </div>
-                                <div className="text-gray-400 text-xs">
-                                  per referral
+                                  total earned ($4 per referral)
                                 </div>
                               </div>
                             </td>
@@ -466,7 +449,7 @@ export function LeaderboardPageContent() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={5} className="py-16 text-center">
+                        <td colSpan={4} className="py-16 text-center">
                           <div className="space-y-4">
                             <div className="text-6xl">🏆</div>
                             <div className="text-gray-400 text-lg">

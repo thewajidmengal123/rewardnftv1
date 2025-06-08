@@ -130,7 +130,7 @@ export function FirebaseLeaderboard({
             <div className="text-xs text-white/70">Referrals</div>
           </div>
           <div className="bg-white/5 rounded-lg p-2">
-            <div className="text-lg font-bold">{stats.totalRewards}</div>
+            <div className="text-lg font-bold">{(stats.totalReferrals * 4).toFixed(0)}</div>
             <div className="text-xs text-white/70">USDC</div>
           </div>
         </div>
@@ -147,7 +147,7 @@ export function FirebaseLeaderboard({
             </div>
             <div className="text-right">
               <div className="font-bold">{userStats.totalReferrals} {getScoreLabel(type)}</div>
-              <div className="text-xs text-white/70">{userStats.totalEarned} USDC earned</div>
+              <div className="text-xs text-white/70">{(userStats.totalReferrals * 4).toFixed(2)} USDC earned</div>
             </div>
           </div>
         </div>
@@ -184,7 +184,7 @@ export function FirebaseLeaderboard({
                   {entry.score} {getScoreLabel(type)}
                 </div>
                 <div className="text-white/70 text-sm">
-                  {entry.totalEarned} USDC
+                  {(entry.totalReferrals * 4).toFixed(2)} USDC
                 </div>
               </div>
             </div>

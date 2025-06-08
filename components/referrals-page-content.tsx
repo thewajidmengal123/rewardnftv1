@@ -233,7 +233,7 @@ export function ReferralsPageContent() {
                     <div className="glass-card glass-card-hover p-6">
                       <div className="text-center">
                         <div className="text-3xl md:text-4xl font-bold text-teal-400 mb-2">
-                          {(stats?.totalEarned * 4 || 0).toFixed(2)} USDC
+                          {(stats?.totalReferrals * 4 || 0).toFixed(2)} USDC
                         </div>
                         <div className="text-sm text-gray-400 uppercase tracking-wide">Total Earned</div>
                       </div>

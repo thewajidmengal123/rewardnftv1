@@ -17,9 +17,20 @@ export function MiniGamePageContent() {
   const [clicks, setClicks] = useState(0)
   const [gameInterval, setGameInterval] = useState<NodeJS.Timeout | null>(null)
   const [questCompleted, setQuestCompleted] = useState(false)
+  const [xpEarned, setXpEarned] = useState(0)
+  const [totalXpEarned, setTotalXpEarned] = useState(0)
+  const [hasPlayedToday, setHasPlayedToday] = useState(false)
+  const [lastPlayDate, setLastPlayDate] = useState<string | null>(null)
+  const [checkingPlayStatus, setCheckingPlayStatus] = useState(true)
+  const [timeUntilReset, setTimeUntilReset] = useState<string>('')
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null)
 
-  // Check for pending quest on component mount
+  // Check daily play status and pending quest on component mount
   useEffect(() => {
+    if (connected && publicKey) {
+      checkDailyPlayStatus()
+    }
+
     const pendingQuestId = localStorage.getItem('pendingQuestId')
     if (pendingQuestId) {
       toast({
@@ -27,14 +38,99 @@ export function MiniGamePageContent() {
         description: "Score 1500+ points in 20 seconds to complete the mini-game quest!",
       })
     }
-  }, [])
+  }, [connected, publicKey])
 
-  const startGame = () => {
+  // Update countdown timer every minute when user has played today
+  useEffect(() => {
+    if (!hasPlayedToday) return
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0) // Set to midnight
+
+      const timeDiff = tomorrow.getTime() - now.getTime()
+      const hours = Math.floor(timeDiff / (1000 * 60 * 60))
+      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60))
+
+      setTimeUntilReset(`${hours}h ${minutes}m`)
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [hasPlayedToday])
+
+  const checkDailyPlayStatus = async () => {
+    if (!publicKey) return
+
+    try {
+      setCheckingPlayStatus(true)
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+
+      const response = await fetch(`/api/mini-game/play-status?walletAddress=${publicKey.toString()}&date=${today}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setHasPlayedToday(result.hasPlayedToday)
+        setLastPlayDate(result.lastPlayDate)
+        setSessionStatus(result.sessionStatus)
+
+        console.log('🎮 Mini-game play status:', {
+          hasPlayedToday: result.hasPlayedToday,
+          sessionStatus: result.sessionStatus,
+          lastPlayDate: result.lastPlayDate
+        })
+
+        // If user has a session today (started or completed), they cannot play again
+        if (result.hasPlayedToday && (result.sessionStatus === 'started' || result.sessionStatus === 'completed')) {
+          setHasPlayedToday(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking daily play status:', error)
+      // On error, allow play (fail open)
+      setHasPlayedToday(false)
+    } finally {
+      setCheckingPlayStatus(false)
+    }
+  }
+
+  const startGame = async () => {
+    // Double-check play status before starting
+    await checkDailyPlayStatus()
+
+    // Check if user has already played today
+    if (hasPlayedToday || sessionStatus === 'completed') {
+      toast({
+        title: "Daily Limit Reached",
+        description: "You can only play the mini-game once per day. Come back tomorrow!",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Record the play session start
+    const sessionRecorded = await recordPlaySession()
+
+    // If session recording failed, don't start the game
+    if (!sessionRecorded) {
+      toast({
+        title: "Error",
+        description: "Failed to start game session. Please try again.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setGameState('playing')
     setScore(0)
     setClicks(0)
     setTimeLeft(20) // Reduced from 30 to 20 seconds
     setQuestCompleted(false)
+    setXpEarned(0) // Reset XP for new game
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -49,6 +145,37 @@ export function MiniGamePageContent() {
     setGameInterval(interval)
   }
 
+  const recordPlaySession = async (): Promise<boolean> => {
+    if (!publicKey) return false
+
+    try {
+      const today = new Date().toISOString().split('T')[0]
+
+      const response = await fetch('/api/mini-game/record-play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          playDate: today,
+          startedAt: Date.now()
+        })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        setHasPlayedToday(true)
+        setLastPlayDate(today)
+        return true
+      } else {
+        console.error('Failed to record play session:', result.error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error recording play session:', error)
+      return false
+    }
+  }
+
   const endGame = useCallback(() => {
     setGameState('gameOver')
     if (gameInterval) {
@@ -56,12 +183,76 @@ export function MiniGamePageContent() {
       setGameInterval(null)
     }
 
+    // Save XP earned to backend
+    if (xpEarned > 0 && publicKey) {
+      saveXPToBackend(xpEarned)
+    }
+
     // Check if quest should be completed (increased target to 1500)
     const pendingQuestId = localStorage.getItem('pendingQuestId')
     if (pendingQuestId && score >= 1500 && !questCompleted) {
       completeQuest(pendingQuestId, score)
     }
-  }, [gameInterval, score, questCompleted])
+  }, [gameInterval, score, questCompleted, xpEarned, publicKey])
+
+  const saveXPToBackend = async (xpAmount: number) => {
+    if (!publicKey) return
+
+    try {
+      // Save XP
+      const xpResponse = await fetch('/api/xp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          xpAmount,
+          source: 'mini-game',
+          details: {
+            gameScore: score,
+            clicks: clicks,
+            timeSpent: 20 - timeLeft,
+            completedAt: Date.now()
+          }
+        })
+      })
+
+      // Update session as completed
+      const today = new Date().toISOString().split('T')[0]
+      await fetch('/api/mini-game/complete-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          playDate: today,
+          gameScore: score,
+          clicks: clicks,
+          xpEarned: xpAmount,
+          completedAt: Date.now()
+        })
+      })
+
+      const result = await xpResponse.json()
+      if (result.success) {
+        setTotalXpEarned(prev => prev + xpAmount)
+
+        // Ensure user cannot play again today
+        setHasPlayedToday(true)
+        setLastPlayDate(today)
+
+        toast({
+          title: "Game Complete!",
+          description: `You earned ${xpAmount} XP from the mini-game! Come back tomorrow to play again.`,
+        })
+      }
+    } catch (error) {
+      console.error('XP save error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to save XP. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
 
   const completeQuest = async (questId: string, finalScore: number) => {
     if (!publicKey) return
@@ -121,6 +312,28 @@ export function MiniGamePageContent() {
     const finalPoints = Math.floor(basePoints * timeMultiplier * speedBonus)
     setScore(prev => prev + finalPoints)
     setClicks(prev => prev + 1)
+
+    // Award XP based on clicks (max 250 XP total)
+    // XP formula: 1-3 XP per click, with diminishing returns after 100 clicks
+    const currentXP = xpEarned
+    if (currentXP < 250) {
+      let xpToAward = 0
+
+      if (clicks < 50) {
+        // Early clicks: 3 XP each (up to 150 XP)
+        xpToAward = 3
+      } else if (clicks < 100) {
+        // Mid clicks: 2 XP each (up to 100 more XP = 250 total)
+        xpToAward = 2
+      } else {
+        // Late clicks: 1 XP each (diminishing returns)
+        xpToAward = 1
+      }
+
+      // Ensure we don't exceed 250 XP total
+      const newXP = Math.min(currentXP + xpToAward, 250)
+      setXpEarned(newXP)
+    }
   }
 
   const resetGame = () => {
@@ -129,6 +342,7 @@ export function MiniGamePageContent() {
     setClicks(0)
     setTimeLeft(20) // Updated to match new game time
     setQuestCompleted(false)
+    setXpEarned(0) // Reset XP for new game
     if (gameInterval) {
       clearInterval(gameInterval)
       setGameInterval(null)
@@ -169,7 +383,9 @@ export function MiniGamePageContent() {
                   Challenge
                 </span>
               </h1>
-              <p className="text-gray-300">Click as fast as you can to score points! Get 1500+ points in 20 seconds to complete the quest!</p>
+              <p className="text-gray-300">Click as fast as you can to score points and earn XP! Get 1500+ points in 20 seconds to complete the quest!</p>
+              <p className="text-cyan-300 text-sm">💡 Earn up to 250 XP based on your clicks - more clicks = more XP!</p>
+              <p className="text-yellow-300 text-sm">⏰ You can play once per day - make it count!</p>
             </div>
 
             {/* Game Area */}
@@ -201,6 +417,25 @@ export function MiniGamePageContent() {
                       <span className="text-gray-300">Quest Target:</span>
                       <span className="text-lg font-bold text-purple-400">1500+</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">XP Earned:</span>
+                      <span className="text-lg font-bold text-cyan-400">{xpEarned}/250</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Daily Play Status */}
+                <Card className={`${hasPlayedToday || sessionStatus === 'completed' ? 'bg-red-900/30 border-red-700' : 'bg-green-900/30 border-green-700'}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Star className={`w-5 h-5 ${hasPlayedToday || sessionStatus === 'completed' ? 'text-red-400' : 'text-green-400'}`} />
+                      <span className={hasPlayedToday || sessionStatus === 'completed' ? 'text-red-300' : 'text-green-300'}>
+                        {hasPlayedToday || sessionStatus === 'completed'
+                          ? `Already played today (${lastPlayDate}). Next play in: ${timeUntilReset}`
+                          : 'Ready to play! You can play once per day.'
+                        }
+                      </span>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -226,14 +461,30 @@ export function MiniGamePageContent() {
                     </CardHeader>
                     <CardContent className="text-center space-y-4">
                       <p className="text-gray-300">Click the button as many times as you can in 20 seconds!</p>
-                      <Button
-                        onClick={startGame}
-                        size="lg"
-                        className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold"
-                      >
-                        <Play className="w-5 h-5 mr-2" />
-                        Start Game
-                      </Button>
+                      <p className="text-cyan-300 text-sm">Earn XP with every click - up to 250 XP total!</p>
+                      {checkingPlayStatus ? (
+                        <Button
+                          disabled
+                          size="lg"
+                          className="bg-gray-600 text-gray-300"
+                        >
+                          Checking Status...
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={startGame}
+                          disabled={hasPlayedToday || sessionStatus === 'completed'}
+                          size="lg"
+                          className={`${
+                            hasPlayedToday || sessionStatus === 'completed'
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold'
+                          }`}
+                        >
+                          <Play className="w-5 h-5 mr-2" />
+                          {hasPlayedToday || sessionStatus === 'completed' ? 'Played Today' : 'Start Game'}
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -248,7 +499,8 @@ export function MiniGamePageContent() {
                       >
                         CLICK ME!
                       </Button>
-                      <p className="text-gray-300 mt-4">Keep clicking to score points!</p>
+                      <p className="text-gray-300 mt-4">Keep clicking to score points and earn XP!</p>
+                      <p className="text-cyan-400 text-sm">XP: {xpEarned}/250</p>
                     </CardContent>
                   </Card>
                 )}
@@ -261,10 +513,12 @@ export function MiniGamePageContent() {
                     <CardContent className="text-center space-y-4">
                       <div className="text-3xl font-bold text-yellow-400">Final Score: {score}</div>
                       <div className="text-lg text-gray-300">Clicks: {clicks}</div>
+                      <div className="text-xl font-bold text-cyan-400">XP Earned: {xpEarned}</div>
 
                       {score >= 1500 ? (
                         <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
                           <div className="text-green-400 font-bold">🎉 Excellent! Quest Target Reached!</div>
+                          <div className="text-cyan-300 text-sm mt-1">Game XP: {xpEarned} XP earned from clicks!</div>
                           {questCompleted && (
                             <div className="text-green-300 text-sm mt-2">Quest completed! You earned 150 XP!</div>
                           )}
@@ -272,6 +526,7 @@ export function MiniGamePageContent() {
                       ) : (
                         <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-4">
                           <div className="text-orange-400">Need {1500 - score} more points for quest completion</div>
+                          <div className="text-cyan-300 text-sm mt-1">But you still earned {xpEarned} XP from clicks!</div>
                         </div>
                       )}
 

@@ -88,7 +88,7 @@ export function ReferralHistory({ referrals = [] }: ReferralHistoryProps) {
                     </Badge>
                     <div className="flex items-center gap-1 text-teal-400 font-medium">
                       <DollarSign className="h-4 w-4" />
-                      <span>{referral.points}</span>
+                      <span>{referral.status === "completed" ? "4" : "0"}</span>
                     </div>
                   </div>
                 </div>
@@ -105,7 +105,7 @@ export function ReferralHistory({ referrals = [] }: ReferralHistoryProps) {
             <span className="text-gray-400">Total Earnings from Referrals:</span>
             <div className="flex items-center gap-1 text-teal-400 font-medium">
               <DollarSign className="h-4 w-4" />
-              <span>{referrals.reduce((total, ref) => total + (ref.status === "completed" ? ref.points : 0), 0)} USDC</span>
+              <span>{referrals.reduce((total, ref) => total + (ref.status === "completed" ? 4 : 0), 0)} USDC</span>
             </div>
           </div>
         </div>
