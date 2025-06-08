@@ -84,7 +84,7 @@ export function ProfileWalletInfo() {
                   asChild
                 >
                   <a
-                    href={`https://explorer.solana.com/address/${publicKey.toString()}?cluster=devnet`}
+                    href={`https://explorer.solana.com/address/${publicKey.toString()}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

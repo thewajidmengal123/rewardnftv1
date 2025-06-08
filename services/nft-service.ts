@@ -17,7 +17,7 @@ class NFTService {
 
   constructor() {
     // Initialize with default connection - will be updated when used
-    this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.devnet.solana.com")
+    this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com")
     this.metaplex = new Metaplex(this.connection)
   }
 

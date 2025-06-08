@@ -4,7 +4,7 @@
   "url": "https://rainbownft.netlify.app",
   "icon": "/images/logo.png",
   "version": "1.0.0",
-  "network": "devnet",
+  "network": "mainnet-beta",
   "features": {
     "nft_minting": true,
     "referral_system": true,

@@ -9,8 +9,8 @@ export const CANDY_MACHINE_ID = "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
 /** NETWORK CONFIGURATION **/
 export type SolanaNetwork = "mainnet-beta" | "devnet" | "testnet"
 
-// Use environment variable or default to devnet
-export const CURRENT_NETWORK: SolanaNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK as SolanaNetwork) || "devnet"
+// Use environment variable or default to mainnet-beta
+export const CURRENT_NETWORK: SolanaNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK as SolanaNetwork) || "mainnet-beta"
 
 // RPC Endpoints with environment variable support
 export const SOLANA_RPC_ENDPOINTS = {
@@ -23,7 +23,7 @@ export const SOLANA_RPC_ENDPOINTS = {
 export const DEFAULT_RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC ||
   process.env.NEXT_PUBLIC_RPC_ENDPOINT ||
-  "https://api.devnet.solana.com"
+  "https://api.mainnet-beta.solana.com"
 
 /** EXPLORER CONFIGURATION **/
 export const SOLANA_EXPLORER_URLS = {

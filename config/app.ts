@@ -3,12 +3,12 @@ export const APP_CONFIG = {
   name: process.env.NEXT_PUBLIC_APP_NAME || "Reward NFT Platform",
   description: "Mint NFTs, earn rewards, and build your network on Solana",
   version: "1.0.0",
-  network: process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet",
+  network: process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta",
 
   // RPC Configuration - Only QuickNode and fallback
   rpc: {
-    primary: process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com",
-    fallback: "https://api.devnet.solana.com",
+    primary: process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com",
+    fallback: "https://api.mainnet-beta.solana.com",
   },
 
   // Feature Flags

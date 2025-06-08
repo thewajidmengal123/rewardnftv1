@@ -31,7 +31,7 @@ export function WalletAddress({ showExplorer = true, showCopy = true, className 
   }
 
   const openExplorer = () => {
-    window.open(`https://explorer.solana.com/address/${publicKey.toString()}?cluster=devnet`, "_blank")
+    window.open(`https://explorer.solana.com/address/${publicKey.toString()}`, "_blank")
   }
 
   return (

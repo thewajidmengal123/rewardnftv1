@@ -248,7 +248,7 @@ export function detectWalletProviders(): string[] {
 
 // Initialize a default connection manager
 export const defaultConnectionManager = new ConnectionManager(
-  process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC || "https://api.devnet.solana.com",
+  process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com",
 )
 
 // Initialize a wallet adapter registry

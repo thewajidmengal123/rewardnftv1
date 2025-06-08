@@ -9,7 +9,7 @@ export const COLLECTION_MINT_ID = new PublicKey("EnEnryMh6Lcxjr8Qard3kSFHJokSxCu
 // Company wallet address
 export const COMPANY_WALLET = new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6")
 
-// USDC mint address (devnet)
+// USDC mint address (mainnet)
 export const USDC_MINT_ADDRESS = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 
 // Collection metadata
@@ -87,6 +87,6 @@ export const CANDY_MACHINE_CONFIG = {
 
 // Network configuration
 export const NETWORK_CONFIG = {
-  cluster: "devnet",
-  rpcUrl: process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC || "https://api.devnet.solana.com",
+  cluster: "mainnet-beta",
+  rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com",
 }
