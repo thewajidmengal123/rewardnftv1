@@ -48,7 +48,7 @@ export const NFT_CONFIG = {
   referralReward: 4, // USDC to referrer per NFT (when referred: 4 to referrer + 6 to treasury = 10 per NFT)
   treasuryAmount: 6, // USDC to treasury per NFT when referred (when no referrer: full 10 to treasury per NFT)
   usdcDecimals: 6, // USDC has 6 decimal places
-  network: (process.env.NEXT_PUBLIC_SOLANA_NETWORK as keyof typeof USDC_MINT_ADDRESSES) || "mainnet",
+  network: (process.env.NEXT_PUBLIC_SOLANA_NETWORK as keyof typeof USDC_MINT_ADDRESSES) || "mainnet-beta",
   // NFT Metadata
   name: "RewardNFT Collection",
   symbol: "RNFT",
