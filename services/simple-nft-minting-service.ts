@@ -121,7 +121,7 @@ export class SimpleNFTMintingService {
       if (quantity <= 0 || quantity > NFT_CONFIG.maxPerWallet) {
         return {
           success: false,
-          error: `Invalid quantity. Must be between 1 and ${NFT_CONFIG.maxPerWallet}`,
+          error: `🔢 Invalid NFT Quantity\n\n📋 Quantity Rules:\n• Minimum: 1 NFT\n• Maximum: ${NFT_CONFIG.maxPerWallet} NFT per wallet\n• Your request: ${quantity} NFT(s)\n\n💡 Our platform allows only ${NFT_CONFIG.maxPerWallet} NFT per wallet to ensure fair distribution.\n\nPlease select a valid quantity and try again.`,
         }
       }
 
@@ -144,11 +144,13 @@ export class SimpleNFTMintingService {
       // Step 1: Validate SOL balance for transaction fees
       const solBalance = await this.connection.getBalance(minter)
       const requiredSolForFees = quantity * 0.015 * LAMPORTS_PER_SOL // More accurate estimate per NFT
-      
+      const currentSolBalance = solBalance / LAMPORTS_PER_SOL
+      const requiredSol = requiredSolForFees / LAMPORTS_PER_SOL
+
       if (solBalance < requiredSolForFees) {
         return {
           success: false,
-          error: `Insufficient SOL balance. You need at least ${requiredSolForFees / LAMPORTS_PER_SOL} SOL for transaction fees.`,
+          error: `💰 Insufficient SOL Balance\n\nYou need SOL to pay for blockchain transaction fees.\n\n📊 Balance Details:\n• Current SOL: ${currentSolBalance.toFixed(4)} SOL\n• Required SOL: ${requiredSol.toFixed(4)} SOL\n• Shortage: ${(requiredSol - currentSolBalance).toFixed(4)} SOL\n\n💡 Solution:\nPlease add SOL to your wallet to cover transaction fees. You can purchase SOL from exchanges like Coinbase, Binance, or use a SOL faucet if available.`,
         }
       }
 
@@ -335,9 +337,31 @@ export class SimpleNFTMintingService {
       }
     } catch (error) {
       console.error("❌ Error in NFT minting process:", error)
+
+      // Provide detailed error messages based on error type
+      let detailedError = "❌ NFT Minting Failed\n\nAn unexpected error occurred during the minting process.\n\n"
+
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+
+        if (errorMessage.includes("insufficient funds") || errorMessage.includes("insufficient balance")) {
+          detailedError = `💰 Insufficient Funds\n\nYour wallet doesn't have enough funds to complete this transaction.\n\n🔍 Error Details:\n${error.message}\n\n💡 Solution:\n• Check your SOL balance for transaction fees\n• Check your USDC balance for NFT payment\n• Add funds to your wallet and try again`
+        } else if (errorMessage.includes("transaction failed") || errorMessage.includes("simulation failed")) {
+          detailedError = `⚠️ Transaction Failed\n\nThe blockchain transaction could not be completed.\n\n🔍 Error Details:\n${error.message}\n\n💡 Possible Solutions:\n• Network congestion - try again in a few minutes\n• Insufficient SOL for fees\n• RPC endpoint issues - refresh and retry\n• Check your wallet connection`
+        } else if (errorMessage.includes("user rejected") || errorMessage.includes("user denied")) {
+          detailedError = `🚫 Transaction Cancelled\n\nYou cancelled the transaction in your wallet.\n\n💡 To complete the mint:\n• Click the mint button again\n• Approve the transaction in your wallet\n• Make sure you have sufficient funds`
+        } else if (errorMessage.includes("network") || errorMessage.includes("rpc") || errorMessage.includes("connection")) {
+          detailedError = `🌐 Network Connection Error\n\nThere was a problem connecting to the Solana network.\n\n🔍 Error Details:\n${error.message}\n\n💡 Solutions:\n• Check your internet connection\n• Refresh the page and try again\n• The network may be experiencing high traffic`
+        } else {
+          detailedError += `🔍 Technical Details:\n${error.message}\n\n💡 Suggestions:\n• Refresh the page and try again\n• Check your wallet connection\n• Ensure you have sufficient SOL and USDC\n• Contact support if the issue persists`
+        }
+      } else {
+        detailedError += "🔍 Technical Details:\nUnknown error type\n\n💡 Suggestions:\n• Refresh the page and try again\n• Check your wallet connection\n• Contact support if the issue persists"
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
+        error: detailedError,
       }
     }
   }
@@ -367,9 +391,12 @@ export class SimpleNFTMintingService {
         })
         
         if (userUsdcAccount.amount < requiredUSDCAmount) {
+          const currentUSDC = Number(userUsdcAccount.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
+          const shortage = requiredAmount - currentUSDC
+
           return {
             success: false,
-            error: `Insufficient USDC balance. You need ${requiredAmount} USDC total (${requiredAmount / NFT_CONFIG.pricePerNFT} NFT(s) × 10 USDC each).`,
+            error: `💳 Insufficient USDC Balance\n\nYou need USDC tokens to mint NFTs on our platform.\n\n📊 Balance Details:\n• Current USDC: ${currentUSDC.toFixed(2)} USDC\n• Required USDC: ${requiredAmount.toFixed(2)} USDC\n• Shortage: ${shortage.toFixed(2)} USDC\n\n💰 NFT Pricing:\n• Price per NFT: ${NFT_CONFIG.pricePerNFT} USDC\n• Quantity: ${requiredAmount / NFT_CONFIG.pricePerNFT} NFT(s)\n\n💡 Solution:\nPlease add USDC to your wallet. You can:\n1. Purchase USDC from exchanges (Coinbase, Binance, etc.)\n2. Swap SOL to USDC using Jupiter or Raydium\n3. Transfer USDC from another wallet`,
           }
         }
 
@@ -378,16 +405,33 @@ export class SimpleNFTMintingService {
         if (error instanceof TokenAccountNotFoundError || error instanceof TokenInvalidAccountOwnerError) {
           return {
             success: false,
-            error: "USDC token account not found. You need to have USDC tokens in your wallet to mint NFTs.",
+            error: `🔍 USDC Account Not Found\n\nYour wallet doesn't have a USDC token account yet.\n\n📋 What this means:\n• You haven't received or held USDC tokens before\n• A USDC account needs to be created in your wallet\n\n💡 Solution:\nTo create a USDC account and get USDC tokens:\n\n1. 🏪 Buy USDC from exchanges:\n   • Coinbase, Binance, Kraken, etc.\n   • Send to your Solana wallet address\n\n2. 🔄 Swap SOL to USDC:\n   • Use Jupiter (jup.ag)\n   • Use Raydium (raydium.io)\n   • Use Orca (orca.so)\n\n3. 📤 Transfer from another wallet:\n   • Send USDC from another Solana wallet\n\n⚠️ Note: You need at least ${NFT_CONFIG.pricePerNFT} USDC to mint 1 NFT`,
           }
         }
         throw error
       }
     } catch (error) {
       console.error("Error validating USDC balance:", error)
+
+      let detailedError = "🔍 USDC Balance Validation Failed\n\n"
+
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+
+        if (errorMessage.includes("network") || errorMessage.includes("connection") || errorMessage.includes("rpc")) {
+          detailedError += `🌐 Network Connection Issue\n\n🔍 Error Details:\n${error.message}\n\n💡 Solutions:\n• Check your internet connection\n• Refresh the page and try again\n• The Solana network may be experiencing high traffic`
+        } else if (errorMessage.includes("timeout")) {
+          detailedError += `⏱️ Request Timeout\n\n🔍 Error Details:\n${error.message}\n\n💡 Solutions:\n• The network is responding slowly\n• Try again in a few moments\n• Check your internet connection`
+        } else {
+          detailedError += `🔍 Technical Details:\n${error.message}\n\n💡 Suggestions:\n• Refresh the page and try again\n• Check your wallet connection\n• Contact support if the issue persists`
+        }
+      } else {
+        detailedError += "Unknown error occurred while checking USDC balance.\n\n💡 Please refresh the page and try again."
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to validate USDC balance",
+        error: detailedError,
       }
     }
   }
@@ -617,9 +661,28 @@ export class SimpleNFTMintingService {
       }
     } catch (error) {
       console.error(`❌ Error in single NFT mint with payment:`, error)
+
+      let detailedError = `❌ NFT #${nftNumber} Minting Failed\n\n`
+
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+
+        if (errorMessage.includes("insufficient funds") || errorMessage.includes("insufficient balance")) {
+          detailedError += `💰 Insufficient Funds for NFT #${nftNumber}\n\n🔍 Error Details:\n${error.message}\n\n💡 Check:\n• SOL balance for transaction fees\n• USDC balance for NFT payment (${NFT_CONFIG.pricePerNFT} USDC required)`
+        } else if (errorMessage.includes("transaction failed") || errorMessage.includes("simulation failed")) {
+          detailedError += `⚠️ Transaction Failed for NFT #${nftNumber}\n\n🔍 Error Details:\n${error.message}\n\n💡 This could be due to:\n• Network congestion\n• Insufficient gas fees\n• RPC endpoint issues`
+        } else if (errorMessage.includes("user rejected") || errorMessage.includes("user denied")) {
+          detailedError += `🚫 Transaction Cancelled\n\nYou cancelled the transaction for NFT #${nftNumber} in your wallet.\n\n💡 To continue:\n• Try minting again\n• Approve the transaction in your wallet`
+        } else {
+          detailedError += `🔍 Technical Details:\n${error.message}\n\n💡 Suggestions:\n• Refresh and try again\n• Check wallet connection\n• Verify sufficient funds`
+        }
+      } else {
+        detailedError += `Unknown error occurred while minting NFT #${nftNumber}\n\n💡 Please try again or contact support.`
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to mint NFT with payment",
+        error: detailedError,
       }
     }
   }
@@ -657,7 +720,9 @@ export class SimpleNFTMintingService {
         console.log(`💰 User USDC balance: ${userBalance} units (${userBalance / Math.pow(10, NFT_CONFIG.usdcDecimals)} USDC)`)
 
         if (userBalance < usdcAmount) {
-          throw new Error(`Insufficient USDC balance. Required: ${amount} USDC, Available: ${userBalance / Math.pow(10, NFT_CONFIG.usdcDecimals)} USDC`)
+          const availableUSDC = userBalance / Math.pow(10, NFT_CONFIG.usdcDecimals)
+          const shortage = amount - availableUSDC
+          throw new Error(`💳 Insufficient USDC for Payment\n\n📊 Payment Details:\n• Required: ${amount} USDC\n• Available: ${availableUSDC.toFixed(2)} USDC\n• Shortage: ${shortage.toFixed(2)} USDC\n\n💡 Please add USDC to your wallet and try again.`)
         }
 
         console.log("✅ User has sufficient USDC balance")
@@ -789,6 +854,19 @@ export class SimpleNFTMintingService {
       return paymentInstructions
     } catch (error) {
       console.error("❌ Error creating USDC payment instructions:", error)
+
+      // Enhance error message for USDC payment issues
+      if (error instanceof Error) {
+        const errorMessage = error.message
+        if (errorMessage.includes("Insufficient USDC")) {
+          // Re-throw the detailed USDC error as-is
+          throw error
+        } else if (errorMessage.includes("TokenAccountNotFoundError")) {
+          throw new Error(`🔍 USDC Account Setup Required\n\nYour wallet needs a USDC token account.\n\n💡 This will be created automatically during the transaction, but you need USDC tokens first.\n\nPlease get USDC tokens and try again.`)
+        } else {
+          throw new Error(`💳 USDC Payment Setup Failed\n\n🔍 Technical Details:\n${errorMessage}\n\n💡 This could be due to:\n• Network connectivity issues\n• Wallet connection problems\n• Solana network congestion\n\nPlease try again in a moment.`)
+        }
+      }
       throw error
     }
   }

@@ -7,11 +7,11 @@ import { Progress } from "@/components/ui/progress"
 import { useWallet } from "@/contexts/wallet-context"
 import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
 import { SimpleNFTMintingService, NFT_CONFIG, type MintProgress } from "@/services/simple-nft-minting-service"
+import { ProfessionalErrorModal } from "@/components/professional-error-modal"
 import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { PublicKey } from "@solana/web3.js"
-import { USDCService } from "@/services/usdc-service"
 import EnhancedUSDCService from "@/services/enhanced-usdc-service"
 
 // Loading component for Suspense fallback
@@ -47,6 +47,15 @@ function NewMintInterfaceInner() {
   const [mintProgress, setMintProgress] = useState<MintProgress | null>(null)
   const [walletMintCount, setWalletMintCount] = useState(0)
   const [referrerWallet, setReferrerWallet] = useState<string | null>(null)
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean
+    error: string
+    title?: string
+  }>({
+    isOpen: false,
+    error: "",
+    title: ""
+  })
   const [supplyInfo, setSupplyInfo] = useState({
     totalSupply: 468,
     maxSupply: 1000,
@@ -142,9 +151,6 @@ function NewMintInterfaceInner() {
     if (!publicKey) return
 
     try {
-      // Check USDC balance (temporarily set to 1000 for testing)
-    const tokenBalances = await usdcService.getAllTokenBalances(publicKey)
-
       // Get USDC balance specifically
       const usdcBal = await usdcService.getUSDCBalance(publicKey)
       setUsdcBalance(usdcBal)
@@ -162,6 +168,13 @@ function NewMintInterfaceInner() {
       }
     } catch (error) {
       console.error("Error checking wallet status:", error)
+      // Only show error modal for critical wallet status errors
+      if (error instanceof Error && error.message.includes("network")) {
+        showError(
+          `🌐 Network Connection Error\n\nUnable to check your wallet status due to network issues.\n\n🔍 Error Details:\n${error.message}\n\n💡 Solutions:\n• Check your internet connection\n• Refresh the page and try again\n• The Solana network may be experiencing high traffic`,
+          "Wallet Status Check Failed"
+        )
+      }
     }
   }
 
@@ -170,16 +183,51 @@ function NewMintInterfaceInner() {
   const totalPrice = mintAmount * NFT_CONFIG.pricePerNFT
   const hasReachedLimit = walletMintCount >= NFT_CONFIG.maxPerWallet
 
+  // Error handling functions
+  const showError = (error: string, title: string = "Transaction Error") => {
+    setErrorModal({
+      isOpen: true,
+      error,
+      title
+    })
+  }
+
+  const closeErrorModal = () => {
+    setErrorModal({
+      isOpen: false,
+      error: "",
+      title: ""
+    })
+  }
+
+  const retryMint = () => {
+    closeErrorModal()
+    handleMint()
+  }
+
   const handleMint = async () => {
     if (!connected || !publicKey || !signTransaction) {
+      showError(
+        "🔗 Wallet Connection Required\n\nPlease connect your Solana wallet to mint NFTs.\n\n💡 Steps:\n1. Click the 'Connect Wallet' button\n2. Select your preferred wallet (Phantom, Solflare, etc.)\n3. Approve the connection\n4. Try minting again",
+        "Wallet Not Connected"
+      )
       return
     }
 
     if (hasReachedLimit) {
+      showError(
+        `🚫 Mint Limit Reached\n\nYou have already minted the maximum number of NFTs allowed per wallet.\n\n📊 Your Status:\n• Minted: ${walletMintCount} NFT(s)\n• Limit: ${NFT_CONFIG.maxPerWallet} NFT per wallet\n\n💡 Our platform enforces a fair distribution policy of ${NFT_CONFIG.maxPerWallet} NFT per wallet to ensure everyone gets a chance to participate.`,
+        "Mint Limit Exceeded"
+      )
       return
     }
 
     if (usdcBalance < totalPrice) {
+      const shortage = totalPrice - usdcBalance
+      showError(
+        `💳 Insufficient USDC Balance\n\nYou need more USDC tokens to complete this mint.\n\n📊 Balance Details:\n• Current USDC: ${usdcBalance.toFixed(2)} USDC\n• Required USDC: ${totalPrice.toFixed(2)} USDC\n• Shortage: ${shortage.toFixed(2)} USDC\n\n💰 NFT Pricing:\n• Price per NFT: ${NFT_CONFIG.pricePerNFT} USDC\n• Quantity: ${mintAmount} NFT(s)\n\n💡 How to get USDC:\n1. 🏪 Buy from exchanges (Coinbase, Binance, etc.)\n2. 🔄 Swap SOL to USDC (Jupiter, Raydium, Orca)\n3. 📤 Transfer from another wallet`,
+        "Insufficient USDC"
+      )
       return
     }
 
@@ -260,11 +308,15 @@ function NewMintInterfaceInner() {
         router.push(`/mint/success?${mintParams}&${sigParams}&usdc=${result.usdcSignature}&total=${result.totalCost}`)
       } else {
         console.error("Minting failed:", result.error)
-        // TODO: Show error to user
+        showError(result.error || "Unknown minting error occurred", "NFT Minting Failed")
       }
     } catch (error) {
       console.error("Minting error:", error)
-      // TODO: Show error to user
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during minting"
+      showError(
+        `❌ Unexpected Minting Error\n\n🔍 Technical Details:\n${errorMessage}\n\n💡 Suggestions:\n• Check your internet connection\n• Ensure your wallet is connected\n• Verify you have sufficient SOL for fees\n• Try refreshing the page and minting again\n• Contact support if the issue persists`,
+        "Minting Error"
+      )
     } finally {
       setLoading(false)
       setMintProgress(null)
@@ -394,6 +446,17 @@ function NewMintInterfaceInner() {
           </div>
         )}
       </div>
+
+      {/* Professional Error Modal */}
+      <ProfessionalErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={closeErrorModal}
+        error={errorModal.error}
+        title={errorModal.title}
+        onRetry={retryMint}
+        showRetryButton={true}
+        showSupportButton={true}
+      />
     </div>
   )
 }
