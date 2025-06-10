@@ -22,10 +22,14 @@ export async function POST(request: NextRequest) {
     // Get all quests
     const questsQuery = query(collection(db, "quests"))
     const questsSnapshot = await getDocs(questsQuery)
-    const allQuests = questsSnapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    }))
+    type Quest = { id: string; title: string; createdAt?: { seconds?: number } } & Record<string, any>
+    const allQuests: Quest[] = questsSnapshot.docs.map(doc => {
+      const { id, ...data } = doc.data() as Quest
+      return {
+        id: doc.id,
+        ...data
+      }
+    })
 
     console.log(`Found ${allQuests.length} total quests`)
 
@@ -40,13 +44,13 @@ export async function POST(request: NextRequest) {
     })
 
     // Find duplicates and keep only the first one of each title
-    const questsToDelete = []
-    const uniqueQuests = []
+    const questsToDelete: Quest[] = []
+    const uniqueQuests: Quest[] = []
 
     questsByTitle.forEach((questsWithSameTitle, title) => {
       if (questsWithSameTitle.length > 1) {
         // Keep the first quest (oldest) and mark others for deletion
-        const [keepQuest, ...duplicates] = questsWithSameTitle.sort((a, b) => {
+        const [keepQuest, ...duplicates] = questsWithSameTitle.sort((a: Quest, b: Quest) => {
           const aTime = a.createdAt?.seconds || 0
           const bTime = b.createdAt?.seconds || 0
           return aTime - bTime
@@ -76,10 +80,12 @@ export async function POST(request: NextRequest) {
     // Also clean up user quest progress for deleted quests
     const userQuestsQuery = query(collection(db, "userQuests"))
     const userQuestsSnapshot = await getDocs(userQuestsQuery)
-    const userQuests = userQuestsSnapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    }))
+    type UserQuest = { id: string; questId: string } & Record<string, any>
+    const userQuests: UserQuest[] = userQuestsSnapshot.docs.map(doc => {
+      const data = doc.data() as UserQuest
+      const { id, ...rest } = data
+      return { id: doc.id, ...rest }
+    })
 
     const deletedQuestIds = new Set(questsToDelete.map(q => q.id))
     const userQuestsToDelete = userQuests.filter(uq => deletedQuestIds.has(uq.questId))
@@ -134,10 +140,14 @@ export async function GET(request: NextRequest) {
     // Get all quests to analyze duplicates
     const questsQuery = query(collection(db, "quests"))
     const questsSnapshot = await getDocs(questsQuery)
-    const allQuests = questsSnapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    }))
+    type Quest = { id: string; title: string; createdAt?: { seconds?: number } } & Record<string, any>
+    const allQuests: Quest[] = questsSnapshot.docs.map(doc => {
+      const { id, ...data } = doc.data() as Quest
+      return {
+        id: doc.id,
+        ...data
+      }
+    })
 
     // Group by title to find duplicates
     const questsByTitle = new Map()
@@ -149,7 +159,7 @@ export async function GET(request: NextRequest) {
       questsByTitle.get(title).push(quest)
     })
 
-    const duplicates = []
+    const duplicates: { title: string; count: number; quests: Quest[] }[] = []
     questsByTitle.forEach((questsWithSameTitle, title) => {
       if (questsWithSameTitle.length > 1) {
         duplicates.push({

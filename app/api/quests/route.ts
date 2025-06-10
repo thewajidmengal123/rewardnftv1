@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { firebaseQuestService } from "@/services/firebase-quest-service"
+import { firebaseQuestService, QuestType } from "@/services/firebase-quest-service"
+// Import QuestType from its module, adjust the path as needed
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
         await firebaseQuestService.ensureUniqueQuestsExist()
 
         if (type) {
-          const quests = await firebaseQuestService.getQuestsByType(type)
+          const quests = await firebaseQuestService.getQuestsByType(type as QuestType)
           return NextResponse.json({ success: true, data: quests })
         } else {
           const quests = await firebaseQuestService.getActiveQuests()

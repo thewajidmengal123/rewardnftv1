@@ -168,7 +168,7 @@ export function useQuestSystem() {
 
   // Get quests by type with deduplication
   const getQuestsByType = (type: "daily" | "weekly"): Quest[] => {
-    const filteredQuests = quests.filter(q => q.type === type)
+    const filteredQuests = quests.filter(q => q.type === type as any)
 
     // Additional deduplication by title for this type
     const uniqueQuests = filteredQuests.reduce((acc: Quest[], quest: Quest) => {

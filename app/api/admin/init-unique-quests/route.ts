@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     // Get all quests to return
     const allQuestsSnapshot = await getDocs(questsQuery)
-    const allQuests = allQuestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const allQuests = allQuestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
 
     console.log(`✅ Successfully initialized ${allQuests.length} unique quests`)
 
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
       where("isActive", "==", true)
     )
     const questsSnapshot = await getDocs(questsQuery)
-    const quests = questsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const quests: Quest[] = questsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
 
     return NextResponse.json({
       success: true,
