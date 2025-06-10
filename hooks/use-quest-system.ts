@@ -29,7 +29,25 @@ export function useQuestSystem() {
       const xpData = await xpResponse.json()
 
       if (questsData.success) {
-        setQuests(questsData.data)
+        // Frontend deduplication: Remove duplicate quests by title
+        const uniqueQuests = questsData.data.reduce((acc: Quest[], quest: Quest) => {
+          const existing = acc.find(q => q.title === quest.title)
+          if (!existing) {
+            acc.push(quest)
+          } else {
+            // Keep the one with earlier creation time (older quest)
+            const existingTime = existing.createdAt?.seconds || 0
+            const currentTime = quest.createdAt?.seconds || 0
+            if (currentTime < existingTime) {
+              const index = acc.findIndex(q => q.title === quest.title)
+              acc[index] = quest
+            }
+          }
+          return acc
+        }, [])
+
+        console.log(`🧹 Frontend deduplication: ${questsData.data.length} -> ${uniqueQuests.length} quests`)
+        setQuests(uniqueQuests)
       }
 
       if (progressData.success) {
@@ -148,9 +166,28 @@ export function useQuestSystem() {
     return userProgress.find(p => p.questId === questId)
   }
 
-  // Get quests by type
+  // Get quests by type with deduplication
   const getQuestsByType = (type: "daily" | "weekly"): Quest[] => {
-    return quests.filter(q => q.type === type)
+    const filteredQuests = quests.filter(q => q.type === type)
+
+    // Additional deduplication by title for this type
+    const uniqueQuests = filteredQuests.reduce((acc: Quest[], quest: Quest) => {
+      const existing = acc.find(q => q.title === quest.title)
+      if (!existing) {
+        acc.push(quest)
+      } else {
+        // Keep the one with earlier creation time (older quest)
+        const existingTime = existing.createdAt?.seconds || 0
+        const currentTime = quest.createdAt?.seconds || 0
+        if (currentTime < existingTime) {
+          const index = acc.findIndex(q => q.title === quest.title)
+          acc[index] = quest
+        }
+      }
+      return acc
+    }, [])
+
+    return uniqueQuests
   }
 
   // Load data when wallet connects
@@ -178,7 +215,7 @@ export function useQuestSystem() {
     getQuestProgress,
     getQuestsByType,
 
-    // Computed values
+    // Computed values (already deduplicated through getQuestsByType)
     dailyQuests: getQuestsByType("daily"),
     weeklyQuests: getQuestsByType("weekly"),
     totalXP: userXPData?.totalXP || 0,

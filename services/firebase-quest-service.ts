@@ -19,7 +19,7 @@ import { db } from "@/lib/firebase"
 import { firebaseUserService } from "./firebase-user-service"
 
 // Quest types
-export type QuestType = "daily" | "weekly" | "special" | "one-time"
+export type QuestType = "one-time" | "special" | "one-time"
 export type QuestDifficulty = "Easy" | "Medium" | "Hard"
 export type QuestStatus = "not_started" | "in_progress" | "completed" | "claimed"
 
@@ -74,79 +74,144 @@ class FirebaseQuestService {
   private readonly USER_QUESTS_COLLECTION = "userQuests"
   private readonly USER_XP_COLLECTION = "userXP"
 
-  // Predefined quests based on the image
+  // Predefined unique one-time quests
   private readonly DEFAULT_QUESTS: Omit<Quest, "id" | "createdAt">[] = [
     {
       title: "Connect Discord",
-      description: "Link your Discord account to RewardNFT",
-      type: "daily",
+      description: "Link your Discord account to RewardNFT community",
+      type: "one-time",
       difficulty: "Easy",
-      reward: { xp: 50 },
-      requirements: { type: "connect_discord", count: 1 },
-      isActive: true,
-    },
-    {
-      title: "Login Streak",
-      description: "Login 5 days in a row",
-      type: "daily",
-      difficulty: "Medium",
       reward: { xp: 100 },
-      requirements: { type: "login_streak", count: 5 },
-      isActive: true,
-    },
-    {
-      title: "Share on Twitter",
-      description: "Share your NFT on Twitter with #RewardNFT",
-      type: "daily",
-      difficulty: "Easy",
-      reward: { xp: 75 },
-      requirements: { type: "share_twitter", count: 1 },
+      requirements: { type: "connect_discord", count: 1 },
       isActive: true,
     },
     {
       title: "Refer 3 Friends",
       description: "Get 3 friends to mint NFTs with your referral link",
-      type: "weekly",
+      type: "one-time",
       difficulty: "Hard",
-      reward: { xp: 250 },
+      reward: { xp: 500 },
       requirements: { type: "refer_friends", count: 3 },
       isActive: true,
     },
     {
-      title: "Play Mini-Game",
-      description: "Score 1000+ points in the mini-game",
-      type: "weekly",
-      difficulty: "Medium",
+      title: "Share on Twitter",
+      description: "Share your NFT or RewardNFT on Twitter with #RewardNFT",
+      type: "one-time",
+      difficulty: "Easy",
       reward: { xp: 150 },
-      requirements: { type: "play_minigame", count: 1000 },
+      requirements: { type: "share_twitter", count: 1 },
+      isActive: true,
+    },
+    {
+      title: "Play Mini-Game Challenge",
+      description: "Score 1500+ points in the click challenge mini-game",
+      type: "one-time",
+      difficulty: "Medium",
+      reward: { xp: 200 },
+      requirements: { type: "play_minigame", count: 1500 },
       isActive: true,
     },
     {
       title: "Join Community Call",
-      description: "Attend the weekly community call",
-      type: "weekly",
+      description: "Attend a RewardNFT community call on Discord",
+      type: "one-time",
       difficulty: "Easy",
-      reward: { xp: 200 },
+      reward: { xp: 250 },
       requirements: { type: "join_community_call", count: 1 },
+      isActive: true,
+    },
+    {
+      title: "Complete Login Streak",
+      description: "Login to the platform for 5 consecutive days",
+      type: "one-time",
+      difficulty: "Medium",
+      reward: { xp: 300 },
+      requirements: { type: "login_streak", count: 5 },
       isActive: true,
     },
   ]
 
-  // Initialize default quests
-  async initializeDefaultQuests(): Promise<void> {
-    const batch = writeBatch(db)
-    
-    for (const questData of this.DEFAULT_QUESTS) {
-      const questRef = doc(collection(db, this.QUESTS_COLLECTION))
-      const quest: Quest = {
-        ...questData,
-        id: questRef.id,
-        createdAt: serverTimestamp() as Timestamp,
+  // Ensure unique quests exist (called automatically when needed)
+  async ensureUniqueQuestsExist(): Promise<void> {
+    try {
+      // Get ALL existing quests (not just active ones) to check for duplicates
+      const allQuestsQuery = query(collection(db, this.QUESTS_COLLECTION))
+      const allQuestsSnapshot = await getDocs(allQuestsQuery)
+      const allQuests = allQuestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
+
+      // Group by title to find duplicates
+      const questsByTitle = new Map<string, Quest[]>()
+      allQuests.forEach(quest => {
+        const title = quest.title
+        if (!questsByTitle.has(title)) {
+          questsByTitle.set(title, [])
+        }
+        questsByTitle.get(title)!.push(quest)
+      })
+
+      // Remove duplicates first (keep only the oldest of each title)
+      const batch = writeBatch(db)
+      let duplicatesRemoved = 0
+
+      questsByTitle.forEach((questsWithSameTitle, title) => {
+        if (questsWithSameTitle.length > 1) {
+          // Sort by creation time and keep the first (oldest)
+          const sortedQuests = questsWithSameTitle.sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0
+            const bTime = b.createdAt?.seconds || 0
+            return aTime - bTime
+          })
+
+          // Remove all but the first one
+          const [keepQuest, ...duplicates] = sortedQuests
+          duplicates.forEach(duplicate => {
+            batch.delete(doc(db, this.QUESTS_COLLECTION, duplicate.id))
+            duplicatesRemoved++
+          })
+
+          console.log(`🧹 Removing ${duplicates.length} duplicates of "${title}"`)
+        }
+      })
+
+      // Commit duplicate removal
+      if (duplicatesRemoved > 0) {
+        await batch.commit()
+        console.log(`✅ Removed ${duplicatesRemoved} duplicate quests`)
       }
-      batch.set(questRef, quest)
+
+      // Now get the remaining unique quests
+      const remainingQuests = await this.getActiveQuests()
+      const existingTitles = new Set(remainingQuests.map(q => q.title))
+
+      // Add missing unique quests
+      const addBatch = writeBatch(db)
+      let questsToAdd = 0
+
+      for (const questData of this.DEFAULT_QUESTS) {
+        if (!existingTitles.has(questData.title)) {
+          const questRef = doc(collection(db, this.QUESTS_COLLECTION))
+          const quest: Quest = {
+            ...questData,
+            id: questRef.id,
+            createdAt: serverTimestamp() as Timestamp,
+          }
+          addBatch.set(questRef, quest)
+          questsToAdd++
+        }
+      }
+
+      if (questsToAdd > 0) {
+        await addBatch.commit()
+        console.log(`✅ Added ${questsToAdd} unique quests to the database`)
+      }
+
+      if (duplicatesRemoved === 0 && questsToAdd === 0) {
+        console.log(`✅ All unique quests already exist, no changes needed`)
+      }
+    } catch (error) {
+      console.error("Error ensuring unique quests exist:", error)
     }
-    
-    await batch.commit()
   }
 
   // Get all active quests (simplified query)
@@ -159,16 +224,32 @@ class FirebaseQuestService {
     const snapshot = await getDocs(q)
     const quests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
 
-    // Sort by createdAt in memory
+    // If no quests exist, ensure unique quests are created
+    if (quests.length === 0) {
+      await this.ensureUniqueQuestsExist()
+      // Re-fetch after creating quests
+      const newSnapshot = await getDocs(q)
+      const newQuests = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
+      return newQuests.sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0
+        const bTime = b.createdAt?.seconds || 0
+        return aTime - bTime // Sort by creation order (oldest first)
+      })
+    }
+
+    // Sort by createdAt in memory (oldest first for consistent order)
     return quests.sort((a, b) => {
       const aTime = a.createdAt?.seconds || 0
       const bTime = b.createdAt?.seconds || 0
-      return bTime - aTime
+      return aTime - bTime
     })
   }
 
   // Get quests by type (simplified query)
   async getQuestsByType(type: QuestType): Promise<Quest[]> {
+    // Ensure unique quests exist first
+    await this.ensureUniqueQuestsExist()
+
     const q = query(
       collection(db, this.QUESTS_COLLECTION),
       where("type", "==", type)
@@ -177,13 +258,13 @@ class FirebaseQuestService {
     const snapshot = await getDocs(q)
     const quests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quest))
 
-    // Filter active quests and sort in memory
+    // Filter active quests and sort in memory (oldest first for consistent order)
     return quests
       .filter(quest => quest.isActive)
       .sort((a, b) => {
         const aTime = a.createdAt?.seconds || 0
         const bTime = b.createdAt?.seconds || 0
-        return bTime - aTime
+        return aTime - bTime
       })
   }
 

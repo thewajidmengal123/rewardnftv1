@@ -7,10 +7,7 @@ import {
   query,
   where,
   getDocs,
-  orderBy,
-  limit,
   serverTimestamp,
-  increment,
   addDoc,
   Timestamp,
 } from "firebase/firestore"
@@ -145,7 +142,6 @@ export class FirebaseReferralService {
       }
 
       const referralDoc = referralSnapshot.docs[0]
-      const referralData = referralDoc.data() as ReferralRecord
 
       // Update referral status to completed
       await updateDoc(doc(db, this.REFERRALS_COLLECTION, referralDoc.id), {
@@ -218,12 +214,25 @@ export class FirebaseReferralService {
     referrerWallet: string,
     referredWallet: string,
     rewardAmount: number,
-    nftsMinted: number,
+    _nftsMinted: number, // Unused - always 1 NFT per wallet
     mintSignatures: string[]
   ): Promise<boolean> {
     try {
-      // Create referral record
-      const referralId = `${referrerWallet}_${referredWallet}_${Date.now()}`
+      // Check if referral already exists to prevent duplicates
+      const existingReferralQuery = query(
+        collection(db, this.REFERRALS_COLLECTION),
+        where("referrerWallet", "==", referrerWallet),
+        where("referredWallet", "==", referredWallet)
+      )
+      const existingReferrals = await getDocs(existingReferralQuery)
+
+      if (!existingReferrals.empty) {
+        console.log(`Referral already exists: ${referrerWallet} -> ${referredWallet}`)
+        return true // Return success to avoid errors, but don't create duplicate
+      }
+
+      // Create referral record with unique ID based on wallets only
+      const referralId = `${referrerWallet}_${referredWallet}`
       const referralData = {
         referrerWallet,
         referredWallet,
@@ -232,7 +241,7 @@ export class FirebaseReferralService {
         nftMinted: true,
         rewardPaid: true,
         rewardAmount,
-        nftsMinted,
+        nftsMinted: 1, // Always 1 since users can only mint 1 NFT
         mintSignatures,
         createdAt: serverTimestamp() as Timestamp,
         completedAt: serverTimestamp() as Timestamp,
@@ -246,13 +255,13 @@ export class FirebaseReferralService {
       await firebaseUserService.updateUserEarnings(referrerWallet, rewardAmount)
       await firebaseUserService.incrementReferralCount(referrerWallet)
 
-      // Update referred user's NFT count
+      // Update referred user's NFT count - always set to 1 (not increment)
       const referredUserRef = doc(db, "users", referredWallet)
       const referredUserDoc = await getDoc(referredUserRef)
 
       if (referredUserDoc.exists()) {
         await updateDoc(referredUserRef, {
-          nftsMinted: increment(nftsMinted),
+          nftsMinted: 1, // Always 1 since users can only mint 1 NFT
           lastActive: serverTimestamp(),
         })
       } else {
@@ -262,7 +271,7 @@ export class FirebaseReferralService {
           displayName: `User ${referredWallet.slice(0, 8)}`,
           totalEarned: 0,
           totalReferrals: 0,
-          nftsMinted: nftsMinted,
+          nftsMinted: 1, // Always 1 since users can only mint 1 NFT
           questsCompleted: 0,
           createdAt: serverTimestamp(),
           lastActive: serverTimestamp(),
@@ -272,7 +281,7 @@ export class FirebaseReferralService {
       // Sync referrer's data to ensure consistency
       await firebaseUserService.syncUserReferralData(referrerWallet)
 
-      console.log(`Direct referral reward processed: ${rewardAmount} USDC to ${referrerWallet} for ${nftsMinted} NFTs`)
+      console.log(`Direct referral reward processed: ${rewardAmount} USDC to ${referrerWallet} for 1 NFT`)
       return true
     } catch (error) {
       console.error("Error processing direct referral reward:", error)

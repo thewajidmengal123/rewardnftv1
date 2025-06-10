@@ -68,7 +68,7 @@ export function ReferralHistory({ referrals = [] }: ReferralHistoryProps) {
                         <span>{referral.date}</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        NFTs Minted: {referral.nftsMinted || 0} | Earned: ${(referral.totalEarned || 0).toFixed(2)}
+                        NFTs Minted: {(referral.nftsMinted && referral.nftsMinted > 0) ? 1 : 0} | Earned: ${(referral.totalEarned || 0).toFixed(2)}
                         {(referral as any).referralId && (
                           <span className="ml-2 text-gray-600">ID: {(referral as any).referralId.slice(0, 8)}</span>
                         )}

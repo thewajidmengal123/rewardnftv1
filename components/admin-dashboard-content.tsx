@@ -21,6 +21,7 @@ export function AdminDashboardContent() {
   const [adminData, setAdminData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [realTimeStats, setRealTimeStats] = useState<any>(null)
+  const [questCount, setQuestCount] = useState<number | null>(null)
 
   // Check if current wallet is admin
   const isAdmin = isAdminWallet(publicKey?.toString())
@@ -29,6 +30,7 @@ export function AdminDashboardContent() {
   useEffect(() => {
     if (connected && isAdmin) {
       loadAdminData()
+      checkQuestCount()
       // Set up real-time updates
       const interval = setInterval(loadRealTimeStats, 30000) // Update every 30 seconds
       return () => clearInterval(interval)
@@ -78,6 +80,43 @@ export function AdminDashboardContent() {
       }
     } catch (error) {
       console.error('Error loading real-time stats:', error)
+    }
+  }
+
+  const checkQuestCount = async () => {
+    try {
+      const response = await fetch(`/api/admin/init-unique-quests?wallet=${publicKey?.toString()}`)
+      const result = await response.json()
+      if (result.success) {
+        setQuestCount(result.questCount)
+      }
+    } catch (error) {
+      console.error("Error checking quest count:", error)
+    }
+  }
+
+  const initializeQuests = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/admin/init-unique-quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: publicKey?.toString() })
+      })
+      const result = await response.json()
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `${result.message}. Created ${result.quests?.length || 0} unique quests.`
+        })
+        setQuestCount(result.quests?.length || 0)
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to initialize quests", variant: "destructive" })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -133,6 +172,11 @@ export function AdminDashboardContent() {
               <Shield className="w-3 h-3 mr-1" />
               Admin Access
             </Badge>
+            {questCount !== null && (
+              <Badge variant={questCount === 0 ? "destructive" : "default"} className="text-sm">
+                {questCount === 0 ? "No Quests" : `${questCount} Quests`}
+              </Badge>
+            )}
             <span className="text-sm text-gray-400">
               {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
             </span>
@@ -142,25 +186,20 @@ export function AdminDashboardContent() {
           <Button onClick={loadAdminData} disabled={loading} variant="outline">
             {loading ? "Loading..." : "Refresh Data"}
           </Button>
-          <Button
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/quests/initialize', { method: 'POST' })
-                const result = await response.json()
-                if (result.success) {
-                  toast({ title: "Success", description: "Default quests initialized" })
-                } else {
-                  toast({ title: "Error", description: result.error, variant: "destructive" })
-                }
-              } catch (error) {
-                toast({ title: "Error", description: "Failed to initialize quests", variant: "destructive" })
-              }
-            }}
-            variant="outline"
-          >
-            <Activity className="w-4 h-4 mr-2" />
-            Init Quests
-          </Button>
+
+          {/* Show Initialize Quests button only if no quests exist */}
+          {questCount === 0 && (
+            <Button
+              onClick={initializeQuests}
+              disabled={loading}
+              variant="default"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              {loading ? "Initializing..." : "Initialize Unique Quests"}
+            </Button>
+          )}
+
           <Button
             onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
             variant="outline"
@@ -335,7 +374,7 @@ export function AdminDashboardContent() {
                           {user.walletAddress?.slice(0, 8)}...{user.walletAddress?.slice(-8)}
                         </td>
                         <td className="py-3 px-4 text-white">{user.displayName || 'Anonymous'}</td>
-                        <td className="py-3 px-4 text-white text-center">{user.nftsMinted || 0}</td>
+                        <td className="py-3 px-4 text-white text-center">{(user.nftsMinted && user.nftsMinted > 0) ? 1 : 0}</td>
                         <td className="py-3 px-4 text-white text-center">{user.totalReferrals || 0}</td>
                         <td className="py-3 px-4 text-white text-right">{user.totalEarned || 0} USDC</td>
                         <td className="py-3 px-4 text-white text-sm">

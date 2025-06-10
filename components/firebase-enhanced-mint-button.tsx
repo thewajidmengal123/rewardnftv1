@@ -58,7 +58,7 @@ export function FirebaseEnhancedMintButton() {
         image: "/nft-reward-token.png",
         attributes: [
           { trait_type: "Collection", value: "Solana Rewards" },
-          { trait_type: "Rarity", value: "Legendary" },
+          { trait_type: "Rarity", value: "Rare" },
           { trait_type: "Type", value: "Membership" },
         ],
         mintCost: 10,

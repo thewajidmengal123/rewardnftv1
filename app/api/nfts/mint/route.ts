@@ -4,9 +4,12 @@ import {
   setDoc,
   getDoc,
   updateDoc,
-  increment,
   arrayUnion,
-  serverTimestamp
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -22,6 +25,23 @@ export async function POST(request: NextRequest) {
           error: "Missing required fields: mintAddress, ownerWallet, transactionSignature",
         },
         { status: 400 },
+      )
+    }
+
+    // Check if user has already minted an NFT (1 NFT per wallet limit)
+    const userNftsQuery = query(
+      collection(db, "nfts"),
+      where("ownerWallet", "==", nftData.ownerWallet)
+    )
+    const userNftsSnapshot = await getDocs(userNftsQuery)
+
+    if (userNftsSnapshot.size >= 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You have already minted your NFT. Only 1 NFT per wallet is allowed.",
+        },
+        { status: 409 },
       )
     }
 
@@ -69,8 +89,9 @@ export async function POST(request: NextRequest) {
     const userDoc = await getDoc(userRef)
 
     if (userDoc.exists()) {
+      // Always set to 1 since users can only mint 1 NFT
       await updateDoc(userRef, {
-        nftsMinted: increment(1),
+        nftsMinted: 1,
         nftAddresses: arrayUnion(nftData.mintAddress),
         lastActive: serverTimestamp(),
       })
@@ -81,7 +102,7 @@ export async function POST(request: NextRequest) {
         displayName: `User ${nftData.ownerWallet.slice(0, 8)}`,
         totalEarned: 0,
         totalReferrals: 0,
-        nftsMinted: 1,
+        nftsMinted: 1, // Always 1 since users can only mint 1 NFT
         nftAddresses: [nftData.mintAddress],
         questsCompleted: 0,
         createdAt: serverTimestamp(),

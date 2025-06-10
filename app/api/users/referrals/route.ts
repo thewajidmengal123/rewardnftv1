@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const formattedReferredUsers = referredUsers.map(user => ({
       walletAddress: user.walletAddress,
       displayName: user.displayName || `User ${user.walletAddress.slice(0, 8)}`,
-      nftsMinted: user.nftsMinted || 0,
+      nftsMinted: (user.nftsMinted && user.nftsMinted > 0) ? 1 : 0, // Always 1 if they have minted, 0 if not
       totalEarned: user.totalEarned || 0,
       createdAt: user.createdAt,
       lastActive: user.lastActive

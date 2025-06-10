@@ -371,8 +371,10 @@ function NewMintInterfaceInner() {
 
           {/* Minted */}
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-400 text-lg">Minted</span>
-            <span className="text-white font-bold text-xl">{supplyInfo.totalSupply}</span>
+            <span className="text-gray-400 text-lg">Status</span>
+            <span className="text-white font-bold text-xl">
+              {hasReachedLimit ? "Minted" : `${supplyInfo.totalSupply} Minted`}
+            </span>
           </div>
 
           {/* Mint Limit Info */}

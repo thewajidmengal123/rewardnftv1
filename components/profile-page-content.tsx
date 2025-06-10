@@ -100,13 +100,13 @@ export function ProfilePageContent() {
       const referralStats = referralData?.success ? referralData.data.stats : null
       const referralHistory = referralData?.success ? referralData.data.history : []
 
-      // Get user's NFT count from Firebase user data in referral history
+      // Get user's NFT count - always 1 if they have minted, 0 if they haven't
       let userNftCount = 0
       if (referralHistory && referralHistory.length > 0) {
         // Check if this user appears as a referred user (they have minted NFTs)
         const userAsReferred = referralHistory.find((ref: any) => ref.referredUser?.walletAddress === walletAddress)
-        if (userAsReferred?.referredUser?.nftsMinted) {
-          userNftCount = userAsReferred.referredUser.nftsMinted
+        if (userAsReferred?.referredUser?.nftsMinted && userAsReferred.referredUser.nftsMinted > 0) {
+          userNftCount = 1 // Always show 1 if they have minted (since max is 1 per wallet)
         }
       }
 
@@ -202,6 +202,11 @@ export function ProfilePageContent() {
           { trait_type: 'Utility', value: 'Referral Rewards' }
         ]
       })) : []
+
+      // Update NFT count based on actual NFTs found
+      if (nfts && nfts.length > 0) {
+        userNftCount = 1 // Always show 1 if they have any NFTs (since max is 1 per wallet)
+      }
 
       // Build comprehensive profile
       const userProfile: UserProfile = {

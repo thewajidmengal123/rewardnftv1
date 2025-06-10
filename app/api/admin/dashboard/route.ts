@@ -1,7 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { adminDb as db } from "@/lib/firebase-admin"
 import { isAdminWallet } from "@/config/admin"
-import { Timestamp } from "firebase-admin/firestore"
+import { db } from "@/lib/firebase"
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+  where,
+  Timestamp
+} from "firebase/firestore"
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,92 +25,66 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Helper function to safely get collection data
+    const safeGetCollection = async (collectionName: string, orderField?: string, limitCount = 100) => {
+      try {
+        let q = collection(db, collectionName)
+        let queryRef: any = q
+        if (orderField) {
+          queryRef = query(q, orderBy(orderField, "desc"), limit(limitCount))
+        } else {
+          queryRef = query(q, limit(limitCount))
+        }
+        const snapshot = await getDocs(queryRef)
+        return snapshot
+      } catch (err) {
+        console.error(`Error loading ${collectionName}:`, err)
+        return { docs: [], size: 0 }
+      }
+    }
+
     switch (action) {
       case "get-dashboard-data": {
         console.log("Loading admin dashboard data...")
 
-        // Get comprehensive dashboard data including quests and XP
-        const [usersSnapshot, nftsSnapshot, referralsSnapshot, questsSnapshot, userXPSnapshot] = await Promise.all([
-          db.collection("users").orderBy("createdAt", "desc").limit(100).get().catch((err: any) => {
-            console.error("Error loading users:", err)
-            return { docs: [] }
-          }),
-          db.collection("nfts").orderBy("mintedAt", "desc").limit(100).get().catch((err: any) => {
-            console.error("Error loading NFTs:", err)
-            return { docs: [] }
-          }),
-          db.collection("referrals").orderBy("createdAt", "desc").limit(100).get().catch((err: any) => {
-            console.error("Error loading referrals:", err)
-            return { docs: [] }
-          }),
-          db.collection("userQuests").limit(100).get().catch((err: any) => {
-            console.error("Error loading quests:", err)
-            return { docs: [] }
-          }),
-          db.collection("userXP").orderBy("totalXP", "desc").limit(50).get().catch((err: any) => {
-            console.error("Error loading XP data:", err)
-            return { docs: [] }
-          })
-        ])
+        // Get basic collections data safely
+        const usersSnapshot = await safeGetCollection("users", "createdAt")
+        const nftsSnapshot = await safeGetCollection("nfts", "mintedAt")
+        const referralsSnapshot = await safeGetCollection("referrals", "createdAt")
 
-        console.log(`Loaded: ${usersSnapshot.docs.length} users, ${nftsSnapshot.docs.length} NFTs, ${referralsSnapshot.docs.length} referrals, ${questsSnapshot.docs.length} quests, ${userXPSnapshot.docs.length} XP records`)
+        // Get optional collections data
+        const userXPSnapshot = await safeGetCollection("userXP", "totalXP", 50)
+        const questsSnapshot = await safeGetCollection("quests", undefined, 100)
 
-        type User = {
-          id: string
-          createdAt?: any
-          [key: string]: any
-        }
+        console.log(`Loaded: ${usersSnapshot.docs?.length || 0} users, ${nftsSnapshot.docs?.length || 0} NFTs, ${referralsSnapshot.docs?.length || 0} referrals`)
 
-        const users: User[] = usersSnapshot.docs.map((doc: any) => ({
+        const users: any[] = usersSnapshot.docs?.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
-        }))
+        })) || []
 
-        type NFT = {
-          id: string
-          mintCost?: number
-          usdcRevenue?: number
-          ownerWallet?: string
-          mintedAt?: any
-          [key: string]: any
-        }
-
-        const nfts: NFT[] = nftsSnapshot.docs.map((doc: any) => ({
+        const nfts: any[] = nftsSnapshot.docs?.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
-        }))
+        })) || []
 
-        type Referral = {
-          id: string
-          createdAt?: any
-          [key: string]: any
-        }
-
-        const referrals: Referral[] = referralsSnapshot.docs.map((doc: any) => ({
+        const referrals: any[] = referralsSnapshot.docs?.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
-        }))
+        })) || []
 
-        const quests = questsSnapshot.docs.map((doc: any) => ({
+        const quests: any[] = questsSnapshot.docs?.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
-        }))
+        })) || []
 
-        type UserXP = {
-          id: string
-          totalXP?: number
-          [key: string]: any
-        }
-        const userXPData: UserXP[] = userXPSnapshot.docs.map((doc: any) => ({
+        const userXPData: any[] = userXPSnapshot.docs?.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
-        }))
+        })) || []
 
-        // Get quest progress data for better insights
-        const questProgressSnapshot = await db.collection("userQuests").limit(200).get().catch((err: any) => {
-          console.error("Error loading quest progress:", err)
-          return { docs: [] }
-        })
+        // Get quest progress data for better insights (skip for now)
+        const questProgressSnapshot = { docs: [] }
         type QuestProgress = {
           id: string
           status?: string
@@ -199,45 +181,58 @@ export async function GET(request: NextRequest) {
 
         const todayTimestampFirestore = Timestamp.fromDate(new Date(todayTimestamp * 1000))
 
+        // Use safe collection helper for real-time stats
+        const safeGetTodayData = async (collectionName: string, dateField: string) => {
+          try {
+            const q = collection(db, collectionName)
+            const queryRef = query(q, where(dateField, ">=", todayTimestampFirestore))
+            const snapshot = await getDocs(queryRef)
+            return snapshot
+          } catch (err) {
+            console.error(`Error loading today's ${collectionName}:`, err)
+            return { docs: [], size: 0 }
+          }
+        }
+
         const [usersToday, mintsToday, referralsToday] = await Promise.all([
-          db.collection("users").where("createdAt", ">=", todayTimestampFirestore).get(),
-          db.collection("nfts").where("mintedAt", ">=", todayTimestampFirestore).get(),
-          db.collection("referrals").where("createdAt", ">=", todayTimestampFirestore).get()
+          safeGetTodayData("users", "createdAt"),
+          safeGetTodayData("nfts", "mintedAt"),
+          safeGetTodayData("referrals", "createdAt")
         ])
 
         // Calculate actual revenue from today's mints
-        const todayMints = mintsToday.docs.map((doc: any) => doc.data())
+        const todayMints = mintsToday.docs?.map((doc: any) => doc.data()) || []
         const actualRevenueToday = todayMints.reduce((sum: number, nft: any) => sum + (nft.mintCost || nft.usdcRevenue || 10), 0)
 
         return NextResponse.json({
           success: true,
           data: {
-            newUsersToday: usersToday.size,
-            mintsToday: mintsToday.size,
-            referralsToday: referralsToday.size,
+            newUsersToday: usersToday.size || 0,
+            mintsToday: mintsToday.size || 0,
+            referralsToday: referralsToday.size || 0,
             revenueToday: actualRevenueToday
           }
         })
       }
 
       case "export-data": {
-        // Export all data for admin
+        // Export all data for admin using safe collection helper
         const [users, nfts, referrals] = await Promise.all([
-          db.collection("users").get(),
-          db.collection("nfts").get(),
-          db.collection("referrals").get()
+          safeGetCollection("users"),
+          safeGetCollection("nfts"),
+          safeGetCollection("referrals")
         ])
 
         const exportData = {
           timestamp: new Date().toISOString(),
-          users: users.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
-          nfts: nfts.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
-          referrals: referrals.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
+          users: users.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
+          nfts: nfts.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
+          referrals: referrals.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
           summary: {
-            totalUsers: users.size,
-            totalNFTs: nfts.size,
-            totalReferrals: referrals.size,
-            totalRevenue: nfts.size * 10
+            totalUsers: users.size || 0,
+            totalNFTs: nfts.size || 0,
+            totalReferrals: referrals.size || 0,
+            totalRevenue: (nfts.size || 0) * 10
           }
         }
 

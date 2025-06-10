@@ -174,7 +174,7 @@ export function ReferralsPageContent() {
       date: historyEntry.createdAt?.toDate ? historyEntry.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString(),
       status: historyEntry.status === "rewarded" || historyEntry.status === "completed" ? "completed" as const : "pending" as const,
       points: historyEntry.rewardAmount || 4,
-      nftsMinted: userData?.nftsMinted || 0,
+      nftsMinted: (userData?.nftsMinted && userData.nftsMinted > 0) ? 1 : 0,
       totalEarned: userData?.totalEarned || 0,
       lastActive: userData?.lastActive,
       referralId: historyEntry.id,

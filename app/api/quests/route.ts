@@ -10,12 +10,33 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case "get-quests": {
+        // Ensure unique quests exist and clean up duplicates
+        await firebaseQuestService.ensureUniqueQuestsExist()
+
         if (type) {
           const quests = await firebaseQuestService.getQuestsByType(type)
           return NextResponse.json({ success: true, data: quests })
         } else {
           const quests = await firebaseQuestService.getActiveQuests()
-          return NextResponse.json({ success: true, data: quests })
+
+          // Additional client-side deduplication as safety measure
+          const uniqueQuests = quests.reduce((acc, quest) => {
+            const existing = acc.find(q => q.title === quest.title)
+            if (!existing) {
+              acc.push(quest)
+            } else {
+              // Keep the one with earlier creation time
+              const existingTime = existing.createdAt?.seconds || 0
+              const currentTime = quest.createdAt?.seconds || 0
+              if (currentTime < existingTime) {
+                const index = acc.findIndex(q => q.title === quest.title)
+                acc[index] = quest
+              }
+            }
+            return acc
+          }, [] as typeof quests)
+
+          return NextResponse.json({ success: true, data: uniqueQuests })
         }
       }
 

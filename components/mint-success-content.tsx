@@ -267,7 +267,7 @@ function MintSuccessContentInner() {
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className="border-yellow-400 text-yellow-400 bg-yellow-400/10 px-3 py-1">
                           <Trophy className="w-3 h-3 mr-1" />
-                          Legendary
+                          Rare
                         </Badge>
                         <Badge variant="outline" className="border-purple-400 text-purple-400 bg-purple-400/10 px-3 py-1">
                           <Star className="w-3 h-3 mr-1" />

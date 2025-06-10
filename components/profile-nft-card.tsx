@@ -36,7 +36,7 @@ export function ProfileNFTCard(props: ProfileNFTCardProps) {
             className={`
               ${rarity === "Rare" ? "bg-purple-500/30 text-purple-200" : ""}
               ${rarity === "Common" ? "bg-blue-500/30 text-blue-200" : ""}
-              ${rarity === "Legendary" ? "bg-yellow-500/30 text-yellow-200" : ""}
+              ${rarity === "Rare" ? "bg-yellow-500/30 text-yellow-200" : ""}
             `}
           >
             {rarity}

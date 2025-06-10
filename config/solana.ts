@@ -72,7 +72,7 @@ export const NFT_METADATA = {
   external_url: "https://reward-nft-platform.vercel.app",
   attributes: [
     { trait_type: "Collection", value: "Solana Rewards" },
-    { trait_type: "Rarity", value: "Legendary" },
+    { trait_type: "Rarity", value: "Rare" },
     { trait_type: "Type", value: "Membership" },
     { trait_type: "Network", value: CURRENT_NETWORK },
     { trait_type: "CID", value: NFT_CID },

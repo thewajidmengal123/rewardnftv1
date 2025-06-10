@@ -144,7 +144,7 @@ export function generateMockNftData(count = 5) {
     const attributes = [
       {
         trait_type: "Rarity",
-        value: ["Common", "Uncommon", "Rare", "Epic", "Legendary"][Math.floor(Math.random() * 5)],
+        value: ["Common", "Uncommon", "Rare", "Epic", "Rare"][Math.floor(Math.random() * 5)],
       },
       { trait_type: "Level", value: Math.floor(Math.random() * 100) },
       { trait_type: "Power", value: Math.floor(Math.random() * 1000) },

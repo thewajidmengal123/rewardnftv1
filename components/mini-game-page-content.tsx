@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { Gamepad2, Trophy, Star, Zap, Play, RotateCcw } from "lucide-react"
+import { Gamepad2, Trophy, Star, Zap, Play } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 export function MiniGamePageContent() {
@@ -183,7 +183,7 @@ export function MiniGamePageContent() {
       setGameInterval(null)
     }
 
-    // Save XP earned to backend
+    // Save XP earned to backend immediately when game ends
     if (xpEarned > 0 && publicKey) {
       saveXPToBackend(xpEarned)
     }
@@ -193,6 +193,10 @@ export function MiniGamePageContent() {
     if (pendingQuestId && score >= 1500 && !questCompleted) {
       completeQuest(pendingQuestId, score)
     }
+
+    // Ensure user cannot play again today
+    setHasPlayedToday(true)
+    setSessionStatus('completed')
   }, [gameInterval, score, questCompleted, xpEarned, publicKey])
 
   const saveXPToBackend = async (xpAmount: number) => {
@@ -240,8 +244,8 @@ export function MiniGamePageContent() {
         setLastPlayDate(today)
 
         toast({
-          title: "Game Complete!",
-          description: `You earned ${xpAmount} XP from the mini-game! Come back tomorrow to play again.`,
+          title: "🎮 XP Rewarded!",
+          description: `You earned ${xpAmount} XP from the mini-game! XP has been added to your account.`,
         })
       }
     } catch (error) {
@@ -279,7 +283,7 @@ export function MiniGamePageContent() {
         localStorage.removeItem('pendingQuestId')
         toast({
           title: "Quest Completed!",
-          description: `Mini-game quest completed with ${finalScore} points! You earned 150 XP!`,
+          description: `Mini-game quest completed with ${finalScore} points! You earned 200 XP!`,
         })
       }
     } catch (error) {
@@ -336,18 +340,7 @@ export function MiniGamePageContent() {
     }
   }
 
-  const resetGame = () => {
-    setGameState('menu')
-    setScore(0)
-    setClicks(0)
-    setTimeLeft(20) // Updated to match new game time
-    setQuestCompleted(false)
-    setXpEarned(0) // Reset XP for new game
-    if (gameInterval) {
-      clearInterval(gameInterval)
-      setGameInterval(null)
-    }
-  }
+
 
   if (!connected) {
     return (
@@ -508,43 +501,59 @@ export function MiniGamePageContent() {
                 {gameState === 'gameOver' && (
                   <Card className="bg-gray-800/50 border-gray-700">
                     <CardHeader>
-                      <CardTitle className="text-white text-center">Game Over!</CardTitle>
+                      <CardTitle className="text-white text-center">🎮 Game Complete!</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-center space-y-4">
-                      <div className="text-3xl font-bold text-yellow-400">Final Score: {score}</div>
-                      <div className="text-lg text-gray-300">Clicks: {clicks}</div>
-                      <div className="text-xl font-bold text-cyan-400">XP Earned: {xpEarned}</div>
+                    <CardContent className="text-center space-y-6">
+                      <div className="space-y-2">
+                        <div className="text-3xl font-bold text-yellow-400">Final Score: {score}</div>
+                        <div className="text-lg text-gray-300">Total Clicks: {clicks}</div>
+                      </div>
 
+                      {/* XP Reward Section */}
+                      <div className="bg-cyan-900/30 border border-cyan-700 rounded-lg p-6">
+                        <div className="text-2xl font-bold text-cyan-400 mb-2">
+                          🌟 XP Rewarded: {xpEarned}
+                        </div>
+                        <div className="text-cyan-300 text-sm">
+                          XP has been added to your account!
+                        </div>
+                      </div>
+
+                      {/* Quest Status */}
                       {score >= 1500 ? (
                         <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                          <div className="text-green-400 font-bold">🎉 Excellent! Quest Target Reached!</div>
-                          <div className="text-cyan-300 text-sm mt-1">Game XP: {xpEarned} XP earned from clicks!</div>
+                          <div className="text-green-400 font-bold text-lg">🎉 Quest Target Reached!</div>
+                          <div className="text-green-300 text-sm mt-1">Excellent performance!</div>
                           {questCompleted && (
-                            <div className="text-green-300 text-sm mt-2">Quest completed! You earned 150 XP!</div>
+                            <div className="text-green-300 text-sm mt-2 font-semibold">
+                              ✅ Quest completed! Bonus 200 XP awarded!
+                            </div>
                           )}
                         </div>
                       ) : (
                         <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-4">
-                          <div className="text-orange-400">Need {1500 - score} more points for quest completion</div>
-                          <div className="text-cyan-300 text-sm mt-1">But you still earned {xpEarned} XP from clicks!</div>
+                          <div className="text-orange-400">Quest target: 1500 points</div>
+                          <div className="text-orange-300 text-sm mt-1">You scored {score} points - try again tomorrow!</div>
                         </div>
                       )}
 
-                      <div className="flex gap-4 justify-center">
+                      {/* Daily Completion Status */}
+                      <div className="bg-purple-900/30 border border-purple-700 rounded-lg p-4">
+                        <div className="text-purple-400 font-semibold">🎯 Daily Game Complete!</div>
+                        <div className="text-purple-300 text-sm mt-1">Come back tomorrow to play again</div>
+                        <div className="text-purple-200 text-sm mt-2">Next play available in: {timeUntilReset}</div>
+                      </div>
+
+                      {/* Navigation back to quests */}
+                      <div className="pt-4">
                         <Button
-                          onClick={startGame}
-                          className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                          asChild
+                          className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold"
                         >
-                          <Play className="w-4 h-4 mr-2" />
-                          Play Again
-                        </Button>
-                        <Button
-                          onClick={resetGame}
-                          variant="outline"
-                          className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                        >
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Back to Menu
+                          <Link href="/quests">
+                            <Trophy className="w-4 h-4 mr-2" />
+                            Back to Quests
+                          </Link>
                         </Button>
                       </div>
                     </CardContent>
