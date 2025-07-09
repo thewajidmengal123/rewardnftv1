@@ -33,11 +33,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">3. NFT Minting</h2>
             <ul className="list-disc list-inside space-y-2">
-<<<<<<< HEAD
-              <li>Users can mint an NFT on our platform for $5.</li>
-=======
               <li>Users can mint an NFT on our platform for $10.</li>
->>>>>>> 65a7781ebc257a9fff0c7f01f5d6835e74699010
               <li>Once an NFT is minted, users unlock access to the referral system, quests, mini-games, and airdrops.</li>
             </ul>
           </section>

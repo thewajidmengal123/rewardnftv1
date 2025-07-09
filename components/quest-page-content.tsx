@@ -543,7 +543,13 @@ export function QuestPageContent() {
                     <div className="text-gray-400">Total XP</div>
                   </div>
                   
-                
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-yellow-400">
+                      #{userXPData.rank || 532}
+                    </div>
+                    <div className="text-gray-400">Rank</div>
+                  </div>
+                </div>
                 
                 <div className="mt-4">
                   <Progress 
