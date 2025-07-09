@@ -10,14 +10,31 @@ import {
   createMintToInstruction,
 } from "@solana/spl-token"
 
-// Simple collection configuration
+// Simple collection configuration for marketplace compatibility
 export const SIMPLE_COLLECTION_CONFIG = {
   name: "RewardNFT Collection",
   symbol: "RNFT",
+  description: "Exclusive NFT collection for the RewardNFT platform with referral rewards and quest access.",
+  image: "https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW",
+  external_url: "https://rewardnft.com",
   maxSupply: 1000,
-  pricePerNFT: 10, // USDC
+  pricePerNFT: 5, // USDC
   maxPerWallet: 1,
   treasuryWallet: "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6",
+  seller_fee_basis_points: 500, // 5% royalty for marketplace sales
+  creators: [
+    {
+      address: "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6",
+      verified: true,
+      share: 100,
+    },
+  ],
+  attributes: [
+    { trait_type: "Platform", value: "RewardNFT" },
+    { trait_type: "Utility", value: "Referral Access" },
+    { trait_type: "Collection Size", value: "1000" },
+    { trait_type: "Network", value: "Solana Mainnet" },
+  ],
 }
 
 export interface SimpleCollectionInfo {

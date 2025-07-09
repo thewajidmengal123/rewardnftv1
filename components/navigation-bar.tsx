@@ -57,11 +57,17 @@ export function NavigationBar() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative h-10 w-10 overflow-hidden rounded-lg">
-              <Image src="/images/logo.png" alt="Reward NFT Logo" width={40} height={40} className="object-cover" />
-            </div>
-            <span className="font-bold text-xl text-white hidden sm:inline-block">Reward NFT</span>
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/images/logo.png"
+              alt="RewardNFT Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8 object-contain"
+            />
+            <span className="bg-gradient-to-r from-yellow-300 via-orange-400 via-red-400 to-pink-500 bg-clip-text text-transparent font-bold text-xl hidden sm:inline-block animate-gradient-x bg-400%">
+              RewardNFT
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

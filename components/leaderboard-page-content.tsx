@@ -14,7 +14,7 @@ export function LeaderboardPageContent() {
   const [selectedTab, setSelectedTab] = useState<"referrals" | "xp">("referrals")
   const [timeframe, setTimeframe] = useState("all")
 
-  // Firebase leaderboard hooks for different types - increased limit to show all users
+  // Firebase leaderboard hooks for different types - optimized with caching and rate limiting
   const {
     leaderboard: referralLeaderboard,
     stats,
@@ -23,38 +23,40 @@ export function LeaderboardPageContent() {
     refreshing: referralRefreshing,
     refresh: refreshReferrals,
     error: referralError,
-  } = useFirebaseLeaderboard("referrals", 100) // Increased limit to show more users
+  } = useFirebaseLeaderboard("referrals", 50, false) // Reduced limit and disabled auto-refresh
 
-  // For XP leaderboard, we'll use xp data
+  // For XP leaderboard, we'll use xp data - only load when needed
   const {
     leaderboard: xpLeaderboard,
     loading: xpLoading,
     refreshing: xpRefreshing,
     refresh: refreshXP,
     error: xpError,
-  } = useFirebaseLeaderboard("xp", 100) // Increased limit to show more users
+  } = useFirebaseLeaderboard("xp", 50, false) // Reduced limit and disabled auto-refresh
 
-  // Filter leaderboard based on search term
+  // Filter leaderboard based on search term - optimized memoization
   const filteredReferralLeaderboard = useMemo(() => {
-    if (!searchTerm) return referralLeaderboard
+    if (!searchTerm.trim()) return referralLeaderboard
+    const lowerSearchTerm = searchTerm.toLowerCase()
     return referralLeaderboard.filter(
       (user) =>
-        user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.walletAddress.toLowerCase().includes(searchTerm.toLowerCase())
+        user.displayName.toLowerCase().includes(lowerSearchTerm) ||
+        user.walletAddress.toLowerCase().includes(lowerSearchTerm)
     )
   }, [referralLeaderboard, searchTerm])
 
   const filteredXPLeaderboard = useMemo(() => {
-    if (!searchTerm) return xpLeaderboard
+    if (!searchTerm.trim()) return xpLeaderboard
+    const lowerSearchTerm = searchTerm.toLowerCase()
     return xpLeaderboard.filter(
       (user) =>
-        user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.walletAddress.toLowerCase().includes(searchTerm.toLowerCase())
+        user.displayName.toLowerCase().includes(lowerSearchTerm) ||
+        user.walletAddress.toLowerCase().includes(lowerSearchTerm)
     )
   }, [xpLeaderboard, searchTerm])
 
-  // Get current leaderboard data based on selected tab
-  const getCurrentLeaderboard = () => {
+  // Get current leaderboard data based on selected tab - memoized to prevent re-calculations
+  const currentLeaderboard = useMemo(() => {
     switch (selectedTab) {
       case "referrals":
         return filteredReferralLeaderboard
@@ -63,9 +65,9 @@ export function LeaderboardPageContent() {
       default:
         return filteredReferralLeaderboard
     }
-  }
+  }, [selectedTab, filteredReferralLeaderboard, filteredXPLeaderboard])
 
-  const getCurrentLoading = () => {
+  const currentLoading = useMemo(() => {
     switch (selectedTab) {
       case "referrals":
         return referralLoading
@@ -74,9 +76,9 @@ export function LeaderboardPageContent() {
       default:
         return referralLoading
     }
-  }
+  }, [selectedTab, referralLoading, xpLoading])
 
-  const getCurrentRefreshing = () => {
+  const currentRefreshing = useMemo(() => {
     switch (selectedTab) {
       case "referrals":
         return referralRefreshing
@@ -85,7 +87,7 @@ export function LeaderboardPageContent() {
       default:
         return referralRefreshing
     }
-  }
+  }, [selectedTab, referralRefreshing, xpRefreshing])
 
   const getCurrentError = () => {
     switch (selectedTab) {
@@ -113,8 +115,8 @@ export function LeaderboardPageContent() {
 
 
 
-  // Get top 3 users for podium display
-  const topThreeUsers = getCurrentLeaderboard().slice(0, 3)
+  // Get top 3 users for podium display - memoized
+  const topThreeUsers = useMemo(() => currentLeaderboard.slice(0, 3), [currentLeaderboard])
 
   return (
     <ProtectedRoute requiresNFT={true}>
@@ -163,7 +165,7 @@ export function LeaderboardPageContent() {
               <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 rounded-xl p-6 border border-purple-700/30 backdrop-blur-sm">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-purple-400 mb-2">
-                    {getCurrentLeaderboard().length}
+                    {currentLeaderboard.length}
                   </div>
                   <div className="text-gray-300 text-sm font-medium">Active Leaders</div>
                 </div>
@@ -226,7 +228,7 @@ export function LeaderboardPageContent() {
                       </p>
                       <div className="bg-yellow-800/30 rounded-lg p-2">
                         <p className="text-yellow-300 text-sm font-medium">USDC Earned</p>
-                        <p className="text-white font-bold text-xl">${topThreeUsers[1].totalEarned.toFixed(2)}</p>
+                        <p className="text-white font-bold text-xl">${(topThreeUsers[1].totalReferrals * 5).toFixed(2)}</p>
                       </div>
                       <div className="text-xs text-yellow-300/80">
                         Rank #{topThreeUsers[1].rank}
@@ -265,7 +267,7 @@ export function LeaderboardPageContent() {
                       </p>
                       <div className="bg-teal-800/40 rounded-lg p-3">
                         <p className="text-teal-300 text-sm font-medium">USDC Earned</p>
-                        <p className="text-white font-bold text-2xl">${topThreeUsers[0].totalEarned.toFixed(2)}</p>
+                        <p className="text-white font-bold text-2xl">${(topThreeUsers[0].totalReferrals * 5).toFixed(2)}</p>
                       </div>
                       <div className="text-sm text-teal-300/80 font-medium">
                         🏆 Champion - Rank #{topThreeUsers[0].rank}
@@ -303,7 +305,7 @@ export function LeaderboardPageContent() {
                       </p>
                       <div className="bg-orange-800/30 rounded-lg p-2">
                         <p className="text-orange-300 text-sm font-medium">USDC Earned</p>
-                        <p className="text-white font-bold text-xl">${topThreeUsers[2].totalEarned.toFixed(2)}</p>
+                        <p className="text-white font-bold text-xl">${(topThreeUsers[2].totalReferrals * 5).toFixed(2)}</p>
                       </div>
                       <div className="text-xs text-orange-300/80">
                         Rank #{topThreeUsers[2].rank}
@@ -352,7 +354,7 @@ export function LeaderboardPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getCurrentLoading() ? (
+                    {currentLoading ? (
                       // Enhanced Loading skeleton
                       [...Array(10)].map((_, i) => (
                         <tr key={i} className="border-b border-gray-700/20 animate-pulse">
@@ -376,8 +378,8 @@ export function LeaderboardPageContent() {
                           </td>
                         </tr>
                       ))
-                    ) : getCurrentLeaderboard().length > 0 ? (
-                      getCurrentLeaderboard().map((user, index) => {
+                    ) : currentLeaderboard.length > 0 ? (
+                      currentLeaderboard.map((user, index) => {
                         const isTopTen = user.rank <= 10
 
                         return (
@@ -437,10 +439,10 @@ export function LeaderboardPageContent() {
                             <td className="text-center py-5 px-6">
                               <div className="space-y-1">
                                 <div className="text-teal-400 font-bold text-lg">
-                                  ${(user.totalReferrals * 4).toFixed(2)}
+                                  ${(user.totalReferrals * 5).toFixed(2)}
                                 </div>
                                 <div className="text-gray-400 text-xs">
-                                  total earned ($4 per referral)
+                                  total earned ($5 per referral)
                                 </div>
                               </div>
                             </td>
@@ -453,10 +455,16 @@ export function LeaderboardPageContent() {
                           <div className="space-y-4">
                             <div className="text-6xl">🏆</div>
                             <div className="text-gray-400 text-lg">
-                              No users found. Connect your wallet to join the leaderboard!
+                              {selectedTab === "xp"
+                                ? "No XP data found. Play mini-games or complete quests to earn XP!"
+                                : "No users found. Connect your wallet to join the leaderboard!"
+                              }
                             </div>
                             <div className="text-gray-500 text-sm">
-                              All users are shown here, including those with 0 referrals
+                              {selectedTab === "xp"
+                                ? "XP is earned through mini-games, quest completions, and other activities"
+                                : "All users are shown here, including those with 0 referrals"
+                              }
                             </div>
                           </div>
                         </td>
@@ -471,10 +479,10 @@ export function LeaderboardPageContent() {
             <div className="flex justify-center mt-8">
               <Button
                 onClick={handleRefresh}
-                disabled={getCurrentRefreshing()}
+                disabled={currentRefreshing}
                 className="bg-teal-500 hover:bg-teal-600 text-black font-medium px-8 py-3 rounded-lg transition-all"
               >
-                {getCurrentRefreshing() ? (
+                {currentRefreshing ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     Refreshing...

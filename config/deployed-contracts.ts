@@ -1,8 +1,8 @@
 // Collection mint ID provided by user
-export const OFFICIAL_COLLECTION = "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa"
+export const OFFICIAL_COLLECTION = process.env.NEXT_PUBLIC_COLLECTION_MINT || "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa"
 
 // Candy machine ID provided by user
-export const CANDY_MACHINE_ID = "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
+export const CANDY_MACHINE_ID = process.env.NEXT_PUBLIC_CANDY_MACHINE_ID || "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
 
 // Company wallet for receiving payments
 export const COMPANY_WALLET = process.env.NEXT_PUBLIC_PLATFORM_WALLET_ADDRESS || "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"

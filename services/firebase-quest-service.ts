@@ -34,7 +34,7 @@ export interface Quest {
     xp: number
   }
   requirements: {
-    type: "connect_discord" | "login_streak" | "share_twitter" | "refer_friends" | "play_minigame" | "join_community_call"
+    type: "connect_discord" | "login_streak" | "share_twitter" | "refer_friends" | "play_minigame" | "join_community_call" | "follow_linkedin" | "engage_tweet" | "follow_x" | "join_telegram"
     count: number
     data?: any
   }
@@ -128,6 +128,58 @@ class FirebaseQuestService {
       difficulty: "Medium",
       reward: { xp: 300 },
       requirements: { type: "login_streak", count: 5 },
+      isActive: true,
+    },
+    {
+      title: "Follow LinkedIn",
+      description: "Follow RewardNFT on LinkedIn to stay updated",
+      type: "one-time",
+      difficulty: "Easy",
+      reward: { xp: 100 },
+      requirements: {
+        type: "follow_linkedin",
+        count: 1,
+        data: { url: "https://www.linkedin.com/company/rewardnft" }
+      },
+      isActive: true,
+    },
+    {
+      title: "Engage Tweet",
+      description: "Like and retweet our latest announcement",
+      type: "one-time",
+      difficulty: "Easy",
+      reward: { xp: 150 },
+      requirements: {
+        type: "engage_tweet",
+        count: 1,
+        data: { url: "https://x.com/RewardNFT_/status/1933524613067137437" }
+      },
+      isActive: true,
+    },
+    {
+      title: "Follow X (Twitter)",
+      description: "Follow @RewardNFT_ on X for latest updates",
+      type: "one-time",
+      difficulty: "Easy",
+      reward: { xp: 100 },
+      requirements: {
+        type: "follow_x",
+        count: 1,
+        data: { url: "https://x.com/RewardNFT_" }
+      },
+      isActive: true,
+    },
+    {
+      title: "Join Telegram",
+      description: "Join our Telegram community for exclusive updates",
+      type: "one-time",
+      difficulty: "Easy",
+      reward: { xp: 100 },
+      requirements: {
+        type: "join_telegram",
+        count: 1,
+        data: { url: "https://t.me/rewardsNFT" }
+      },
       isActive: true,
     },
   ]
@@ -352,8 +404,16 @@ class FirebaseQuestService {
       throw new Error("Quest requirement not met")
     }
 
-    const newProgress = Math.min(progress.progress + progressIncrement, progress.maxProgress)
+    // For mini-game quests, use the actual game score as progress
+    let newProgress = progress.progress + progressIncrement
+    if (quest.requirements.type === "play_minigame" && verificationData?.gameScore) {
+      newProgress = Math.max(verificationData.gameScore, progress.progress)
+      console.log(`🎮 Mini-game progress update: Score ${verificationData.gameScore}, Progress ${newProgress}/${progress.maxProgress}`)
+    }
+    newProgress = Math.min(newProgress, progress.maxProgress)
     const isCompleted = newProgress >= progress.maxProgress
+
+    console.log(`🎯 Quest completion check: Progress ${newProgress}/${progress.maxProgress}, Completed: ${isCompleted}`)
 
     const updateData: Partial<UserQuestProgress> = {
       progress: newProgress,
@@ -433,12 +493,31 @@ class FirebaseQuestService {
         return false
 
       case "play_minigame":
-        // Verify mini-game score
-        return verificationData?.gameScore >= quest.requirements.count
+        // Verify mini-game score meets requirement (1500+ points)
+        const requiredScore = quest.requirements.count || 1500
+        const achievedScore = verificationData?.gameScore || 0
+        console.log(`🎮 Mini-game verification: Required ${requiredScore}, Achieved ${achievedScore}`)
+        return achievedScore >= requiredScore && verificationData?.completedAt && verificationData?.verified === true
 
       case "join_community_call":
         // Verify community call attendance
         return verificationData?.attendanceVerified === true && verificationData?.joinedAt
+
+      case "follow_linkedin":
+        // Verify LinkedIn follow
+        return verificationData?.linkedinFollowed === true && verificationData?.timestamp
+
+      case "engage_tweet":
+        // Verify tweet engagement (like + retweet)
+        return verificationData?.tweetEngaged === true && verificationData?.timestamp
+
+      case "follow_x":
+        // Verify X (Twitter) follow
+        return verificationData?.xFollowed === true && verificationData?.timestamp
+
+      case "join_telegram":
+        // Verify Telegram join
+        return verificationData?.telegramJoined === true && verificationData?.timestamp
 
       default:
         return true
@@ -475,24 +554,93 @@ class FirebaseQuestService {
     return true
   }
 
+  // Enhanced referral quest monitoring
+  async monitorAndCompleteReferralQuests(): Promise<{ completed: number; errors: string[] }> {
+    try {
+      console.log("🔍 Monitoring referral quests for auto-completion...")
+
+      // Get all users with 3+ referrals
+      const usersQuery = query(collection(db, "users"))
+      const usersSnapshot = await getDocs(usersQuery)
+      const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Array<{
+        id: string
+        walletAddress: string
+        totalReferrals?: number
+        [key: string]: any
+      }>
+      const eligibleUsers = users.filter(user => (user.totalReferrals || 0) >= 3)
+
+      console.log(`Found ${eligibleUsers.length} users eligible for referral quest completion`)
+
+      let completed = 0
+      const errors: string[] = []
+
+      // Get referral quest
+      const quests = await this.getActiveQuests()
+      const referralQuest = quests.find(quest => quest.requirements.type === 'refer_friends')
+
+      if (!referralQuest) {
+        errors.push("Referral quest not found")
+        return { completed, errors }
+      }
+
+      for (const user of eligibleUsers) {
+        try {
+          // Check if quest is already completed
+          const userProgress = await this.getUserQuestProgress(user.walletAddress)
+          const questProgress = userProgress.find(progress =>
+            progress.questId === referralQuest.id &&
+            (progress.status === 'completed' || progress.status === 'claimed')
+          )
+
+          if (!questProgress) {
+            // Auto-complete the quest
+            await this.updateQuestProgress(
+              user.walletAddress,
+              referralQuest.id,
+              1,
+              {
+                referralCount: user.totalReferrals,
+                verified: true,
+                autoCompleted: true,
+                monitoredAt: Date.now()
+              }
+            )
+            completed++
+            console.log(`✅ Auto-completed referral quest for ${user.walletAddress}`)
+          }
+        } catch (error) {
+          const errorMsg = `Failed for ${user.walletAddress}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          errors.push(errorMsg)
+          console.error(errorMsg)
+        }
+      }
+
+      return { completed, errors }
+    } catch (error) {
+      console.error("Error monitoring referral quests:", error)
+      return { completed: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] }
+    }
+  }
+
   // Add XP to user and update level
   async addUserXP(walletAddress: string, xpAmount: number): Promise<UserXPData> {
     const userXPRef = doc(db, this.USER_XP_COLLECTION, walletAddress)
     const userXPDoc = await getDoc(userXPRef)
-    
+
     let currentXP = 0
     let currentLevel = 1
-    
+
     if (userXPDoc.exists()) {
       const data = userXPDoc.data() as UserXPData
       currentXP = data.totalXP
       currentLevel = data.level
     }
-    
+
     const newTotalXP = currentXP + xpAmount
     const newLevel = this.calculateLevel(newTotalXP)
     const { currentLevelXP, nextLevelXP } = this.getLevelXPInfo(newTotalXP, newLevel)
-    
+
     const userXPData: UserXPData = {
       walletAddress,
       totalXP: newTotalXP,
@@ -534,19 +682,53 @@ class FirebaseQuestService {
 
   // Get XP leaderboard
   async getXPLeaderboard(limitCount: number = 50): Promise<UserXPData[]> {
-    const q = query(
-      collection(db, this.USER_XP_COLLECTION),
-      orderBy("totalXP", "desc"),
-      limit(limitCount)
-    )
-    
-    const snapshot = await getDocs(q)
-    const leaderboard = snapshot.docs.map((doc, index) => ({
-      ...doc.data(),
-      rank: index + 1,
-    } as UserXPData))
-    
-    return leaderboard
+    try {
+      console.log(`🏆 Firebase Quest Service: Getting XP leaderboard with limit ${limitCount}`)
+
+      // First check if collection exists and has documents
+      const collectionRef = collection(db, this.USER_XP_COLLECTION)
+      const allSnapshot = await getDocs(collectionRef)
+      console.log(`🏆 Firebase Quest Service: Found ${allSnapshot.docs.length} total XP documents`)
+
+      if (allSnapshot.docs.length === 0) {
+        console.log(`🏆 Firebase Quest Service: No XP data found. Users need to earn XP first.`)
+        return []
+      }
+
+      // Log some sample data
+      allSnapshot.docs.slice(0, 3).forEach((doc, index) => {
+        const data = doc.data()
+        console.log(`🏆 Firebase Quest Service: Sample XP doc ${index + 1}:`, {
+          id: doc.id,
+          walletAddress: data.walletAddress,
+          totalXP: data.totalXP,
+          level: data.level
+        })
+      })
+
+      const q = query(
+        collection(db, this.USER_XP_COLLECTION),
+        orderBy("totalXP", "desc"),
+        limit(limitCount)
+      )
+
+      const snapshot = await getDocs(q)
+      console.log(`🏆 Firebase Quest Service: Query returned ${snapshot.docs.length} documents`)
+
+      const leaderboard = snapshot.docs.map((doc, index) => {
+        const data = doc.data() as UserXPData
+        return {
+          ...data,
+          rank: index + 1,
+        }
+      })
+
+      console.log(`🏆 Firebase Quest Service: Created leaderboard with ${leaderboard.length} entries`)
+      return leaderboard
+    } catch (error) {
+      console.error(`🏆 Firebase Quest Service: Error getting XP leaderboard:`, error)
+      return []
+    }
   }
 }
 

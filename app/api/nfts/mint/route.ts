@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
         { trait_type: "Platform", value: "RewardNFT" },
         { trait_type: "Utility", value: "Membership" }
       ],
-      mintCost: nftData.mintCost || 10, // 10 USDC per NFT
-      usdcRevenue: nftData.mintCost || 10, // Track USDC revenue
+      mintCost: nftData.mintCost || 5, // 5 USDC per NFT
+      usdcRevenue: nftData.mintCost || 5, // Track USDC revenue
       mintedAt: serverTimestamp(),
       isVerified: true,
       isTransferred: false,

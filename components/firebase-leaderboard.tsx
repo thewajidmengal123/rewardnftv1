@@ -11,13 +11,17 @@ interface FirebaseLeaderboardProps {
   limit?: number
   showRefresh?: boolean
   className?: string
+  autoRefresh?: boolean
+  refreshInterval?: number
 }
 
-export function FirebaseLeaderboard({ 
-  type = "referrals", 
-  limit = 10, 
+export function FirebaseLeaderboard({
+  type = "referrals",
+  limit = 10,
   showRefresh = true,
-  className = "" 
+  className = "",
+  autoRefresh = false,
+  refreshInterval = 300000
 }: FirebaseLeaderboardProps) {
   const {
     leaderboard,
@@ -27,7 +31,7 @@ export function FirebaseLeaderboard({
     refreshing,
     refresh,
     error,
-  } = useFirebaseLeaderboard(type, limit)
+  } = useFirebaseLeaderboard(type, limit, autoRefresh, refreshInterval)
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -130,7 +134,7 @@ export function FirebaseLeaderboard({
             <div className="text-xs text-white/70">Referrals</div>
           </div>
           <div className="bg-white/5 rounded-lg p-2">
-            <div className="text-lg font-bold">{(stats.totalReferrals * 4).toFixed(0)}</div>
+            <div className="text-lg font-bold">{(stats.totalReferrals * 5).toFixed(0)}</div>
             <div className="text-xs text-white/70">USDC</div>
           </div>
         </div>
@@ -147,7 +151,7 @@ export function FirebaseLeaderboard({
             </div>
             <div className="text-right">
               <div className="font-bold">{userStats.totalReferrals} {getScoreLabel(type)}</div>
-              <div className="text-xs text-white/70">{(userStats.totalReferrals * 4).toFixed(2)} USDC earned</div>
+              <div className="text-xs text-white/70">{(userStats.totalReferrals * 5).toFixed(2)} USDC earned</div>
             </div>
           </div>
         </div>
@@ -184,7 +188,7 @@ export function FirebaseLeaderboard({
                   {entry.score} {getScoreLabel(type)}
                 </div>
                 <div className="text-white/70 text-sm">
-                  {(entry.totalReferrals * 4).toFixed(2)} USDC
+                  {(entry.totalReferrals * 5).toFixed(2)} USDC
                 </div>
               </div>
             </div>

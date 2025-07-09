@@ -42,10 +42,7 @@ export function saveWalletSession(walletName: string, address: string): void {
     localStorage.setItem(STORAGE_KEYS.CONNECTION_TIMESTAMP, session.timestamp.toString())
     localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, session.sessionToken)
 
-    // Set preferred wallet to awwallet if that's what was connected
-    if (walletName === "awwallet") {
-      localStorage.setItem(STORAGE_KEYS.PREFERRED_WALLET, "awwallet")
-    }
+
   } catch (error) {
     console.error("Failed to save wallet session:", error)
   }
@@ -93,15 +90,15 @@ export function isSessionValid(): boolean {
 }
 
 /**
- * Get preferred wallet (awwallet by default)
+ * Get preferred wallet (phantom by default)
  */
 export function getPreferredWallet(): string {
-  if (typeof window === "undefined") return "awwallet"
+  if (typeof window === "undefined") return "phantom"
 
   try {
-    return localStorage.getItem(STORAGE_KEYS.PREFERRED_WALLET) || "awwallet"
+    return localStorage.getItem(STORAGE_KEYS.PREFERRED_WALLET) || "phantom"
   } catch (error) {
-    return "awwallet"
+    return "phantom"
   }
 }
 

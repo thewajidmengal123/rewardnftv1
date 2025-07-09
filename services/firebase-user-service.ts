@@ -101,18 +101,19 @@ export class FirebaseUserService {
   async updateUserEarnings(walletAddress: string, amount: number): Promise<void> {
     const userRef = doc(db, this.COLLECTION, walletAddress)
 
-    await updateDoc(userRef, {
+    // Use setDoc with merge to create user if doesn't exist
+    await setDoc(userRef, {
       totalEarned: increment(amount),
       lastActive: serverTimestamp(),
-    })
+    }, { merge: true })
   }
 
   // Get all users for leaderboard (with pagination)
   async getAllUsers(limitCount: number = 100): Promise<UserProfile[]> {
     try {
+      // Get users without ordering to avoid missing field issues
       const usersQuery = query(
         collection(db, this.COLLECTION),
-        orderBy("totalReferrals", "desc"),
         limit(limitCount)
       )
 
@@ -122,6 +123,9 @@ export class FirebaseUserService {
       usersSnapshot.docs.forEach((doc) => {
         users.push({ id: doc.id, ...doc.data() } as UserProfile)
       })
+
+      // Sort users by totalReferrals in memory (descending order)
+      users.sort((a, b) => (b.totalReferrals || 0) - (a.totalReferrals || 0))
 
       return users
     } catch (error) {
@@ -182,20 +186,22 @@ export class FirebaseUserService {
   async incrementReferralCount(walletAddress: string): Promise<void> {
     const userRef = doc(db, this.COLLECTION, walletAddress)
 
-    await updateDoc(userRef, {
+    // Use setDoc with merge to create user if doesn't exist
+    await setDoc(userRef, {
       totalReferrals: increment(1),
       lastActive: serverTimestamp(),
-    })
+    }, { merge: true })
   }
 
   // Update quest completion
   async incrementQuestCompletion(walletAddress: string): Promise<void> {
     const userRef = doc(db, this.COLLECTION, walletAddress)
 
-    await updateDoc(userRef, {
+    // Use setDoc with merge to create user if doesn't exist
+    await setDoc(userRef, {
       questsCompleted: increment(1),
       lastActive: serverTimestamp(),
-    })
+    }, { merge: true })
   }
 
   // Update daily check-in

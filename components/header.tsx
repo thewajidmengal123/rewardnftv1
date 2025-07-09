@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { MobileNav } from "@/components/mobile-nav"
@@ -17,7 +18,14 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold">
+            <Link href="/" className="flex items-center gap-3 text-xl font-bold">
+              <Image
+                src="/images/logo.png"
+                alt="RewardNFT Logo"
+                width={32}
+                height={32}
+                className="w-8 h-8 object-contain"
+              />
               <span className="bg-gradient-to-r from-yellow-300 via-orange-400 via-red-400 to-pink-500 bg-clip-text text-transparent animate-gradient-x bg-400%">
                 RewardNFT
               </span>

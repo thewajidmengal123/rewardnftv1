@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { Gamepad2, Trophy, Star, Zap, Play } from "lucide-react"
+import { ProtectedRoute } from "@/components/protected-route"
+import { Gamepad2, Trophy, Star, Zap, Play, Clock, Timer, RotateCcw } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 export function MiniGamePageContent() {
@@ -19,18 +21,15 @@ export function MiniGamePageContent() {
   const [questCompleted, setQuestCompleted] = useState(false)
   const [xpEarned, setXpEarned] = useState(0)
   const [totalXpEarned, setTotalXpEarned] = useState(0)
-  const [hasPlayedToday, setHasPlayedToday] = useState(false)
-  const [lastPlayDate, setLastPlayDate] = useState<string | null>(null)
-  const [checkingPlayStatus, setCheckingPlayStatus] = useState(true)
-  const [timeUntilReset, setTimeUntilReset] = useState<string>('')
-  const [sessionStatus, setSessionStatus] = useState<string | null>(null)
+  const [gameEnded, setGameEnded] = useState(false)
+  const [xpSaved, setXpSaved] = useState(false)
+  const gameSessionRef = useRef<string | null>(null)
+  const lastXPSaveTime = useRef<number>(0)
+  const xpSaveInProgress = useRef(false)
 
-  // Check daily play status and pending quest on component mount
+
+  // Check for pending quest on component mount
   useEffect(() => {
-    if (connected && publicKey) {
-      checkDailyPlayStatus()
-    }
-
     const pendingQuestId = localStorage.getItem('pendingQuestId')
     if (pendingQuestId) {
       toast({
@@ -40,102 +39,53 @@ export function MiniGamePageContent() {
     }
   }, [connected, publicKey])
 
-  // Update countdown timer every minute when user has played today
+  // Cleanup interval on unmount and reset flags
   useEffect(() => {
-    if (!hasPlayedToday) return
-
-    const updateCountdown = () => {
-      const now = new Date()
-      const tomorrow = new Date(now)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      tomorrow.setHours(0, 0, 0, 0) // Set to midnight
-
-      const timeDiff = tomorrow.getTime() - now.getTime()
-      const hours = Math.floor(timeDiff / (1000 * 60 * 60))
-      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60))
-
-      setTimeUntilReset(`${hours}h ${minutes}m`)
-    }
-
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 60000) // Update every minute
-
-    return () => clearInterval(interval)
-  }, [hasPlayedToday])
-
-  const checkDailyPlayStatus = async () => {
-    if (!publicKey) return
-
-    try {
-      setCheckingPlayStatus(true)
-      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
-
-      const response = await fetch(`/api/mini-game/play-status?walletAddress=${publicKey.toString()}&date=${today}`)
-      const result = await response.json()
-
-      if (result.success) {
-        setHasPlayedToday(result.hasPlayedToday)
-        setLastPlayDate(result.lastPlayDate)
-        setSessionStatus(result.sessionStatus)
-
-        console.log('🎮 Mini-game play status:', {
-          hasPlayedToday: result.hasPlayedToday,
-          sessionStatus: result.sessionStatus,
-          lastPlayDate: result.lastPlayDate
-        })
-
-        // If user has a session today (started or completed), they cannot play again
-        if (result.hasPlayedToday && (result.sessionStatus === 'started' || result.sessionStatus === 'completed')) {
-          setHasPlayedToday(true)
-        }
+    return () => {
+      if (gameInterval) {
+        clearInterval(gameInterval)
       }
-    } catch (error) {
-      console.error('Error checking daily play status:', error)
-      // On error, allow play (fail open)
-      setHasPlayedToday(false)
-    } finally {
-      setCheckingPlayStatus(false)
+      setGameEnded(false)
+      setXpSaved(false)
+      xpSaveInProgress.current = false
+      gameSessionRef.current = null
     }
-  }
+  }, [gameInterval])
 
   const startGame = async () => {
-    // Double-check play status before starting
-    await checkDailyPlayStatus()
-
-    // Check if user has already played today
-    if (hasPlayedToday || sessionStatus === 'completed') {
-      toast({
-        title: "Daily Limit Reached",
-        description: "You can only play the mini-game once per day. Come back tomorrow!",
-        variant: "destructive"
-      })
-      return
+    // Clear any existing intervals first
+    if (gameInterval) {
+      clearInterval(gameInterval)
+      setGameInterval(null)
     }
 
-    // Record the play session start
-    const sessionRecorded = await recordPlaySession()
+    // Generate unique session ID
+    const sessionId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    gameSessionRef.current = sessionId
 
-    // If session recording failed, don't start the game
-    if (!sessionRecorded) {
-      toast({
-        title: "Error",
-        description: "Failed to start game session. Please try again.",
-        variant: "destructive"
-      })
-      return
-    }
+    console.log(`🎮 Starting new game session: ${sessionId}`)
 
     setGameState('playing')
     setScore(0)
     setClicks(0)
-    setTimeLeft(20) // Reduced from 30 to 20 seconds
+    setTimeLeft(20) // 20 seconds game duration
     setQuestCompleted(false)
     setXpEarned(0) // Reset XP for new game
+    setGameEnded(false) // Reset game ended flag
+    setXpSaved(false) // Reset XP saved flag
+    xpSaveInProgress.current = false // Reset XP save progress
+    lastXPSaveTime.current = 0 // Reset last save time
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          endGame()
+          // Only end game if this is still the active session
+          if (gameSessionRef.current === sessionId) {
+            console.log(`🎮 Timer ended for session: ${sessionId}`)
+            clearInterval(interval)
+            setGameInterval(null)
+            setTimeout(() => endGame(), 100) // Small delay to ensure state updates
+          }
           return 0
         }
         return prev - 1
@@ -145,146 +95,223 @@ export function MiniGamePageContent() {
     setGameInterval(interval)
   }
 
-  const recordPlaySession = async (): Promise<boolean> => {
-    if (!publicKey) return false
 
-    try {
-      const today = new Date().toISOString().split('T')[0]
-
-      const response = await fetch('/api/mini-game/record-play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: publicKey.toString(),
-          playDate: today,
-          startedAt: Date.now()
-        })
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        setHasPlayedToday(true)
-        setLastPlayDate(today)
-        return true
-      } else {
-        console.error('Failed to record play session:', result.error)
-        return false
-      }
-    } catch (error) {
-      console.error('Error recording play session:', error)
-      return false
-    }
-  }
 
   const endGame = useCallback(() => {
+    const currentSession = gameSessionRef.current
+
+    // Prevent multiple calls to endGame
+    if (gameEnded) {
+      console.log(`🎮 Game already ended, skipping duplicate call`)
+      return
+    }
+
+    console.log(`🎮 Ending game session: ${currentSession}`)
+    setGameEnded(true)
     setGameState('gameOver')
+
+    // Clear the session
+    gameSessionRef.current = null
+
     if (gameInterval) {
       clearInterval(gameInterval)
       setGameInterval(null)
     }
 
-    // Save XP earned to backend immediately when game ends
-    if (xpEarned > 0 && publicKey) {
-      saveXPToBackend(xpEarned)
+    // Calculate final XP based on current game state
+    // Use the actual XP earned from clicks, with a minimum of 10 XP for playing
+    const finalXP = Math.max(xpEarned, 10)
+    console.log(`🎮 Game ended - Final XP: ${finalXP} (from ${xpEarned} earned, minimum 10)`)
+    console.log(`🎮 Game stats - Score: ${score}, Clicks: ${clicks}, XP Earned: ${xpEarned}`)
+
+    // CRITICAL: Always save XP to backend when game ends, regardless of amount
+    if (publicKey && !xpSaved && !xpSaveInProgress.current) {
+      console.log(`🎮 Game ended - Saving ${finalXP} XP to backend for ${publicKey.toString()}`)
+      saveXPToBackend(finalXP)
+    } else if (!publicKey) {
+      console.error('❌ Cannot save XP - wallet not connected')
+    } else {
+      console.log('💎 XP already saved or save in progress, skipping duplicate save in endGame')
     }
 
-    // Check if quest should be completed (increased target to 1500)
-    const pendingQuestId = localStorage.getItem('pendingQuestId')
-    if (pendingQuestId && score >= 1500 && !questCompleted) {
-      completeQuest(pendingQuestId, score)
+    // Check if quest should be completed (target: 1500 points)
+    if (score >= 1500 && !questCompleted) {
+      console.log(`🎮 Score ${score} meets quest requirement (1500+), checking for mini-game quest...`)
+      checkAndCompleteMinigameQuest(score)
     }
-
-    // Ensure user cannot play again today
-    setHasPlayedToday(true)
-    setSessionStatus('completed')
-  }, [gameInterval, score, questCompleted, xpEarned, publicKey])
+  }, [gameInterval, score, questCompleted, xpEarned, publicKey, gameEnded, xpSaved])
 
   const saveXPToBackend = async (xpAmount: number) => {
-    if (!publicKey) return
+    if (!publicKey) {
+      console.error('❌ Cannot save XP - wallet not connected')
+      return
+    }
+
+    const now = Date.now()
+    const timeSinceLastSave = now - lastXPSaveTime.current
+    const MIN_SAVE_INTERVAL = 5000 // 5 seconds minimum between saves
+
+    // Prevent duplicate XP saves using multiple checks
+    if (xpSaved || xpSaveInProgress.current) {
+      console.log('💎 XP already saved or save in progress, skipping duplicate save')
+      return
+    }
+
+    // Time-based protection against rapid saves
+    if (timeSinceLastSave < MIN_SAVE_INTERVAL) {
+      console.log(`💎 XP save blocked - only ${timeSinceLastSave}ms since last save (minimum: ${MIN_SAVE_INTERVAL}ms)`)
+      return
+    }
+
+    // Ensure minimum XP reward (at least 10 XP for playing)
+    const finalXPAmount = Math.max(xpAmount, 10)
+
+    console.log(`💎 Saving ${finalXPAmount} XP to backend for wallet: ${publicKey.toString()}`)
+    setXpSaved(true)
+    xpSaveInProgress.current = true
+    lastXPSaveTime.current = now
 
     try {
-      // Save XP
+      // Save XP to backend
       const xpResponse = await fetch('/api/xp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: publicKey.toString(),
-          xpAmount,
+          xpAmount: finalXPAmount,
           source: 'mini-game',
           details: {
             gameScore: score,
             clicks: clicks,
             timeSpent: 20 - timeLeft,
-            completedAt: Date.now()
+            completedAt: Date.now(),
+            originalXP: xpAmount,
+            adjustedXP: finalXPAmount
           }
         })
       })
 
-      // Update session as completed
-      const today = new Date().toISOString().split('T')[0]
-      await fetch('/api/mini-game/complete-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: publicKey.toString(),
-          playDate: today,
-          gameScore: score,
-          clicks: clicks,
-          xpEarned: xpAmount,
-          completedAt: Date.now()
-        })
-      })
-
       const result = await xpResponse.json()
-      if (result.success) {
-        setTotalXpEarned(prev => prev + xpAmount)
+      console.log('🎮 XP API Response:', result)
 
-        // Ensure user cannot play again today
-        setHasPlayedToday(true)
-        setLastPlayDate(today)
+      if (result.success) {
+        // Session completion is not required for XP awarding
+        // The XP has been successfully saved to the backend
+
+        setTotalXpEarned(prev => prev + finalXPAmount)
 
         toast({
           title: "🎮 XP Rewarded!",
-          description: `You earned ${xpAmount} XP from the mini-game! XP has been added to your account.`,
+          description: `You earned ${finalXPAmount} XP from the mini-game! XP has been added to your account.`,
         })
+
+        console.log(`✅ Successfully awarded ${finalXPAmount} XP to ${publicKey.toString()}`)
+      } else {
+        throw new Error(result.error || 'Failed to save XP')
       }
     } catch (error) {
-      console.error('XP save error:', error)
+      console.error('❌ XP save error:', error)
+      setXpSaved(false) // Reset flag on error so user can try again
+      xpSaveInProgress.current = false // Reset ref on error
       toast({
         title: "Error",
-        description: "Failed to save XP. Please try again.",
+        description: `Failed to save XP: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       })
+    } finally {
+      xpSaveInProgress.current = false // Always reset ref when done
     }
   }
 
-  const completeQuest = async (questId: string, finalScore: number) => {
+  const checkAndCompleteMinigameQuest = async (finalScore: number) => {
     if (!publicKey) return
 
     try {
+      console.log(`🎮 Checking for mini-game quest completion with score: ${finalScore}`)
+
+      // Get all active quests to find mini-game quest
+      const questsResponse = await fetch(`/api/quests?action=get-quests`)
+      const questsResult = await questsResponse.json()
+
+      if (!questsResult.success) {
+        console.error('Failed to fetch quests:', questsResult.error)
+        return
+      }
+
+      // Find mini-game quest
+      const minigameQuest = questsResult.data.find((quest: any) =>
+        quest.requirements?.type === 'play_minigame'
+      )
+
+      if (!minigameQuest) {
+        console.log('🎮 No mini-game quest found')
+        return
+      }
+
+      console.log('🎮 Found mini-game quest:', minigameQuest)
+
+      // Check current quest progress
+      const progressResponse = await fetch(`/api/quests?wallet=${publicKey.toString()}&action=get-user-progress`)
+      const progressResult = await progressResponse.json()
+
+      let currentProgress = null
+      if (progressResult.success) {
+        currentProgress = progressResult.data.find((progress: any) =>
+          progress.questId === minigameQuest.id
+        )
+
+        if (currentProgress && (currentProgress.status === 'completed' || currentProgress.status === 'claimed')) {
+          console.log('🎮 Mini-game quest already completed')
+          return
+        }
+      }
+
+      // Always update quest progress to track the latest game attempt
+      const targetScore = minigameQuest.requirements?.count || 1500
+      const progressIncrement = finalScore >= targetScore ? 1 : 0
+
+      console.log(`🎮 Updating quest progress: score=${finalScore}, target=${targetScore}, increment=${progressIncrement}`)
+
+      // Update quest progress
       const response = await fetch('/api/quests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: publicKey.toString(),
-          questId,
+          questId: minigameQuest.id,
           action: 'update-progress',
-          progressIncrement: 1,
+          progressIncrement: progressIncrement,
           verificationData: {
             gameScore: finalScore,
-            completedAt: Date.now()
+            targetScore: targetScore,
+            completedAt: Date.now(),
+            verified: true,
+            bestScore: Math.max(finalScore, currentProgress?.verificationData?.bestScore || 0)
           }
         })
       })
 
       const result = await response.json()
+      console.log('🎮 Quest progress update response:', result)
+
       if (result.success) {
-        setQuestCompleted(true)
-        localStorage.removeItem('pendingQuestId')
-        toast({
-          title: "Quest Completed!",
-          description: `Mini-game quest completed with ${finalScore} points! You earned 200 XP!`,
-        })
+        if (progressIncrement > 0) {
+          setQuestCompleted(true)
+          toast({
+            title: "🎉 Quest Completed!",
+            description: `Mini-game quest completed with ${finalScore} points! You earned ${minigameQuest.reward?.xp || 200} XP!`,
+          })
+
+          // Clear the pending quest ID since it's completed
+          localStorage.removeItem('pendingQuestId')
+        } else {
+          toast({
+            title: "🎮 Game Complete!",
+            description: `Score: ${finalScore}/${targetScore}. Keep trying to reach the target score!`,
+          })
+        }
+      } else {
+        console.error('Quest progress update failed:', result.error)
       }
     } catch (error) {
       console.error('Quest completion error:', error)
@@ -293,6 +320,7 @@ export function MiniGamePageContent() {
 
   const handleClick = () => {
     if (gameState !== 'playing') return
+    if (xpEarned >= 250) return // Prevent clicking when XP limit reached
 
     // More challenging scoring system
     // Base points: 5-25 (reduced from 10-60)
@@ -337,48 +365,59 @@ export function MiniGamePageContent() {
       // Ensure we don't exceed 250 XP total
       const newXP = Math.min(currentXP + xpToAward, 250)
       setXpEarned(newXP)
+
+      // End game immediately when XP reaches 250
+      if (newXP >= 250) {
+        console.log(`🎮 XP limit reached (${newXP}/250) - ending game immediately`)
+        setTimeout(() => endGame(), 100) // Small delay to ensure state updates
+      }
     }
   }
 
 
 
+
+
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white flex items-center justify-center">
-        <Card className="w-full max-w-md mx-auto bg-gray-800/50 border-gray-700">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-white">Connect Wallet</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-gray-300">Connect your wallet to play the mini-game!</p>
-            <WalletConnectButton className="w-full" />
-          </CardContent>
-        </Card>
-      </div>
+      <ProtectedRoute requiresNFT={true}>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white flex items-center justify-center">
+          <Card className="w-full max-w-md mx-auto bg-gray-800/50 border-gray-700">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl text-white">Connect Wallet</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-gray-300">Connect your wallet to play the mini-game!</p>
+              <WalletConnectButton className="w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </ProtectedRoute>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative overflow-hidden">
-      {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 z-0" />
+    <ProtectedRoute requiresNFT={true}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative overflow-hidden">
+        {/* Background gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 z-0" />
 
-      {/* Content */}
-      <div className="relative z-10">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
+        {/* Content */}
+        <div className="relative z-10">
+          <div className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto">
 
-            {/* Game Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-4">
-                <span className="text-purple-400">Click</span>{" "}
-                <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                  Challenge
-                </span>
-              </h1>
+              {/* Game Header */}
+              <div className="text-center mb-8">
+                <h1 className="text-4xl font-bold mb-4">
+                  <span className="text-purple-400">Click</span>{" "}
+                  <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                    Challenge
+                  </span>
+                </h1>
               <p className="text-gray-300">Click as fast as you can to score points and earn XP! Get 1500+ points in 20 seconds to complete the quest!</p>
               <p className="text-cyan-300 text-sm">💡 Earn up to 250 XP based on your clicks - more clicks = more XP!</p>
-              <p className="text-yellow-300 text-sm">⏰ You can play once per day - make it count!</p>
+              <p className="text-yellow-300 text-sm">🎮 Play as many times as you want!</p>
             </div>
 
             {/* Game Area */}
@@ -417,20 +456,7 @@ export function MiniGamePageContent() {
                   </CardContent>
                 </Card>
 
-                {/* Daily Play Status */}
-                <Card className={`${hasPlayedToday || sessionStatus === 'completed' ? 'bg-red-900/30 border-red-700' : 'bg-green-900/30 border-green-700'}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Star className={`w-5 h-5 ${hasPlayedToday || sessionStatus === 'completed' ? 'text-red-400' : 'text-green-400'}`} />
-                      <span className={hasPlayedToday || sessionStatus === 'completed' ? 'text-red-300' : 'text-green-300'}>
-                        {hasPlayedToday || sessionStatus === 'completed'
-                          ? `Already played today (${lastPlayDate}). Next play in: ${timeUntilReset}`
-                          : 'Ready to play! You can play once per day.'
-                        }
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+
 
                 {/* Quest Status */}
                 {localStorage.getItem('pendingQuestId') && (
@@ -455,29 +481,14 @@ export function MiniGamePageContent() {
                     <CardContent className="text-center space-y-4">
                       <p className="text-gray-300">Click the button as many times as you can in 20 seconds!</p>
                       <p className="text-cyan-300 text-sm">Earn XP with every click - up to 250 XP total!</p>
-                      {checkingPlayStatus ? (
-                        <Button
-                          disabled
-                          size="lg"
-                          className="bg-gray-600 text-gray-300"
-                        >
-                          Checking Status...
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={startGame}
-                          disabled={hasPlayedToday || sessionStatus === 'completed'}
-                          size="lg"
-                          className={`${
-                            hasPlayedToday || sessionStatus === 'completed'
-                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold'
-                          }`}
-                        >
-                          <Play className="w-5 h-5 mr-2" />
-                          {hasPlayedToday || sessionStatus === 'completed' ? 'Played Today' : 'Start Game'}
-                        </Button>
-                      )}
+                      <Button
+                        onClick={startGame}
+                        size="lg"
+                        className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold"
+                      >
+                        <Play className="w-5 h-5 mr-2" />
+                        Start Game
+                      </Button>
                     </CardContent>
                   </Card>
                 )}
@@ -488,12 +499,22 @@ export function MiniGamePageContent() {
                       <Button
                         onClick={handleClick}
                         size="lg"
-                        className="w-48 h-48 rounded-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold text-2xl transform hover:scale-105 transition-transform"
+                        disabled={xpEarned >= 250}
+                        className={`w-48 h-48 rounded-full font-bold text-2xl transform transition-transform ${
+                          xpEarned >= 250
+                            ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white cursor-not-allowed'
+                            : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white hover:scale-105'
+                        }`}
                       >
-                        CLICK ME!
+                        {xpEarned >= 250 ? 'MAX XP!' : 'CLICK ME!'}
                       </Button>
-                      <p className="text-gray-300 mt-4">Keep clicking to score points and earn XP!</p>
-                      <p className="text-cyan-400 text-sm">XP: {xpEarned}/250</p>
+                      <p className="text-gray-300 mt-4">
+                        {xpEarned >= 250 ? 'Maximum XP reached! Game ending...' : 'Keep clicking to score points and earn XP!'}
+                      </p>
+                      <p className={`text-sm ${xpEarned >= 250 ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                        XP: {xpEarned}/250
+                      </p>
+
                     </CardContent>
                   </Card>
                 )}
@@ -512,10 +533,13 @@ export function MiniGamePageContent() {
                       {/* XP Reward Section */}
                       <div className="bg-cyan-900/30 border border-cyan-700 rounded-lg p-6">
                         <div className="text-2xl font-bold text-cyan-400 mb-2">
-                          🌟 XP Rewarded: {xpEarned}
+                          🌟 XP Rewarded: {Math.max(xpEarned, 10)}
                         </div>
                         <div className="text-cyan-300 text-sm">
-                          XP has been added to your account!
+                          XP has been automatically added to your account!
+                        </div>
+                        <div className="text-cyan-400 text-xs mt-2">
+                          Max XP: 250 per game • Play unlimited times!
                         </div>
                       </div>
 
@@ -537,15 +561,34 @@ export function MiniGamePageContent() {
                         </div>
                       )}
 
-                      {/* Daily Completion Status */}
-                      <div className="bg-purple-900/30 border border-purple-700 rounded-lg p-4">
-                        <div className="text-purple-400 font-semibold">🎯 Daily Game Complete!</div>
-                        <div className="text-purple-300 text-sm mt-1">Come back tomorrow to play again</div>
-                        <div className="text-purple-200 text-sm mt-2">Next play available in: {timeUntilReset}</div>
-                      </div>
 
-                      {/* Navigation back to quests */}
-                      <div className="pt-4">
+
+                      {/* Navigation buttons */}
+                      <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+                        <Button
+                          onClick={() => {
+                            // Reset game state for restart
+                            setGameState('menu')
+                            setScore(0)
+                            setClicks(0)
+                            setXpEarned(0)
+                            setQuestCompleted(false)
+                            setTimeLeft(20)
+                            setGameEnded(false)
+                            setXpSaved(false)
+                            // Clear any existing intervals
+                            if (gameInterval) {
+                              clearInterval(gameInterval)
+                              setGameInterval(null)
+                            }
+                            // Generate new game session
+                            gameSessionRef.current = `game_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+                          }}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold"
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Restart Game
+                        </Button>
                         <Button
                           asChild
                           className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold"
@@ -564,17 +607,47 @@ export function MiniGamePageContent() {
 
             {/* Navigation */}
             <div className="text-center mt-8">
-              <Button
-                asChild
-                variant="outline"
-                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-              >
-                <Link href="/quests">Back to Quests</Link>
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                {gameState === 'gameOver' && (
+                  <Button
+                    onClick={() => {
+                      // Reset game state for restart
+                      setGameState('menu')
+                      setScore(0)
+                      setClicks(0)
+                      setXpEarned(0)
+                      setQuestCompleted(false)
+                      setTimeLeft(20)
+                      setGameEnded(false)
+                      setXpSaved(false)
+                      // Clear any existing intervals
+                      if (gameInterval) {
+                        clearInterval(gameInterval)
+                        setGameInterval(null)
+                      }
+                      // Generate new game session
+                      gameSessionRef.current = `game_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+                    }}
+                    variant="outline"
+                    className="border-purple-600 text-purple-400 hover:bg-purple-700 hover:text-white"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Restart Game
+                  </Button>
+                )}
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                >
+                  <Link href="/quests">Back to Quests</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

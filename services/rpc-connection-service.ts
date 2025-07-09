@@ -9,7 +9,7 @@ export class RPCConnectionService {
     // Use the provided QuickNode endpoint
     this.endpoint =
       process.env.NEXT_PUBLIC_SOLANA_RPC ||
-      "https://morning-indulgent-energy.solana-devnet.quiknode.pro/450ae68bfe8c733d96e2301292cc52bab5ceb2cf/"
+      "https://wandering-solemn-scion.solana-mainnet.quiknode.pro/1dfef1eef37249801430636b37c4ad6f22c3188d"
 
     // Configure connection with optimal settings for QuickNode
     this.connection = new Connection(this.endpoint, {

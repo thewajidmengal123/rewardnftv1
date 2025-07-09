@@ -83,8 +83,17 @@ export function MobileNav() {
           >
             <div className="flex flex-col h-full">
               <div className="flex justify-between items-center p-4 border-b border-white/10">
-                <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <span className="text-yellow-400 font-bold text-xl">RewardNFT</span>
+                <Link href="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
+                  <Image
+                    src="/images/logo.png"
+                    alt="RewardNFT Logo"
+                    width={28}
+                    height={28}
+                    className="w-7 h-7 object-contain"
+                  />
+                  <span className="bg-gradient-to-r from-yellow-300 via-orange-400 via-red-400 to-pink-500 bg-clip-text text-transparent font-bold text-xl">
+                    RewardNFT
+                  </span>
                 </Link>
                 <button
                   onClick={toggleMenu}

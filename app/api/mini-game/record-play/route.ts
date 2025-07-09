@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Temporary in-memory storage for development (replace with Firebase when credentials are set up)
-const playSessionsStore = new Map<string, any[]>()
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,43 +14,57 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get user's sessions from in-memory store
-    const userSessions = playSessionsStore.get(walletAddress) || []
-
     // Check if user has already played today
-    const existingSession = userSessions.find(session => session.playDate === playDate)
+    const sessionsRef = collection(db, 'miniGameSessions')
+    const existingSessionQuery = query(
+      sessionsRef,
+      where('walletAddress', '==', walletAddress),
+      where('playDate', '==', playDate)
+    )
 
-    if (existingSession) {
+    const existingSessionSnapshot = await getDocs(existingSessionQuery)
+
+    if (!existingSessionSnapshot.empty) {
+      const existingSession = existingSessionSnapshot.docs[0].data()
       console.log(`❌ User ${walletAddress} already has a session for ${playDate}:`, existingSession.status)
-      return NextResponse.json({
-        success: false,
-        error: 'User has already played today',
-        existingSession: {
-          status: existingSession.status,
-          playDate: existingSession.playDate
-        }
-      }, { status: 400 })
+
+      // Check if it's been 24 hours since last play
+      const lastPlayTime = existingSession.startedAt || existingSession.completedAt
+      const now = Date.now()
+      const timeSinceLastPlay = now - lastPlayTime
+      const twentyFourHours = 24 * 60 * 60 * 1000
+
+      if (timeSinceLastPlay < twentyFourHours) {
+        const timeRemaining = twentyFourHours - timeSinceLastPlay
+        return NextResponse.json({
+          success: false,
+          error: 'Must wait 24 hours between plays',
+          timeRemaining,
+          existingSession: {
+            status: existingSession.status,
+            playDate: existingSession.playDate,
+            lastPlayTime
+          }
+        }, { status: 400 })
+      }
     }
 
     // Record the new play session
     const sessionData = {
-      id: `${walletAddress}-${playDate}-${Date.now()}`,
       walletAddress,
       playDate,
       startedAt,
-      createdAt: Date.now(),
+      createdAt: serverTimestamp(),
       status: 'started'
     }
 
-    // Add to user's sessions
-    userSessions.push(sessionData)
-    playSessionsStore.set(walletAddress, userSessions)
+    const docRef = await addDoc(sessionsRef, sessionData)
 
     console.log(`✅ Mini-game play session recorded for ${walletAddress} on ${playDate}`)
 
     return NextResponse.json({
       success: true,
-      sessionId: sessionData.id,
+      sessionId: docRef.id,
       message: 'Play session recorded successfully'
     })
 

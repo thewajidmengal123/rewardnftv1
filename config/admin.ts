@@ -1,8 +1,7 @@
 // Admin configuration
 export const ADMIN_CONFIG = {
-  // Admin wallet address
-  ADMIN_WALLET: "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ",
-  // ADMIN_WALLET: "9gQMg6z6A3FroStYWc6BVYVNBnk8XyrsDjoimxJTCEKr",
+  // Admin wallet address from environment variable (public Solana address - not a secret)
+  ADMIN_WALLET: process.env.NEXT_PUBLIC_ADMIN_WALLET || "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ",
   
   // Admin permissions
   PERMISSIONS: {
@@ -13,6 +12,9 @@ export const ADMIN_CONFIG = {
     MANAGE_AIRDROPS: true,
     EXPORT_DATA: true,
     SYSTEM_MAINTENANCE: true,
+    MANAGE_QUESTS: true,
+    RESET_WEEKLY_QUESTS: true,
+    MONITOR_REFERRAL_QUESTS: true,
   },
   
   // Admin dashboard features
@@ -23,6 +25,9 @@ export const ADMIN_CONFIG = {
     REFERRAL_ANALYTICS: true,
     REVENUE_TRACKING: true,
     SYSTEM_HEALTH: true,
+    QUEST_MANAGEMENT: true,
+    WEEKLY_QUEST_RESET: true,
+    REFERRAL_QUEST_MONITORING: true,
   }
 }
 

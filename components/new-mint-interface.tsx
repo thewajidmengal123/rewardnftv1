@@ -8,7 +8,8 @@ import { useWallet } from "@/contexts/wallet-context"
 import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
 import { SimpleNFTMintingService, NFT_CONFIG, type MintProgress } from "@/services/simple-nft-minting-service"
 import { ProfessionalErrorModal } from "@/components/professional-error-modal"
-import { Loader2 } from "lucide-react"
+
+import { Loader2, Info } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { PublicKey } from "@solana/web3.js"
@@ -56,6 +57,7 @@ function NewMintInterfaceInner() {
     error: "",
     title: ""
   })
+
   const [supplyInfo, setSupplyInfo] = useState({
     totalSupply: 468,
     maxSupply: 1000,
@@ -156,6 +158,7 @@ function NewMintInterfaceInner() {
       setUsdcBalance(usdcBal)
       // Check wallet mint count
       const mintCount = await nftService.getWalletMintCount(publicKey)
+      console.log(`🔍 Wallet ${publicKey.toString()} mint count:`, mintCount)
       setWalletMintCount(mintCount)
 
       // Get supply info
@@ -205,7 +208,7 @@ function NewMintInterfaceInner() {
     handleMint()
   }
 
-  const handleMint = async () => {
+  const handleMintClick = () => {
     if (!connected || !publicKey || !signTransaction) {
       showError(
         "🔗 Wallet Connection Required\n\nPlease connect your Solana wallet to mint NFTs.\n\n💡 Steps:\n1. Click the 'Connect Wallet' button\n2. Select your preferred wallet (Phantom, Solflare, etc.)\n3. Approve the connection\n4. Try minting again",
@@ -216,8 +219,8 @@ function NewMintInterfaceInner() {
 
     if (hasReachedLimit) {
       showError(
-        `🚫 Mint Limit Reached\n\nYou have already minted the maximum number of NFTs allowed per wallet.\n\n📊 Your Status:\n• Minted: ${walletMintCount} NFT(s)\n• Limit: ${NFT_CONFIG.maxPerWallet} NFT per wallet\n\n💡 Our platform enforces a fair distribution policy of ${NFT_CONFIG.maxPerWallet} NFT per wallet to ensure everyone gets a chance to participate.`,
-        "Mint Limit Exceeded"
+        `🚫 You Cannot Mint NFT\n\nYou have already minted your NFT. Our platform allows only 1 NFT per wallet to ensure fair distribution.\n\n📊 Your Status:\n• NFTs Minted: ${walletMintCount} / 1\n• Status: Limit Reached\n\n💡 This policy ensures everyone gets a fair chance to participate in our NFT collection.`,
+        "Cannot Mint - Already Minted"
       )
       return
     }
@@ -230,6 +233,14 @@ function NewMintInterfaceInner() {
       )
       return
     }
+
+    // Proceed directly with minting (no modal)
+    handleMint()
+  }
+
+  const handleMint = async () => {
+    // Validation is now handled in handleMintClick
+    if (!connected || !publicKey || !signTransaction) return
 
     setLoading(true)
 
@@ -325,10 +336,10 @@ function NewMintInterfaceInner() {
 
   const getButtonText = () => {
     if (!connected) return "Connect Wallet"
-    if (hasReachedLimit) return `Already Minted (${walletMintCount}/1)`
+    if (hasReachedLimit) return `🚫 Cannot Mint - Already Minted (${walletMintCount}/1)`
     if (usdcBalance < totalPrice) return `Insufficient USDC (${usdcBalance.toFixed(2)}/${totalPrice})`
     if (loading) return mintProgress ? mintProgress.message : "Minting..."
-    return "Mint NFT (10 USDC)"
+    return "Mint NFT (5 USDC)"
   }
 
   const isButtonDisabled = () => {
@@ -366,7 +377,7 @@ function NewMintInterfaceInner() {
           {/* Price per NFT */}
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-400 text-lg">Price per NFT</span>
-            <span className="text-white font-bold text-xl">10 USDC</span>
+            <span className="text-white font-bold text-xl">5 USDC</span>
           </div>
 
           {/* Minted */}
@@ -393,7 +404,7 @@ function NewMintInterfaceInner() {
           {referrerWallet && (
             <div className="bg-teal-900/30 border border-teal-700/50 rounded-xl p-4">
               <p className="text-teal-400 text-sm">
-                🎉 You were referred! Your referrer will receive 4 USDC when you mint.
+                🎉 You were referred! Your referral will be tracked for analytics.
               </p>
             </div>
           )}
@@ -413,15 +424,24 @@ function NewMintInterfaceInner() {
             </div>
           )}
 
-          {/* Mint Button */}
-          <Button
-            onClick={handleMint}
-            disabled={isButtonDisabled()}
-            className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
-          >
-            {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
-            {getButtonText()}
-          </Button>
+          {/* Mint Button with Fee Info */}
+          <div className="space-y-3">
+            <Button
+              onClick={handleMintClick}
+              disabled={isButtonDisabled()}
+              className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
+            >
+              {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
+              {getButtonText()}
+            </Button>
+
+            {connected && !hasReachedLimit && usdcBalance >= totalPrice && !loading && (
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                <Info className="w-4 h-4" />
+                <span>Network fees will be shown before transaction</span>
+              </div>
+            )}
+          </div>
 
           {/* Terms */}
           <p className="text-sm text-gray-400 text-center">
@@ -442,9 +462,34 @@ function NewMintInterfaceInner() {
                 variant={hasReachedLimit ? "secondary" : "outline"}
                 className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-teal-900/50 text-teal-300 border-teal-700"}
               >
-                {hasReachedLimit ? `Already Minted (${walletMintCount}/1)` : "Available to Mint"}
+                {hasReachedLimit ? `🚫 Cannot Mint - Already Minted (${walletMintCount}/1)` : "✅ Available to Mint"}
               </Badge>
             </div>
+
+            {/* Show clear message when user has already minted */}
+            {hasReachedLimit && (
+              <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 mt-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">!</span>
+                  </div>
+                  <h3 className="text-red-300 font-bold text-lg">You Cannot Mint NFT</h3>
+                </div>
+                <p className="text-red-200 text-sm leading-relaxed">
+                  You have already minted your NFT. Our platform allows only <strong>1 NFT per wallet</strong> to ensure fair distribution for all users.
+                </p>
+                <div className="mt-3 p-3 bg-red-800/30 rounded border border-red-600/30">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-300">Your NFTs Minted:</span>
+                    <span className="text-red-100 font-bold">{walletMintCount} / 1</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-red-300">Status:</span>
+                    <span className="text-red-100 font-bold">Limit Reached</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -459,6 +504,8 @@ function NewMintInterfaceInner() {
         showRetryButton={true}
         showSupportButton={true}
       />
+
+
     </div>
   )
 }

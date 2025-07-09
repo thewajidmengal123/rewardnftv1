@@ -12,7 +12,7 @@ export const MainNav: React.FC<MainNavProps> = ({ className }) => {
   return (
     <nav className={`flex items-center justify-between p-4 ${className}`}>
       <Link href="/" className="flex items-center space-x-2">
-        <Image src="/images/logo.png" alt="Logo" width={32} height={32} className="rounded-full" />
+        <Image src="/images/logo.png" alt="Logo" width={35} height={36} className="rounded-full bg-white p-1" />
         <span className="font-bold">{appName}</span>
       </Link>
 
@@ -35,6 +35,11 @@ export const MainNav: React.FC<MainNavProps> = ({ className }) => {
         <Link href="/quests" className="text-sm font-medium transition-colors hover:text-foreground/80">
           Quests
         </Link>
+        {process.env.NODE_ENV === 'development' && (
+          <Link href="/wallet-test" className="text-sm font-medium transition-colors hover:text-foreground/80 text-yellow-400">
+            Wallet Test
+          </Link>
+        )}
       </div>
     </nav>
   )

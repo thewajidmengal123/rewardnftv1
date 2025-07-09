@@ -314,7 +314,7 @@ export function CandyMachineManager() {
 
             <Button onClick={mintNFT} disabled={loading || !candyMachine} className="w-full">
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Coins className="w-4 h-4 mr-2" />}
-              Mint Test NFT (10 USDC)
+              Mint Test NFT (5 USDC)
             </Button>
           </CardContent>
         </Card>

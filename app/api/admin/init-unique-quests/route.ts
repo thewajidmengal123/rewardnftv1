@@ -14,7 +14,11 @@ interface Quest {
   type: QuestType
   difficulty: QuestDifficulty
   reward: { xp: number }
-  requirements: { type: string; count: number }
+  requirements: {
+    type: "connect_discord" | "login_streak" | "share_twitter" | "refer_friends" | "play_minigame" | "join_community_call" | "follow_linkedin" | "engage_tweet" | "follow_x" | "join_telegram"
+    count: number
+    data?: any
+  }
   isActive: boolean
   createdAt: any
 }
@@ -73,6 +77,58 @@ const DEFAULT_QUESTS: Omit<Quest, "id" | "createdAt">[] = [
     difficulty: "Medium",
     reward: { xp: 300 },
     requirements: { type: "login_streak", count: 5 },
+    isActive: true,
+  },
+  {
+    title: "Follow LinkedIn",
+    description: "Follow RewardNFT on LinkedIn to stay updated",
+    type: "one-time",
+    difficulty: "Easy",
+    reward: { xp: 100 },
+    requirements: {
+      type: "follow_linkedin",
+      count: 1,
+      data: { url: "https://www.linkedin.com/company/rewardnft" }
+    },
+    isActive: true,
+  },
+  {
+    title: "Engage Tweet",
+    description: "Like and retweet our latest announcement",
+    type: "one-time",
+    difficulty: "Easy",
+    reward: { xp: 150 },
+    requirements: {
+      type: "engage_tweet",
+      count: 1,
+      data: { url: "https://x.com/RewardNFT_/status/1933524613067137437" }
+    },
+    isActive: true,
+  },
+  {
+    title: "Follow X (Twitter)",
+    description: "Follow @RewardNFT_ on X for latest updates",
+    type: "one-time",
+    difficulty: "Easy",
+    reward: { xp: 100 },
+    requirements: {
+      type: "follow_x",
+      count: 1,
+      data: { url: "https://x.com/RewardNFT_" }
+    },
+    isActive: true,
+  },
+  {
+    title: "Join Telegram",
+    description: "Join our Telegram community for exclusive updates",
+    type: "one-time",
+    difficulty: "Easy",
+    reward: { xp: 100 },
+    requirements: {
+      type: "join_telegram",
+      count: 1,
+      data: { url: "https://t.me/rewardsNFT" }
+    },
     isActive: true,
   },
 ]

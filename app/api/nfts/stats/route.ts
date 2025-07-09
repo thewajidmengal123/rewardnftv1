@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate statistics
     const totalMints = nfts.length
-    const totalRevenue = nfts.reduce((sum, nft) => sum + (nft.mintCost || nft.usdcRevenue || 10), 0)
+    const totalRevenue = nfts.reduce((sum, nft) => sum + (nft.mintCost || nft.usdcRevenue || 5), 0)
     const averageMintCost = totalMints > 0 ? totalRevenue / totalMints : 0
 
     // Get unique minters
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       if (nft.mintedAt && nft.mintedAt.toDate) {
         const date = nft.mintedAt.toDate().toISOString().split('T')[0]
         mintsByDay[date] = (mintsByDay[date] || 0) + 1
-        revenueByDay[date] = (revenueByDay[date] || 0) + (nft.mintCost || nft.usdcRevenue || 10)
+        revenueByDay[date] = (revenueByDay[date] || 0) + (nft.mintCost || nft.usdcRevenue || 5)
       }
     })
 
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     const recentMints = nfts.slice(0, 10).map(nft => ({
       mintAddress: nft.mintAddress,
       ownerWallet: nft.ownerWallet,
-      mintCost: nft.mintCost || nft.usdcRevenue || 10,
+      mintCost: nft.mintCost || nft.usdcRevenue || 5,
       mintedAt: nft.mintedAt,
       transactionSignature: nft.transactionSignature
     }))

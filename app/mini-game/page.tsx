@@ -1,4 +1,5 @@
 import { MiniGamePageContent } from "@/components/mini-game-page-content"
+import { ProtectedRoute } from "@/components/protected-route"
 
 export const metadata = {
   title: "Mini Game | Reward NFT Platform",
@@ -6,5 +7,9 @@ export const metadata = {
 }
 
 export default function MiniGamePage() {
-  return <MiniGamePageContent />
+  return (
+    <ProtectedRoute requiresNFT={true}>
+      <MiniGamePageContent />
+    </ProtectedRoute>
+  )
 }

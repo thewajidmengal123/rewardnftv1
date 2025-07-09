@@ -1,13 +1,13 @@
 import { PublicKey } from "@solana/web3.js"
 
 // Actual deployed Candy Machine ID
-export const CANDY_MACHINE_ID = new PublicKey("AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ")
+export const CANDY_MACHINE_ID = new PublicKey(process.env.NEXT_PUBLIC_CANDY_MACHINE_ID || "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ")
 
 // Collection mint ID
-export const COLLECTION_MINT_ID = new PublicKey("EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa")
+export const COLLECTION_MINT_ID = new PublicKey(process.env.NEXT_PUBLIC_COLLECTION_MINT || "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa")
 
 // Company wallet address
-export const COMPANY_WALLET = new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6")
+export const COMPANY_WALLET = new PublicKey(process.env.NEXT_PUBLIC_PLATFORM_WALLET_ADDRESS || "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6")
 
 // USDC mint address (mainnet)
 export const USDC_MINT_ADDRESS = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
@@ -97,13 +97,13 @@ export const CANDY_MACHINE_V3_CONFIG = {
   retainAuthority: true,
 
   // Pricing
-  price: 10, // 10 USDC
+  price: 5, // 5 USDC
 
   // Guards configuration
   guards: {
     // USDC payment guard
     tokenPayment: {
-      amount: 10_000_000, // 10 USDC (6 decimals)
+      amount: 5_000_000, // 5 USDC (6 decimals)
       mint: USDC_MINT_ADDRESS,
       destinationAta: null, // Will be set to company wallet ATA
     },

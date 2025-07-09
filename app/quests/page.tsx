@@ -1,4 +1,5 @@
 import { QuestPageContent } from "@/components/quest-page-content"
+import { ProtectedRoute } from "@/components/protected-route"
 
 export const metadata = {
   title: "Quests | Reward NFT Platform",
@@ -6,5 +7,9 @@ export const metadata = {
 }
 
 export default function QuestsPage() {
-  return <QuestPageContent />
+  return (
+    <ProtectedRoute requiresNFT={true}>
+      <QuestPageContent />
+    </ProtectedRoute>
+  )
 }

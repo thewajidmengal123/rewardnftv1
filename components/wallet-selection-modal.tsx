@@ -24,6 +24,7 @@ export function WalletSelectionModal({ open, onOpenChange }: WalletSelectionModa
     setAutoConnectEnabled,
     preferredWallet,
     setPreferredWallet,
+    isMobile,
   } = useWallet()
 
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null)
@@ -72,10 +73,10 @@ export function WalletSelectionModal({ open, onOpenChange }: WalletSelectionModa
                 <Button
                   variant="outline"
                   className={`w-full h-16 justify-between ${
-                    !wallet.installed ? "opacity-50" : ""
+                    !wallet.installed && !isMobile ? "opacity-50" : ""
                   } ${preferredWallet === wallet.name ? "ring-2 ring-primary" : ""}`}
-                  onClick={() => (wallet.installed ? handleConnect(wallet.name) : null)}
-                  disabled={!wallet.installed || connecting}
+                  onClick={() => handleConnect(wallet.name)}
+                  disabled={(!wallet.installed && !isMobile) || connecting}
                 >
                   <div className="flex items-center space-x-3">
                     <div className="relative h-8 w-8">
@@ -88,8 +89,16 @@ export function WalletSelectionModal({ open, onOpenChange }: WalletSelectionModa
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-medium">{wallet.displayName}</span>
-                      {wallet.name === "awwallet" && <span className="text-xs text-primary">Recommended</span>}
-                      {!wallet.installed && <span className="text-xs text-muted-foreground">Not installed</span>}
+                      {!wallet.installed && !isMobile && <span className="text-xs text-muted-foreground">Not installed</span>}
+                      {!wallet.installed && isMobile && wallet.name === 'phantom' && (
+                        <span className="text-xs text-green-400">Opens in Phantom browser</span>
+                      )}
+                      {!wallet.installed && isMobile && wallet.name !== 'phantom' && (
+                        <span className="text-xs text-blue-400">Available on mobile</span>
+                      )}
+                      {wallet.installed && isMobile && (
+                        <span className="text-xs text-green-400">Mobile ready</span>
+                      )}
                     </div>
                   </div>
 
@@ -128,27 +137,22 @@ export function WalletSelectionModal({ open, onOpenChange }: WalletSelectionModa
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open("https://awwallet.io", "_blank")}
-                  className="w-full"
-                >
-                  Install AWWallet (Recommended)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => window.open("https://phantom.app", "_blank")}
                   className="w-full"
                 >
                   Install Phantom
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("https://solflare.com", "_blank")}
+                  className="w-full"
+                >
+                  Install Solflare
+                </Button>
               </div>
             </div>
           )}
-
-          {/* AWWallet priority note */}
-          <div className="text-xs text-muted-foreground text-center p-2 bg-primary/5 rounded">
-            💡 AWWallet is set as the default wallet and will auto-connect when available
-          </div>
         </div>
       </DialogContent>
     </Dialog>

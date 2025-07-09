@@ -6,49 +6,42 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
+    console.log(`📊 Referral API called (tracking only, no rewards):`, body)
+
     // Handle both old and new API formats
     if (body.walletAddress && body.transactionSignature) {
-      // Old format - use existing logic
+      // Old format - track only, no rewards
       const { walletAddress, transactionSignature } = body
 
-      // Process the referral reward
-      const success = await firebaseReferralService.processReferralReward(
-        walletAddress,
-        transactionSignature
-      )
+      console.log(`📊 Tracking referral (old format): ${walletAddress}`)
 
-      if (!success) {
-        return NextResponse.json(
-          { error: "Failed to process referral reward. No completed referral found." },
-          { status: 400 }
-        )
-      }
-
-      // Update leaderboard for the referrer
+      // Just track the referral, no reward processing
       const referrerWallet = await firebaseReferralService.checkIfReferred(walletAddress)
       if (referrerWallet) {
+        // Update leaderboard for tracking purposes
         await firebaseLeaderboardService.updateUserLeaderboardPosition(referrerWallet)
+        console.log(`✅ Referral tracked for analytics: ${referrerWallet}`)
       }
 
       return NextResponse.json({
         success: true,
-        message: "Referral reward processed successfully",
+        message: "Referral tracked successfully (no rewards)",
         transactionSignature,
       })
     } else {
-      // New format from minting services
+      // New format from minting services - track only
       const {
         referrerWallet,
         referredWallet,
-        rewardAmount,
         nftsMinted,
-        mintSignatures
+        mintSignatures,
+        trackingOnly
       } = body
 
-      // Validate required fields
-      if (!referrerWallet || !referredWallet || !rewardAmount || !nftsMinted) {
+      // Validate required fields (removed rewardAmount)
+      if (!referrerWallet || !referredWallet || !nftsMinted) {
         return NextResponse.json(
-          { error: "Missing required fields: referrerWallet, referredWallet, rewardAmount, nftsMinted" },
+          { error: "Missing required fields: referrerWallet, referredWallet, nftsMinted" },
           { status: 400 }
         )
       }
@@ -61,38 +54,39 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Process the referral reward using the new format
-      const success = await firebaseReferralService.processDirectReferralReward(
+      console.log(`📊 Tracking referral: ${referrerWallet} → ${referredWallet} (${nftsMinted} NFTs)`)
+
+      // Track the referral without processing rewards
+      const success = await firebaseReferralService.trackReferralOnly(
         referrerWallet,
         referredWallet,
-        rewardAmount,
         nftsMinted,
         mintSignatures || []
       )
 
       if (!success) {
         return NextResponse.json(
-          { error: "Failed to process referral reward" },
+          { error: "Failed to track referral" },
           { status: 400 }
         )
       }
 
-      // Update leaderboard for the referrer
+      // Update leaderboard for tracking purposes
       await firebaseLeaderboardService.updateUserLeaderboardPosition(referrerWallet)
 
       return NextResponse.json({
         success: true,
-        message: `Referral reward of ${rewardAmount} USDC processed successfully`,
+        message: `Referral tracked successfully (no rewards)`,
         data: {
           referrerWallet,
           referredWallet,
-          rewardAmount,
-          nftsMinted
+          nftsMinted,
+          trackingOnly: true
         }
       })
     }
   } catch (error) {
-    console.error("Error processing referral reward:", error)
+    console.error("Error tracking referral:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

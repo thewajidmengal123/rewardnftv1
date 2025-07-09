@@ -20,11 +20,11 @@ import { EnhancedUSDCService } from "./enhanced-usdc-service"
 
 export const NFT_CONFIG = {
   maxSupply: 1000,
-  pricePerNFT: 10, // USDC
+  pricePerNFT: 5, // USDC
   maxPerWallet: 1, // Allow only 1 NFT per wallet
   treasuryWallet: new PublicKey("8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6"),
-  referralReward: 4, // USDC to referrer
-  treasuryAmount: 6, // USDC to treasury when referred
+  referralReward: 0, // No USDC rewards to referrer (referrals tracked for analytics only)
+  treasuryAmount: 5, // Full 5 USDC to treasury per NFT (no referral rewards)
 }
 
 export interface NFTMintResult {
@@ -205,12 +205,13 @@ export class EnhancedCollectionNFTService {
         // Don't fail the entire mint process if database recording fails
       }
 
-      // Step 5: Handle referral rewards if applicable
+      // Step 5: Track referral for analytics (no rewards)
       if (referrerWallet && referrerWallet.toString() !== minter.toString()) {
         try {
-          const referralReward = quantity * 4 // 4 USDC per NFT for referrer
+          console.log(`📊 Tracking referral for analytics: ${referrerWallet.toString()} → ${minter.toString()} (no rewards)`)
 
-          const response = await fetch("/api/referrals/reward", {
+          // Only track the referral, no reward processing
+          const response = await fetch("/api/referrals/track", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -218,19 +219,19 @@ export class EnhancedCollectionNFTService {
             body: JSON.stringify({
               referrerWallet: referrerWallet.toString(),
               referredWallet: minter.toString(),
-              rewardAmount: referralReward,
               nftsMinted: quantity,
               mintSignatures: signatures,
+              trackingOnly: true, // Flag to indicate this is tracking only
             }),
           })
 
           if (response.ok) {
-            console.log(`✅ Processed referral reward: ${referralReward} USDC to ${referrerWallet.toString()}`)
+            console.log(`✅ Tracked referral for analytics: ${referrerWallet.toString()}`)
           } else {
-            console.error("Failed to process referral reward")
+            console.error("Failed to track referral")
           }
         } catch (error) {
-          console.error("Error processing referral reward:", error)
+          console.error("Error tracking referral:", error)
         }
       }
 
@@ -372,9 +373,10 @@ export class EnhancedCollectionNFTService {
   // Get wallet mint count
   async getWalletMintCount(wallet: PublicKey): Promise<number> {
     try {
-      // This would typically query the blockchain or database
-      // For now, return 0 as placeholder
-      return 0
+      // Get user from Firebase to check nftsMinted count
+      const { firebaseUserService } = await import('./firebase-user-service')
+      const user = await firebaseUserService.getUserByWallet(wallet.toString())
+      return user?.nftsMinted || 0
     } catch (error) {
       console.error("Error getting wallet mint count:", error)
       return 0

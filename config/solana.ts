@@ -1,10 +1,10 @@
 import { PublicKey } from "@solana/web3.js"
 
 /** COLLECTION CONFIGURATION **/
-export const OFFICIAL_COLLECTION = "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa"
+export const OFFICIAL_COLLECTION = process.env.NEXT_PUBLIC_COLLECTION_MINT || "EnEnryMh6Lcxjr8Qard3kSFHJokSxCuqcwCfGLHbmMZa"
 
 /** CANDY MACHINE CONFIGURATION **/
-export const CANDY_MACHINE_ID = "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
+export const CANDY_MACHINE_ID = process.env.NEXT_PUBLIC_CANDY_MACHINE_ID || "AMrF3PSDh8Th7ygYbMabMzzJ6vUKJGd7xFkziSVVGqsQ"
 
 /** NETWORK CONFIGURATION **/
 export type SolanaNetwork = "mainnet-beta" | "devnet" | "testnet"
@@ -54,7 +54,7 @@ export const PLATFORM_WALLET_ADDRESS = new PublicKey(
   process.env.NEXT_PUBLIC_PLATFORM_WALLET_ADDRESS || "8QY2zcWZWwBZYMeiSfPivWAiPBbLZe1mbnyJauWe8ms6",
 )
 
-export const NFT_MINT_COST_USDC = 10
+export const NFT_MINT_COST_USDC = 5
 
 /** NFT METADATA **/
 export const NFT_CID = "QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"

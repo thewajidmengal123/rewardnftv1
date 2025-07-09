@@ -167,7 +167,7 @@ export function useQuestSystem() {
   }
 
   // Get quests by type with deduplication
-  const getQuestsByType = (type: "daily" | "weekly"): Quest[] => {
+  const getQuestsByType = (type: "daily" | "weekly" | "one-time"): Quest[] => {
     const filteredQuests = quests.filter(q => q.type === type as any)
 
     // Additional deduplication by title for this type
@@ -190,12 +190,61 @@ export function useQuestSystem() {
     return uniqueQuests
   }
 
+  // Auto-check referral quest completion
+  const checkReferralQuestCompletion = async () => {
+    if (!connected || !publicKey) return
+
+    try {
+      console.log('🔍 Auto-checking referral quest completion...')
+
+      // Get user's referral count
+      const userResponse = await fetch(`/api/users?wallet=${publicKey.toString()}`)
+      const userData = await userResponse.json()
+
+      if (userData.success && (userData.data?.totalReferrals || 0) >= 3) {
+        console.log(`👥 User has ${userData.data.totalReferrals} referrals, checking quest status...`)
+
+        // Find referral quest
+        const referralQuest = quests.find(quest => quest.requirements?.type === 'refer_friends')
+        if (!referralQuest) return
+
+        // Check if quest is already completed
+        const questProgress = userProgress.find(progress =>
+          progress.questId === referralQuest.id &&
+          (progress.status === 'completed' || progress.status === 'claimed')
+        )
+
+        if (!questProgress) {
+          console.log('👥 Auto-completing referral quest...')
+          const success = await updateQuestProgress(referralQuest.id, 1, {
+            referralCount: userData.data.totalReferrals,
+            verified: true,
+            autoCompleted: true
+          })
+
+          if (success) {
+            console.log(`✅ Referral quest auto-completed for ${publicKey.toString()}`)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error auto-checking referral quest:', error)
+    }
+  }
+
   // Load data when wallet connects
   useEffect(() => {
     if (connected && publicKey) {
       loadQuestData()
     }
   }, [connected, publicKey])
+
+  // Auto-check referral quest when quests and progress are loaded
+  useEffect(() => {
+    if (connected && publicKey && quests.length > 0 && userProgress.length >= 0) {
+      checkReferralQuestCompletion()
+    }
+  }, [connected, publicKey, quests, userProgress])
 
   return {
     // Data
@@ -218,6 +267,7 @@ export function useQuestSystem() {
     // Computed values (already deduplicated through getQuestsByType)
     dailyQuests: getQuestsByType("daily"),
     weeklyQuests: getQuestsByType("weekly"),
+    oneTimeQuests: getQuestsByType("one-time"),
     totalXP: userXPData?.totalXP || 0,
     currentLevel: userXPData?.level || 1,
     currentRank: userXPData?.rank || 0,

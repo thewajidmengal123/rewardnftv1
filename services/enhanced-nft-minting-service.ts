@@ -390,7 +390,7 @@ export class EnhancedNFTMintingService {
         // Split payment: 6 USDC to treasury, 4 USDC to referrer
         usdcSignature = await this.processReferralPayment(walletAddress, signTransaction, referralCode)
       } else {
-        // Full 10 USDC to treasury
+        // Full 5 USDC to treasury
         const usdcTransaction = await this.usdcService.createPlatformUSDCTransfer(walletAddress, NFT_MINT_COST_USDC)
         const signedUsdcTransaction = await signTransaction(usdcTransaction)
         usdcSignature = await this.connection.sendRawTransaction(signedUsdcTransaction.serialize(), {

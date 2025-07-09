@@ -216,30 +216,251 @@ export async function GET(request: NextRequest) {
       }
 
       case "export-data": {
-        // Export all data for admin using safe collection helper
-        const [users, nfts, referrals] = await Promise.all([
+        // Export leaderboard data only - wallet address, XP, and referrals ranked by position
+        const [users, userXP] = await Promise.all([
           safeGetCollection("users"),
-          safeGetCollection("nfts"),
-          safeGetCollection("referrals")
+          safeGetCollection("userXP", "totalXP")
         ])
+
+        // Get all users data
+        const usersData = users.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+        const userXPData = userXP.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+
+        // Create XP lookup map
+        const xpMap = new Map()
+        userXPData.forEach(xp => {
+          xpMap.set(xp.walletAddress, xp.totalXP || 0)
+        })
+
+        // Build leaderboard entries with ranking
+        const leaderboardEntries = usersData.map(user => ({
+          walletAddress: user.walletAddress,
+          totalReferrals: user.totalReferrals || 0,
+          totalXP: xpMap.get(user.walletAddress) || user.totalXP || 0,
+          totalEarned: user.totalEarned || 0,
+          nftsMinted: user.nftsMinted || 0,
+          questsCompleted: user.questsCompleted || 0
+        }))
+
+        // Sort by referrals first, then by XP as tiebreaker
+        const sortedByReferrals = [...leaderboardEntries].sort((a, b) => {
+          if (b.totalReferrals !== a.totalReferrals) {
+            return b.totalReferrals - a.totalReferrals
+          }
+          return b.totalXP - a.totalXP
+        })
+
+        // Sort by XP first, then by referrals as tiebreaker
+        const sortedByXP = [...leaderboardEntries].sort((a, b) => {
+          if (b.totalXP !== a.totalXP) {
+            return b.totalXP - a.totalXP
+          }
+          return b.totalReferrals - a.totalReferrals
+        })
+
+        // Add ranking to each leaderboard
+        const referralLeaderboard = sortedByReferrals.map((entry, index) => ({
+          rank: index + 1,
+          walletAddress: entry.walletAddress,
+          totalReferrals: entry.totalReferrals,
+          totalXP: entry.totalXP,
+          totalEarned: entry.totalEarned
+        }))
+
+        const xpLeaderboard = sortedByXP.map((entry, index) => ({
+          rank: index + 1,
+          walletAddress: entry.walletAddress,
+          totalXP: entry.totalXP,
+          totalReferrals: entry.totalReferrals,
+          totalEarned: entry.totalEarned
+        }))
 
         const exportData = {
           timestamp: new Date().toISOString(),
-          users: users.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
-          nfts: nfts.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
-          referrals: referrals.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || [],
+          exportType: "Leaderboard Data",
+          description: "Ranked leaderboard data with wallet addresses, XP, and referrals",
+          referralLeaderboard: referralLeaderboard,
+          xpLeaderboard: xpLeaderboard,
           summary: {
-            totalUsers: users.size || 0,
-            totalNFTs: nfts.size || 0,
-            totalReferrals: referrals.size || 0,
-            totalRevenue: (nfts.size || 0) * 10
+            totalUsers: usersData.length,
+            totalReferrals: usersData.reduce((sum, user) => sum + (user.totalReferrals || 0), 0),
+            totalXP: userXPData.reduce((sum, xp) => sum + (xp.totalXP || 0), 0),
+            totalEarned: usersData.reduce((sum, user) => sum + (user.totalEarned || 0), 0),
+            topReferrer: referralLeaderboard[0] || null,
+            topXPHolder: xpLeaderboard[0] || null
           }
         }
 
         return new NextResponse(JSON.stringify(exportData, null, 2), {
           headers: {
             'Content-Type': 'application/json',
-            'Content-Disposition': `attachment; filename="admin-export-${new Date().toISOString().split('T')[0]}.json"`
+            'Content-Disposition': `attachment; filename="leaderboard-export-${new Date().toISOString().split('T')[0]}.json"`
+          }
+        })
+      }
+
+      case "export-csv": {
+        // Export leaderboard data as CSV for easier analysis
+        const [users, userXP] = await Promise.all([
+          safeGetCollection("users"),
+          safeGetCollection("userXP", "totalXP")
+        ])
+
+        // Get all users data
+        const usersData = users.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+        const userXPData = userXP.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+
+        // Create XP lookup map
+        const xpMap = new Map()
+        userXPData.forEach(xp => {
+          xpMap.set(xp.walletAddress, xp.totalXP || 0)
+        })
+
+        // Build leaderboard entries
+        const leaderboardEntries = usersData.map(user => ({
+          walletAddress: user.walletAddress,
+          totalReferrals: user.totalReferrals || 0,
+          totalXP: xpMap.get(user.walletAddress) || user.totalXP || 0,
+          totalEarned: user.totalEarned || 0
+        }))
+
+        // Sort by referrals first, then by XP as tiebreaker
+        const sortedEntries = leaderboardEntries.sort((a, b) => {
+          if (b.totalReferrals !== a.totalReferrals) {
+            return b.totalReferrals - a.totalReferrals
+          }
+          return b.totalXP - a.totalXP
+        })
+
+        // Create CSV content
+        const csvHeader = "Rank,Wallet Address,Total Referrals,Total XP,Total Earned (USDC)\n"
+        const csvRows = sortedEntries.map((entry, index) =>
+          `${index + 1},"${entry.walletAddress}",${entry.totalReferrals},${entry.totalXP},${entry.totalEarned}`
+        ).join("\n")
+
+        const csvContent = csvHeader + csvRows
+
+        return new NextResponse(csvContent, {
+          headers: {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename="leaderboard-${new Date().toISOString().split('T')[0]}.csv"`
+          }
+        })
+      }
+
+      case "export-quest-data": {
+        // Export quest leaderboard data only - wallet address, XP, quests completed, and level ranked by XP
+        const [userXP, questProgress] = await Promise.all([
+          safeGetCollection("userXP", "totalXP"),
+          safeGetCollection("questProgress")
+        ])
+
+        // Get all XP data
+        const userXPData = userXP.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+        const questProgressData = questProgress.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+
+        // Create quest completion lookup map
+        const questCompletionMap = new Map()
+        questProgressData.forEach(progress => {
+          const userId = progress.userId || progress.walletAddress
+          if (userId) {
+            const currentCount = questCompletionMap.get(userId) || 0
+            if (progress.status === 'completed' || progress.status === 'claimed') {
+              questCompletionMap.set(userId, currentCount + 1)
+            }
+          }
+        })
+
+        // Build quest leaderboard entries
+        const questLeaderboard = userXPData.map((user, index) => ({
+          rank: index + 1,
+          walletAddress: user.walletAddress,
+          totalXP: user.totalXP || 0,
+          level: user.level || 1,
+          questsCompleted: questCompletionMap.get(user.walletAddress) || 0,
+          lastActive: user.lastActive || user.updatedAt || null,
+          currentLevelXP: user.currentLevelXP || 0,
+          nextLevelXP: user.nextLevelXP || 500
+        }))
+
+        // Sort by total XP (descending)
+        const sortedQuestLeaderboard = questLeaderboard.sort((a, b) => b.totalXP - a.totalXP)
+
+        // Update ranks after sorting
+        sortedQuestLeaderboard.forEach((entry, index) => {
+          entry.rank = index + 1
+        })
+
+        const exportData = {
+          exportType: "quest-leaderboard",
+          exportDate: new Date().toISOString(),
+          totalEntries: sortedQuestLeaderboard.length,
+          leaderboard: sortedQuestLeaderboard,
+          summary: {
+            totalXPAwarded: sortedQuestLeaderboard.reduce((sum, entry) => sum + entry.totalXP, 0),
+            totalQuestsCompleted: sortedQuestLeaderboard.reduce((sum, entry) => sum + entry.questsCompleted, 0),
+            averageXPPerUser: sortedQuestLeaderboard.length > 0 ?
+              sortedQuestLeaderboard.reduce((sum, entry) => sum + entry.totalXP, 0) / sortedQuestLeaderboard.length : 0,
+            topLevel: sortedQuestLeaderboard.length > 0 ? Math.max(...sortedQuestLeaderboard.map(entry => entry.level)) : 0
+          }
+        }
+
+        return new NextResponse(JSON.stringify(exportData, null, 2), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Disposition': `attachment; filename="quest-leaderboard-export-${new Date().toISOString().split('T')[0]}.json"`
+          }
+        })
+      }
+
+      case "export-quest-csv": {
+        // Export quest leaderboard data as CSV for easier analysis
+        const [userXP, questProgress] = await Promise.all([
+          safeGetCollection("userXP", "totalXP"),
+          safeGetCollection("questProgress")
+        ])
+
+        // Get all XP data
+        const userXPData = userXP.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+        const questProgressData = questProgress.docs?.map((doc: any) => ({ id: doc.id, ...doc.data() })) || []
+
+        // Create quest completion lookup map
+        const questCompletionMap = new Map()
+        questProgressData.forEach(progress => {
+          const userId = progress.userId || progress.walletAddress
+          if (userId) {
+            const currentCount = questCompletionMap.get(userId) || 0
+            if (progress.status === 'completed' || progress.status === 'claimed') {
+              questCompletionMap.set(userId, currentCount + 1)
+            }
+          }
+        })
+
+        // Build quest leaderboard entries
+        const questLeaderboard = userXPData.map(user => ({
+          walletAddress: user.walletAddress,
+          totalXP: user.totalXP || 0,
+          level: user.level || 1,
+          questsCompleted: questCompletionMap.get(user.walletAddress) || 0,
+          currentLevelXP: user.currentLevelXP || 0,
+          nextLevelXP: user.nextLevelXP || 500
+        }))
+
+        // Sort by total XP (descending)
+        const sortedQuestLeaderboard = questLeaderboard.sort((a, b) => b.totalXP - a.totalXP)
+
+        // Create CSV content
+        const csvHeader = "Rank,Wallet Address,Total XP,Level,Quests Completed,Current Level XP,Next Level XP\n"
+        const csvRows = sortedQuestLeaderboard.map((entry, index) =>
+          `${index + 1},"${entry.walletAddress}",${entry.totalXP},${entry.level},${entry.questsCompleted},${entry.currentLevelXP},${entry.nextLevelXP}`
+        ).join("\n")
+
+        const csvContent = csvHeader + csvRows
+
+        return new NextResponse(csvContent, {
+          headers: {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename="quest-leaderboard-${new Date().toISOString().split('T')[0]}.csv"`
           }
         })
       }

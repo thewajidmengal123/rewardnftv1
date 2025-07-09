@@ -2,8 +2,8 @@ import { type Connection, PublicKey } from "@solana/web3.js"
 import { createTokenTransferTransaction } from "./token"
 import { DEFAULT_USDC_TOKEN_ADDRESS } from "@/config/solana"
 
-// Referral reward amount in USDC
-export const REFERRAL_REWARD_AMOUNT = 4
+// Referral reward amount in USDC (disabled - tracking only)
+export const REFERRAL_REWARD_AMOUNT = 0
 
 // Interface for referral data
 export interface ReferralData {

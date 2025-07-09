@@ -42,7 +42,9 @@ export interface UseFirebaseLeaderboardReturn {
 
 export function useFirebaseLeaderboard(
   initialType: LeaderboardType = "referrals",
-  initialLimit: number = 10
+  initialLimit: number = 10,
+  autoRefresh: boolean = false,
+  refreshInterval: number = 300000 // 5 minutes default
 ): UseFirebaseLeaderboardReturn {
   const { connected, publicKey } = useWallet()
   
@@ -65,43 +67,113 @@ export function useFirebaseLeaderboard(
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load leaderboard data
+  // Load leaderboard data - optimized to prevent excessive calls
   const loadLeaderboardData = useCallback(async (type: LeaderboardType, limit: number) => {
+    // Prevent multiple simultaneous loads
+    if (loading || refreshing) return
+
     setLoading(true)
     setError(null)
 
     try {
-      // Load leaderboard and stats
-      const [leaderboardData, statsData] = await Promise.all([
-        firebaseLeaderboardService.getLeaderboard(type, limit),
-        firebaseLeaderboardService.getLeaderboardStats(),
-      ])
+      console.log(`🏆 Loading ${type} leaderboard data...`)
 
-      setLeaderboard(leaderboardData)
-      setStats(statsData)
+      // For XP leaderboard, use API directly to avoid Firebase timeout issues
+      if (type === "xp") {
+        try {
+          console.log(`🏆 Loading XP leaderboard via API...`)
+          const response = await fetch(`/api/xp?action=get-leaderboard&limit=${limit}`)
 
-      // Load user stats if wallet is connected
-      if (connected && publicKey) {
-        const walletAddress = publicKey.toString()
-        const userStatsData = await firebaseLeaderboardService.getUserLeaderboardStats(walletAddress)
-        setUserStats(userStatsData)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success) {
+              // Convert XP data to LeaderboardEntry format
+              const xpData = data.data || []
+              const leaderboardData = xpData.map((entry: any, index: number) => ({
+                rank: index + 1,
+                walletAddress: entry.walletAddress,
+                displayName: entry.displayName || `User ${entry.walletAddress.slice(0, 8)}`,
+                totalReferrals: 0,
+                totalEarned: 0,
+                questsCompleted: entry.questsCompleted || 0,
+                nftsMinted: 0,
+                totalXP: entry.totalXP || 0,
+                level: entry.level || 1,
+                score: entry.totalXP || 0,
+                lastActive: entry.lastActive ? new Date(entry.lastActive) : new Date(),
+              }))
+
+              setLeaderboard(leaderboardData)
+              console.log(`🏆 XP leaderboard loaded successfully: ${leaderboardData.length} entries`)
+            } else {
+              console.warn("XP API returned unsuccessful response:", data)
+              setLeaderboard([])
+            }
+          } else {
+            console.warn("XP API request failed:", response.status)
+            setLeaderboard([])
+          }
+        } catch (xpError) {
+          console.error("XP API error:", xpError)
+          setLeaderboard([])
+        }
+
+        // Skip stats for XP leaderboard to avoid additional complexity
+        setStats(null)
       } else {
+        // For other leaderboard types, use the Firebase service
+        const leaderboardData = await firebaseLeaderboardService.getLeaderboard(type, limit)
+        setLeaderboard(leaderboardData)
+
+        // Load stats separately and don't fail if it times out
+        try {
+          const statsData = await firebaseLeaderboardService.getLeaderboardStats()
+          setStats(statsData)
+        } catch (statsError) {
+          console.warn("Stats loading failed, continuing without stats:", statsError)
+          setStats(null)
+        }
+      }
+
+      // Load user stats if wallet is connected - but don't trigger reload on every call
+      if (connected && publicKey && !userStats) {
+        try {
+          const walletAddress = publicKey.toString()
+          const userStatsData = await firebaseLeaderboardService.getUserLeaderboardStats(walletAddress)
+          setUserStats(userStatsData)
+        } catch (userStatsError) {
+          console.warn("Failed to load user stats:", userStatsError)
+          // Don't fail the entire load for user stats
+        }
+      } else if (!connected) {
         setUserStats(null)
       }
     } catch (err) {
       console.error("Error loading leaderboard data:", err)
-      setError("Failed to load leaderboard data")
+      setError(err instanceof Error ? err.message : "Failed to load leaderboard data")
+
+      // Don't clear existing data on error, just show error state
+      if (leaderboard.length === 0) {
+        setLeaderboard([])
+        setStats(null)
+      }
     } finally {
       setLoading(false)
     }
-  }, [connected, publicKey])
+  }, [connected, publicKey, loading, refreshing]) // Removed leaderboard.length dependency
 
   // Refresh data
   const refresh = useCallback(async () => {
+    // Prevent multiple simultaneous refreshes
+    if (refreshing || loading) return
+
     setRefreshing(true)
-    await loadLeaderboardData(currentType, currentLimit)
-    setRefreshing(false)
-  }, [currentType, currentLimit, loadLeaderboardData])
+    try {
+      await loadLeaderboardData(currentType, currentLimit)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [currentType, currentLimit, loadLeaderboardData, refreshing, loading])
 
   // Set leaderboard type
   const setType = useCallback((type: LeaderboardType) => {
@@ -113,33 +185,62 @@ export function useFirebaseLeaderboard(
     setCurrentLimit(limit)
   }, [])
 
-  // Load data when type or limit changes
+  // Load data when type or limit changes - but only once per change
   useEffect(() => {
-    loadLeaderboardData(currentType, currentLimit)
-  }, [currentType, currentLimit, loadLeaderboardData])
+    let isMounted = true
 
-  // Refresh user stats when wallet connection changes
+    const loadData = async () => {
+      if (isMounted) {
+        await loadLeaderboardData(currentType, currentLimit)
+      }
+    }
+
+    loadData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [currentType, currentLimit]) // Removed loadLeaderboardData dependency to prevent loops
+
+  // Load user stats only when wallet connection changes - not on every render
   useEffect(() => {
+    let isMounted = true
+
     if (connected && publicKey) {
       const walletAddress = publicKey.toString()
       firebaseLeaderboardService.getUserLeaderboardStats(walletAddress)
-        .then(setUserStats)
-        .catch((err) => {
-          console.error("Error loading user stats:", err)
+        .then((stats) => {
+          if (isMounted) {
+            setUserStats(stats)
+          }
         })
-    } else {
+        .catch((err) => {
+          if (isMounted) {
+            console.error("Error loading user stats:", err)
+          }
+        })
+    } else if (isMounted) {
       setUserStats(null)
     }
-  }, [connected, publicKey])
 
-  // Auto-refresh data periodically
+    return () => {
+      isMounted = false
+    }
+  }, [connected, publicKey?.toString()]) // Use toString() to prevent object reference changes
+
+  // Auto-refresh data periodically (only if enabled and not already loading)
   useEffect(() => {
+    if (!autoRefresh || loading || refreshing) return
+
     const interval = setInterval(() => {
-      refresh()
-    }, 60000) // Refresh every minute
+      // Only refresh if not currently loading and has been some time since last refresh
+      if (!loading && !refreshing) {
+        refresh()
+      }
+    }, Math.max(refreshInterval, 60000)) // Minimum 1 minute between refreshes
 
     return () => clearInterval(interval)
-  }, [refresh])
+  }, [autoRefresh, refreshInterval, loading, refreshing]) // Removed refresh dependency to prevent loops
 
   return {
     // Leaderboard data

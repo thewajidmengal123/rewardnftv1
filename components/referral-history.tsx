@@ -45,7 +45,7 @@ export function ReferralHistory({ referrals = [] }: ReferralHistoryProps) {
             </div>
             <p className="text-gray-400 text-lg font-medium mb-2">No referrals yet</p>
             <p className="text-gray-500 text-sm">
-              Share your referral link to start earning 4 USDC per successful referral!
+              Share your referral link to start tracking your referrals!
             </p>
           </div>
         ) : (
@@ -102,10 +102,10 @@ export function ReferralHistory({ referrals = [] }: ReferralHistoryProps) {
       {referrals.length > 0 && (
         <div className="bg-gray-900/50 backdrop-blur-sm rounded-lg border border-gray-800/50 p-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-400">Total Earnings from Referrals:</span>
+            <span className="text-gray-400">Total Referrals Tracked:</span>
             <div className="flex items-center gap-1 text-teal-400 font-medium">
               <DollarSign className="h-4 w-4" />
-              <span>{referrals.reduce((total, ref) => total + (ref.status === "completed" ? 4 : 0), 0)} USDC</span>
+              <span>{referrals.filter(ref => ref.status === "completed").length} Referrals</span>
             </div>
           </div>
         </div>

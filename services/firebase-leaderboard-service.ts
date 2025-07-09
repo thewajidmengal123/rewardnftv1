@@ -42,25 +42,66 @@ export class FirebaseLeaderboardService {
   private readonly LEADERBOARD_COLLECTION = "leaderboard"
   private readonly CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
+  // Cache for leaderboard data
+  private cache = new Map<string, { data: any; timestamp: number }>()
+
+  // Rate limiting - prevent calls more frequent than every 30 seconds
+  private lastCallTime = new Map<string, number>()
+  private readonly MIN_CALL_INTERVAL = 30 * 1000 // 30 seconds
+
   /**
-   * Get leaderboard data
+   * Get leaderboard data with caching and rate limiting
    */
   async getLeaderboard(
     type: LeaderboardType = "referrals",
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
+    const cacheKey = `${type}-${limitCount}`
+    const now = Date.now()
+
+    // Check cache first
+    const cached = this.cache.get(cacheKey)
+    if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+      console.log(`🏆 Returning cached ${type} leaderboard data`)
+      return cached.data
+    }
+
+    // Check rate limiting
+    const lastCall = this.lastCallTime.get(cacheKey) || 0
+    if ((now - lastCall) < this.MIN_CALL_INTERVAL) {
+      console.log(`🏆 Rate limited - returning cached data for ${type} leaderboard`)
+      return cached?.data || []
+    }
+
+    // Update last call time
+    this.lastCallTime.set(cacheKey, now)
+
     try {
+      console.log(`🏆 Fetching fresh ${type} leaderboard data`)
+
       // Try Firebase first
-      return await this.getLeaderboardFromFirebase(type, limitCount)
+      const data = await this.getLeaderboardFromFirebase(type, limitCount)
+
+      // Cache the result
+      this.cache.set(cacheKey, { data, timestamp: now })
+
+      return data
     } catch (error) {
       console.error("Error getting leaderboard from Firebase, trying API fallback:", error)
 
       // Fallback to API endpoint
       try {
-        return await this.getLeaderboardFromAPI(type, limitCount)
+        const data = await this.getLeaderboardFromAPI(type, limitCount)
+
+        // Cache the fallback result too
+        this.cache.set(cacheKey, { data, timestamp: now })
+
+        return data
       } catch (apiError) {
         console.error("Error getting leaderboard from API:", apiError)
-        return []
+
+        // Return cached data if available, even if expired
+        return cached?.data || []
       }
     }
   }
@@ -72,79 +113,67 @@ export class FirebaseLeaderboardService {
     type: LeaderboardType = "referrals",
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
-    // For XP leaderboard, query the userXP collection directly
+    // For XP leaderboard, immediately use API to avoid Firebase timeout issues
     if (type === "xp") {
-      const xpQuery = query(
-        collection(db, "userXP"),
-        orderBy("totalXP", "desc"),
-        limit(limitCount)
-      )
-
-      const xpSnapshot = await getDocs(xpQuery)
-      const leaderboard: LeaderboardEntry[] = []
-
-      for (let i = 0; i < xpSnapshot.docs.length; i++) {
-        const xpDoc = xpSnapshot.docs[i]
-        const xpData = xpDoc.data()
-
-        // Get user profile data
-        const userDoc = await getDoc(doc(db, "users", xpData.walletAddress))
-        const userData = userDoc.exists() ? userDoc.data() as UserProfile : null
-
-        const entry: LeaderboardEntry = {
-          rank: i + 1,
-          walletAddress: xpData.walletAddress,
-          displayName: userData?.displayName || `User ${xpData.walletAddress.slice(0, 8)}`,
-          totalReferrals: userData?.totalReferrals || 0,
-          totalEarned: userData?.totalEarned || 0,
-          questsCompleted: userData?.questsCompleted || 0,
-          nftsMinted: userData?.nftsMinted || 0,
-          totalXP: xpData.totalXP || 0,
-          level: xpData.level || 1,
-          score: xpData.totalXP || 0,
-          lastActive: userData?.lastActive?.toDate() || new Date(),
-        }
-
-        leaderboard.push(entry)
-      }
-
-      return leaderboard
+      console.log(`🏆 XP leaderboard requested - using API fallback immediately`)
+      throw new Error("Using API fallback for XP leaderboard")
     }
 
-    // For other leaderboard types, use the users collection
-    const sortField = this.getSortField(type)
+    // For other leaderboard types, get ALL users first then sort in memory
+    // This avoids Firebase orderBy issues with missing fields
+    try {
+      // Get all users without ordering (to avoid missing field issues)
+      const usersQuery = query(
+        collection(db, "users"),
+        limit(Math.max(limitCount * 3, 100)) // Get more users to ensure we have enough data
+      )
 
-    // Get ALL users, including those with 0 referrals
-    const usersQuery = query(
-      collection(db, "users"),
-      orderBy(sortField, "desc"),
-      limit(limitCount)
-    )
+      const usersSnapshot = await getDocs(usersQuery)
+      const allUsers: LeaderboardEntry[] = []
 
-    const usersSnapshot = await getDocs(usersQuery)
-    const leaderboard: LeaderboardEntry[] = []
+      usersSnapshot.docs.forEach((doc) => {
+        const userData = doc.data() as UserProfile
 
-    usersSnapshot.docs.forEach((doc, index) => {
-      const userData = doc.data() as UserProfile
+        // Skip users without walletAddress (invalid documents)
+        const walletAddress = userData.walletAddress || doc.id
+        if (!walletAddress) {
+          console.warn("Skipping user document without walletAddress:", doc.id)
+          return
+        }
 
-      const entry: LeaderboardEntry = {
-        rank: index + 1,
-        walletAddress: userData.walletAddress,
-        displayName: userData.displayName || `User ${userData.walletAddress.slice(0, 8)}`,
-        totalReferrals: userData.totalReferrals || 0,
-        totalEarned: userData.totalEarned || 0,
-        questsCompleted: userData.questsCompleted || 0,
-        nftsMinted: userData.nftsMinted || 0,
-        totalXP: 0, // Will be populated if needed
-        level: 1, // Will be populated if needed
-        score: this.calculateScore(userData, type),
-        lastActive: userData.lastActive?.toDate() || new Date(),
-      }
+        const entry: LeaderboardEntry = {
+          rank: 0, // Will be set after sorting
+          walletAddress: walletAddress,
+          displayName: userData.displayName || `User ${walletAddress.slice(0, 8)}`,
+          totalReferrals: userData.totalReferrals || 0,
+          totalEarned: userData.totalEarned || 0,
+          questsCompleted: userData.questsCompleted || 0,
+          nftsMinted: userData.nftsMinted || 0,
+          totalXP: 0, // Will be populated if needed
+          level: 1, // Will be populated if needed
+          score: this.calculateScore(userData, type),
+          lastActive: userData.lastActive?.toDate() || new Date(),
+        }
 
-      leaderboard.push(entry)
-    })
+        allUsers.push(entry)
+      })
 
-    return leaderboard
+      // Sort users by score in descending order
+      allUsers.sort((a, b) => b.score - a.score)
+
+      // Take only the requested number of users and set ranks
+      const leaderboard = allUsers.slice(0, limitCount).map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }))
+
+      return leaderboard
+
+    } catch (error) {
+      console.error("Error in Firebase leaderboard query:", error)
+      // Fallback: return empty array
+      return []
+    }
   }
 
   /**
@@ -154,19 +183,81 @@ export class FirebaseLeaderboardService {
     type: LeaderboardType = "referrals",
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
-    const response = await fetch(`/api/leaderboard/all-users?type=${type}&limit=${limitCount}`)
+    try {
+      // For XP leaderboard, use the XP API endpoint
+      if (type === "xp") {
+        console.log(`🏆 Fetching XP leaderboard from API with limit: ${limitCount}`)
 
-    if (!response.ok) {
-      throw new Error(`API responded with status: ${response.status}`)
+        // Add timeout to API call as well
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+
+        try {
+          const response = await fetch(`/api/xp?action=get-leaderboard&limit=${limitCount}`, {
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (!response.ok) {
+            console.error(`🏆 XP API responded with status: ${response.status}`)
+            const errorText = await response.text()
+            console.error(`🏆 XP API error response:`, errorText)
+            throw new Error(`XP API responded with status: ${response.status}`)
+          }
+
+          const data = await response.json()
+          console.log(`🏆 XP API response:`, data)
+
+          if (!data.success) {
+            console.error(`🏆 XP API error:`, data.error)
+            throw new Error(data.error || "XP API request failed")
+          }
+
+          // Convert XP data to LeaderboardEntry format
+          const xpData = data.data || []
+          console.log(`🏆 Raw XP data from API:`, xpData)
+
+          const leaderboard: LeaderboardEntry[] = xpData.map((entry: any, index: number) => ({
+            rank: index + 1,
+            walletAddress: entry.walletAddress,
+            displayName: entry.displayName || `User ${entry.walletAddress.slice(0, 8)}`,
+            totalReferrals: 0,
+            totalEarned: 0,
+            questsCompleted: entry.questsCompleted || 0,
+            nftsMinted: 0,
+            totalXP: entry.totalXP || 0,
+            level: entry.level || 1,
+            score: entry.totalXP || 0,
+            lastActive: entry.lastActive ? new Date(entry.lastActive) : new Date(),
+          }))
+
+          console.log(`🏆 XP API returned ${leaderboard.length} entries`)
+          return leaderboard
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          throw fetchError
+        }
+      }
+
+      // For other leaderboard types, use the general API
+      const response = await fetch(`/api/leaderboard/all-users?type=${type}&limit=${limitCount}`)
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || "API request failed")
+      }
+
+      return data.data.leaderboard || []
+    } catch (error) {
+      console.error(`🏆 API fallback error for ${type} leaderboard:`, error)
+      return []
     }
-
-    const data = await response.json()
-
-    if (!data.success) {
-      throw new Error(data.error || "API request failed")
-    }
-
-    return data.data.leaderboard || []
   }
 
   /**
@@ -195,21 +286,55 @@ export class FirebaseLeaderboardService {
   }
 
   /**
-   * Get leaderboard statistics
+   * Get leaderboard statistics with caching
    */
   async getLeaderboardStats(): Promise<LeaderboardStats> {
+    const cacheKey = "leaderboard-stats"
+    const now = Date.now()
+
+    // Check cache first
+    const cached = this.cache.get(cacheKey)
+    if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+      console.log(`🏆 Returning cached leaderboard stats`)
+      return cached.data
+    }
+
+    // Check rate limiting
+    const lastCall = this.lastCallTime.get(cacheKey) || 0
+    if ((now - lastCall) < this.MIN_CALL_INTERVAL) {
+      console.log(`🏆 Rate limited - returning cached stats`)
+      return cached?.data || { totalUsers: 0, totalReferrals: 0, totalRewards: 0, topReferrer: null }
+    }
+
+    // Update last call time
+    this.lastCallTime.set(cacheKey, now)
+
     try {
+      console.log(`🏆 Fetching fresh leaderboard stats`)
+
       // Try Firebase first
-      return await this.getLeaderboardStatsFromFirebase()
+      const stats = await this.getLeaderboardStatsFromFirebase()
+
+      // Cache the result
+      this.cache.set(cacheKey, { data: stats, timestamp: now })
+
+      return stats
     } catch (error) {
       console.error("Error getting leaderboard stats from Firebase, trying API fallback:", error)
 
       // Fallback to API endpoint
       try {
-        return await this.getLeaderboardStatsFromAPI()
+        const stats = await this.getLeaderboardStatsFromAPI()
+
+        // Cache the fallback result too
+        this.cache.set(cacheKey, { data: stats, timestamp: now })
+
+        return stats
       } catch (apiError) {
         console.error("Error getting leaderboard stats from API:", apiError)
-        return {
+
+        // Return cached data if available, even if expired
+        return cached?.data || {
           totalUsers: 0,
           totalReferrals: 0,
           totalRewards: 0,

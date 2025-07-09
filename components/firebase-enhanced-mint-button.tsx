@@ -110,7 +110,7 @@ export function FirebaseEnhancedMintButton() {
       ) : (
         <>
           <Coins className="mr-2 h-4 w-4" />
-          Mint NFT for 10 USDC
+          Mint NFT for 5 USDC
         </>
       )}
     </Button>

@@ -35,7 +35,7 @@ export interface ReferralWithUser {
 
 export class FirebaseReferralService {
   private readonly REFERRALS_COLLECTION = "referrals"
-  private readonly REFERRAL_REWARD_AMOUNT = 4 // USDC
+  private readonly REFERRAL_REWARD_AMOUNT = 5 // USDC
 
   /**
    * Initialize referral system for a user
@@ -114,6 +114,9 @@ export class FirebaseReferralService {
       await firebaseUserService.createOrUpdateUser(referredWallet, {
         referredBy: referrer.walletAddress,
       })
+
+      // Check if referrer now has 3+ referrals and auto-complete quest
+      await this.checkAndCompleteReferralQuest(referrer.walletAddress)
 
       console.log(`Referral tracked: ${referrer.walletAddress} -> ${referredWallet}`)
       return true
@@ -281,10 +284,102 @@ export class FirebaseReferralService {
       // Sync referrer's data to ensure consistency
       await firebaseUserService.syncUserReferralData(referrerWallet)
 
+      // Check if referrer now has 3+ referrals and auto-complete quest
+      await this.checkAndCompleteReferralQuest(referrerWallet)
+
       console.log(`Direct referral reward processed: ${rewardAmount} USDC to ${referrerWallet} for 1 NFT`)
       return true
     } catch (error) {
       console.error("Error processing direct referral reward:", error)
+      return false
+    }
+  }
+
+  /**
+   * Track referral without processing rewards (analytics only)
+   */
+  async trackReferralOnly(
+    referrerWallet: string,
+    referredWallet: string,
+    nftsMinted: number,
+    mintSignatures: string[]
+  ): Promise<boolean> {
+    try {
+      console.log(`📊 Tracking referral (no rewards):`)
+      console.log(`   Referrer: ${referrerWallet}`)
+      console.log(`   Referred: ${referredWallet}`)
+      console.log(`   NFTs: ${nftsMinted}`)
+
+      // Check if referral already exists to prevent duplicates
+      const existingReferralQuery = query(
+        collection(db, this.REFERRALS_COLLECTION),
+        where("referrerWallet", "==", referrerWallet),
+        where("referredWallet", "==", referredWallet)
+      )
+      const existingReferrals = await getDocs(existingReferralQuery)
+
+      if (!existingReferrals.empty) {
+        console.log(`Referral already tracked: ${referrerWallet} -> ${referredWallet}`)
+        return true // Return success to avoid errors, but don't create duplicate
+      }
+
+      // Create referral record with unique ID based on wallets only
+      const referralId = `${referrerWallet}_${referredWallet}`
+      const referralData = {
+        referrerWallet,
+        referredWallet,
+        referralCode: "", // Not applicable for direct tracking
+        status: "tracked" as const, // Changed from "rewarded" to "tracked"
+        nftMinted: true,
+        rewardPaid: false, // No rewards paid
+        rewardAmount: 0, // No reward amount
+        nftsMinted: 1, // Always 1 since users can only mint 1 NFT
+        mintSignatures,
+        createdAt: serverTimestamp() as Timestamp,
+        completedAt: serverTimestamp() as Timestamp,
+        rewardedAt: null, // No reward date
+        type: "nft_mint_referral_tracking",
+        trackingOnly: true
+      }
+
+      await setDoc(doc(db, this.REFERRALS_COLLECTION, referralId), referralData)
+
+      // Update referrer's referral count (but not earnings)
+      await firebaseUserService.incrementReferralCount(referrerWallet)
+
+      // Update referred user's NFT count - always set to 1 (not increment)
+      const referredUserRef = doc(db, "users", referredWallet)
+      const referredUserDoc = await getDoc(referredUserRef)
+
+      if (referredUserDoc.exists()) {
+        await updateDoc(referredUserRef, {
+          nftsMinted: 1, // Always 1 since users can only mint 1 NFT
+          lastActive: serverTimestamp(),
+        })
+      } else {
+        // Create referred user profile if it doesn't exist
+        await setDoc(referredUserRef, {
+          walletAddress: referredWallet,
+          displayName: `User ${referredWallet.slice(0, 8)}`,
+          totalEarned: 0, // No earnings from referrals
+          totalReferrals: 0,
+          nftsMinted: 1, // Always 1 since users can only mint 1 NFT
+          questsCompleted: 0,
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp(),
+        })
+      }
+
+      // Sync referrer's data to ensure consistency (but no earnings)
+      await firebaseUserService.syncUserReferralData(referrerWallet)
+
+      // Check if referrer now has 3+ referrals and auto-complete quest
+      await this.checkAndCompleteReferralQuest(referrerWallet)
+
+      console.log(`Referral tracked successfully (no rewards): ${referrerWallet} -> ${referredWallet}`)
+      return true
+    } catch (error) {
+      console.error("Error tracking referral:", error)
       return false
     }
   }
@@ -457,6 +552,87 @@ export class FirebaseReferralService {
     } catch (error) {
       console.error("Error checking if referred:", error)
       return null
+    }
+  }
+
+  /**
+   * Check and auto-complete referral quest when user reaches 3 referrals
+   */
+  async checkAndCompleteReferralQuest(walletAddress: string): Promise<void> {
+    try {
+      // Get user's current referral count with fresh data
+      const user = await firebaseUserService.getUserByWallet(walletAddress)
+      if (!user || (user.totalReferrals || 0) < 3) {
+        console.log(`👥 User ${walletAddress} has ${user?.totalReferrals || 0} referrals, not enough for quest completion`)
+        return // Not enough referrals yet
+      }
+
+      console.log(`👥 User ${walletAddress} has ${user.totalReferrals} referrals, checking quest completion...`)
+
+      // Import quest service dynamically to avoid circular dependency
+      const { firebaseQuestService } = await import('./firebase-quest-service')
+
+      // Get all active quests to find referral quest
+      const quests = await firebaseQuestService.getActiveQuests()
+      const referralQuest = quests.find(quest => quest.requirements.type === 'refer_friends')
+
+      if (!referralQuest) {
+        console.log('👥 No referral quest found')
+        return
+      }
+
+      // Check if quest is already completed
+      const userProgress = await firebaseQuestService.getUserQuestProgress(walletAddress)
+      const questProgress = userProgress.find(progress =>
+        progress.questId === referralQuest.id &&
+        (progress.status === 'completed' || progress.status === 'claimed')
+      )
+
+      if (questProgress) {
+        console.log(`👥 Referral quest already ${questProgress.status} for ${walletAddress}`)
+        return
+      }
+
+      // Auto-complete the quest
+      console.log(`👥 Auto-completing referral quest for ${walletAddress} with ${user.totalReferrals} referrals`)
+      await firebaseQuestService.updateQuestProgress(
+        walletAddress,
+        referralQuest.id,
+        1,
+        {
+          referralCount: user.totalReferrals,
+          verified: true,
+          autoCompleted: true,
+          completedAt: Date.now(),
+          triggeredBy: 'referral_service'
+        }
+      )
+
+      console.log(`✅ Successfully auto-completed referral quest for ${walletAddress}`)
+    } catch (error) {
+      console.error(`❌ Error auto-completing referral quest for ${walletAddress}:`, error)
+      throw error // Re-throw to allow caller to handle
+    }
+  }
+
+  /**
+   * Enhanced referral tracking with quest monitoring
+   */
+  async trackReferralWithQuestMonitoring(referrerWallet: string, referredWallet: string): Promise<boolean> {
+    try {
+      // Track the referral first
+      const success = await this.trackReferral(referrerWallet, referredWallet)
+
+      if (success) {
+        // Check and complete referral quest after successful tracking
+        await this.checkAndCompleteReferralQuest(referrerWallet)
+        console.log(`✅ Referral tracked and quest checked for ${referrerWallet}`)
+      }
+
+      return success
+    } catch (error) {
+      console.error('Error in enhanced referral tracking:', error)
+      return false
     }
   }
 }

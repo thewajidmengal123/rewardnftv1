@@ -11,6 +11,14 @@ export function SocialMeta() {
       <meta name="application-name" content="RewardNFT" />
       <meta name="theme-color" content="#000000" />
       <meta name="msapplication-TileColor" content="#000000" />
+
+      {/* Phantom Wallet DApp Verification */}
+      <link rel="manifest" href="/dapp-manifest.json" />
+      <link rel="wallet-config" href="/wallet-config.json" />
+      <meta name="dapp-name" content="RewardNFT" />
+      <meta name="dapp-description" content="Mint NFTs and earn rewards on Solana" />
+      <meta name="dapp-url" content="https://rewardnft.com" />
+      <meta name="dapp-icon" content="https://rewardnft.com/images/logo.png" />
       
       {/* Social Verification */}
       <meta name="twitter:site" content="@RewardNFT_" />

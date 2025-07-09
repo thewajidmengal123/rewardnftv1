@@ -141,7 +141,7 @@ export class ReferralService {
       // Update the referral data
       referral.rewarded = true
       referral.transactionId = transactionId
-      referralData.totalEarned += 4 // 4 USDC reward per referral
+      referralData.totalEarned += 5 // 5 USDC reward per referral
 
       this.saveReferralData()
 

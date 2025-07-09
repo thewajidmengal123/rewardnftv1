@@ -17,6 +17,7 @@ export function QuestPageContent() {
   const {
     dailyQuests,
     weeklyQuests,
+    oneTimeQuests,
     userXPData,
     loading,
     error,
@@ -80,10 +81,90 @@ export function QuestPageContent() {
             if (success) {
               toast({
                 title: "Discord Connected!",
-                description: "Quest completed! You earned 50 XP",
+                description: "Quest completed! You earned 100 XP",
               })
             }
           }, 3000) // 3 second delay to simulate Discord connection
+          break
+
+        case "follow_linkedin":
+          // Open LinkedIn and mark as completed
+          window.open("https://www.linkedin.com/company/rewardnft", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              linkedinFollowed: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "LinkedIn Followed!",
+                description: "Quest completed! You earned 100 XP",
+              })
+            }
+          }, 3000)
+          break
+
+        case "engage_tweet":
+          // Open specific tweet for engagement
+          window.open("https://x.com/RewardNFT_/status/1933524613067137437", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              tweetEngaged: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "Tweet Engaged!",
+                description: "Quest completed! You earned 150 XP",
+              })
+            }
+          }, 3000)
+          break
+
+        case "follow_x":
+          // Open X profile and mark as completed
+          window.open("https://x.com/RewardNFT_", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              xFollowed: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "X Followed!",
+                description: "Quest completed! You earned 100 XP",
+              })
+            }
+          }, 3000)
+          break
+
+        case "join_telegram":
+          // Open Telegram and mark as completed
+          window.open("https://t.me/rewardsNFT", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              telegramJoined: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "Telegram Joined!",
+                description: "Quest completed! You earned 100 XP",
+              })
+            }
+          }, 3000)
           break
 
         case "login_streak":
@@ -161,32 +242,72 @@ export function QuestPageContent() {
         case "refer_friends":
           // Check current referral count and update progress based on actual referrals
           try {
+            console.log(`👥 Checking referral quest for wallet: ${publicKey.toString()}`)
+
             // Get current user's referral count from Firebase
             const userResponse = await fetch(`/api/users?wallet=${publicKey.toString()}`)
             const userData = await userResponse.json()
 
             if (userData.success) {
               const referralCount = userData.data?.totalReferrals || 0
+              const targetReferrals = 3
+              console.log(`👥 Current referral count: ${referralCount}/${targetReferrals}`)
 
-              if (referralCount >= 3) {
-                const success = await updateQuestProgress(questId, 3, {
-                  referralCount: referralCount,
-                  verified: true
-                })
+              // Get current quest progress to calculate the correct increment
+              const currentProgressResponse = await fetch(`/api/quests?wallet=${publicKey.toString()}&action=get-user-progress`)
+              const currentProgressResult = await currentProgressResponse.json()
 
-                if (success) {
+              let currentProgress = 0
+              if (currentProgressResult.success) {
+                const questProgress = currentProgressResult.data.find((progress: any) =>
+                  progress.questId === questId
+                )
+                currentProgress = questProgress?.progress || 0
+              }
+
+              // Calculate the exact progress needed and the increment
+              const targetProgress = Math.min(referralCount, targetReferrals)
+              const progressIncrement = Math.max(0, targetProgress - currentProgress)
+              const isCompleted = referralCount >= targetReferrals
+
+              console.log(`👥 Referral quest progress: current=${currentProgress}, target=${targetProgress}, increment=${progressIncrement}, completed=${isCompleted}`)
+
+              // Update quest progress with the calculated increment
+              const success = await updateQuestProgress(questId, progressIncrement, {
+                referralCount: referralCount,
+                targetReferrals: targetReferrals,
+                verified: true,
+                lastUpdated: Date.now(),
+                currentProgress: currentProgress,
+                targetProgress: targetProgress
+              })
+
+              if (success) {
+                if (isCompleted) {
                   toast({
-                    title: "Referral Quest Complete!",
-                    description: `You have ${referralCount} referrals! Quest completed! You earned 250 XP`,
+                    title: "🎉 Referral Quest Complete!",
+                    description: `You have ${referralCount} referrals! Quest completed! You earned 500 XP!`,
+                  })
+                } else {
+                  toast({
+                    title: "📊 Referral Progress Updated",
+                    description: `You have ${referralCount}/${targetReferrals} referrals. Refer ${targetReferrals - referralCount} more friends to complete this quest.`,
                   })
                 }
               } else {
                 toast({
-                  title: "Not Enough Referrals",
-                  description: `You have ${referralCount}/3 referrals. Refer ${3 - referralCount} more friends to complete this quest.`,
+                  title: "Quest Update Failed",
+                  description: "Failed to update quest progress. Please try again.",
                   variant: "destructive",
                 })
               }
+            } else {
+              console.error("Failed to fetch user data:", userData.error)
+              toast({
+                title: "Error",
+                description: "Failed to fetch referral data. Please try again.",
+                variant: "destructive",
+              })
             }
           } catch (error) {
             console.error("Referral check error:", error)
@@ -254,6 +375,10 @@ export function QuestPageContent() {
         case "refer_friends": return "👥"
         case "play_minigame": return "🎮"
         case "join_community_call": return "📞"
+        case "follow_linkedin": return "💼"
+        case "engage_tweet": return "❤️"
+        case "follow_x": return "🐦"
+        case "join_telegram": return "📱"
         default: return "⭐"
       }
     }
@@ -266,6 +391,10 @@ export function QuestPageContent() {
         case "refer_friends": return "👥 Check Referrals"
         case "play_minigame": return "🎮 Play Game"
         case "join_community_call": return "💬 Join Community"
+        case "follow_linkedin": return "💼 Follow LinkedIn"
+        case "engage_tweet": return "❤️ Engage Tweet"
+        case "follow_x": return "🐦 Follow X"
+        case "join_telegram": return "📱 Join Telegram"
         default: return "Complete"
       }
     }
@@ -278,6 +407,10 @@ export function QuestPageContent() {
         case "refer_friends": return `Get ${requirements.count} friends to mint NFTs`
         case "play_minigame": return `Score ${requirements.count}+ points in mini-game`
         case "join_community_call": return "Join our Discord community"
+        case "follow_linkedin": return "Follow RewardNFT on LinkedIn for updates"
+        case "engage_tweet": return "Like and retweet our latest announcement"
+        case "follow_x": return "Follow @RewardNFT_ on X (Twitter)"
+        case "join_telegram": return "Join our Telegram community"
         default: return "Complete this quest to earn rewards"
       }
     }
@@ -427,13 +560,27 @@ export function QuestPageContent() {
               </div>
             )}
 
+            {/* One-Time Quests */}
+            <div className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <Trophy className="w-6 h-6 text-purple-400" />
+                <h2 className="text-3xl font-bold text-white">One-Time Quests</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {oneTimeQuests.map((quest) => (
+                  <QuestCard key={quest.id} quest={quest} />
+                ))}
+              </div>
+            </div>
+
             {/* Daily Quests */}
             <div className="mb-12">
               <div className="flex items-center gap-3 mb-6">
                 <Zap className="w-6 h-6 text-blue-400" />
                 <h2 className="text-3xl font-bold text-white">Daily Quests</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {dailyQuests.map((quest) => (
                   <QuestCard key={quest.id} quest={quest} />
@@ -447,7 +594,7 @@ export function QuestPageContent() {
                 <Star className="w-6 h-6 text-yellow-400" />
                 <h2 className="text-3xl font-bold text-white">Weekly Quests</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {weeklyQuests.map((quest) => (
                   <QuestCard key={quest.id} quest={quest} />

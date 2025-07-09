@@ -210,7 +210,7 @@ export function ReferralsPageContent() {
               Referral Program
             </h1>
             <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-              Invite friends and earn 4 USDC for every successful referral. Build your network and maximize your rewards.
+              Invite friends to join the RewardNFT platform. Track your referrals and build your network.
             </p>
           </div>
 
@@ -233,15 +233,15 @@ export function ReferralsPageContent() {
                     <div className="glass-card glass-card-hover p-6">
                       <div className="text-center">
                         <div className="text-3xl md:text-4xl font-bold text-teal-400 mb-2">
-                          {(stats?.totalReferrals * 4 || 0).toFixed(2)} USDC
+                          {stats?.totalReferrals || 0}
                         </div>
-                        <div className="text-sm text-gray-400 uppercase tracking-wide">Total Earned</div>
+                        <div className="text-sm text-gray-400 uppercase tracking-wide">Total Referrals</div>
                       </div>
                     </div>
                     <div className="glass-card glass-card-hover p-6">
                       <div className="text-center">
-                        <div className="text-3xl md:text-4xl font-bold text-cyan-400 mb-2">4 USDC</div>
-                        <div className="text-sm text-gray-400 uppercase tracking-wide">Per Referral</div>
+                        <div className="text-3xl md:text-4xl font-bold text-cyan-400 mb-2">Analytics</div>
+                        <div className="text-sm text-gray-400 uppercase tracking-wide">Tracking Only</div>
                       </div>
                     </div>
                   </div>

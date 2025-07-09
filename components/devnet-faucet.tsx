@@ -214,13 +214,13 @@ export function DevnetFaucet() {
           <div className="text-center text-sm text-gray-600">
             <p>• All tokens are for Solana Devnet testing only</p>
             <p>• SOL is required for transaction fees</p>
-            <p>• USDC is required for NFT minting (10 USDC)</p>
+            <p>• USDC is required for NFT minting (5 USDC)</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Ready Status */}
-      {solBalance >= 0.5 && usdcBalance >= 10 && (
+      {solBalance >= 0.5 && usdcBalance >= 5 && (
         <Alert>
           <Coins className="h-4 w-4" />
           <AlertDescription className="text-green-600">

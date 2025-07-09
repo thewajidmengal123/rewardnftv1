@@ -209,7 +209,7 @@ export function EnhancedMintButton() {
               <p className="text-sm text-gray-600">USDC Payment Required</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-purple-600">10 USDC</p>
+              <p className="text-2xl font-bold text-purple-600">5 USDC</p>
               <Badge variant="outline">+ network fees</Badge>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function EnhancedMintButton() {
       {/* Mint Button */}
       <Button
         onClick={handleMint}
-        disabled={loading || hasAlreadyMinted || usdcBalance < 10}
+        disabled={loading || hasAlreadyMinted || usdcBalance < 5}
         className="w-full h-12 text-lg"
         size="lg"
       >
@@ -287,15 +287,15 @@ export function EnhancedMintButton() {
             <CheckCircle className="w-5 h-5 mr-2" />
             Already Minted ✓
           </>
-        ) : usdcBalance < 10 ? (
+        ) : usdcBalance < 5 ? (
           <>
             <AlertCircle className="w-5 h-5 mr-2" />
-            Insufficient USDC ({usdcBalance.toFixed(2)}/10)
+            Insufficient USDC ({usdcBalance.toFixed(2)}/5)
           </>
         ) : (
           <>
             <Coins className="w-5 h-5 mr-2" />
-            Mint NFT (10 USDC)
+            Mint NFT (5 USDC)
           </>
         )}
       </Button>

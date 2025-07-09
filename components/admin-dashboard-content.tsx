@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle } from "lucide-react"
+import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle, RefreshCw } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { isAdminWallet } from "@/config/admin"
@@ -120,6 +120,144 @@ export function AdminDashboardContent() {
     }
   }
 
+  const handleResetWeeklyQuests = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/admin/reset-weekly-quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: publicKey?.toString() })
+      })
+      const result = await response.json()
+      if (result.success) {
+        toast({
+          title: "Weekly Quests Reset",
+          description: `${result.message}. Reset ${result.resetCount} progress records for ${result.affectedUsers} users.`
+        })
+        await loadAdminData() // Refresh data
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to reset weekly quests", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetLeaderboard = async (resetType: string = "all") => {
+    try {
+      // First, get preview of what will be reset
+      setLoading(true)
+      const previewResponse = await fetch(`/api/admin/reset-leaderboard?wallet=${publicKey?.toString()}&type=${resetType}`)
+      const previewResult = await previewResponse.json()
+
+      if (!previewResult.success) {
+        toast({
+          title: "Preview Failed",
+          description: previewResult.error,
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Show detailed confirmation dialog with preview data
+      const previewText = previewResult.affectedCollections.join('\n• ')
+      const confirmed = window.confirm(
+        `⚠️ WARNING: This will permanently reset ${resetType === "all" ? "ALL leaderboard data" : resetType + " data"}!\n\n` +
+        `Records to be reset:\n• ${previewText}\n\n` +
+        `Total records affected: ${previewResult.totalToReset}\n\n` +
+        "This includes:\n" +
+        (resetType === "all" || resetType === "xp" ? "• All user XP and levels will be reset to 0\n" : "") +
+        (resetType === "all" || resetType === "referrals" ? "• All referral counts and earnings will be reset to 0\n" : "") +
+        (resetType === "all" || resetType === "quests" ? "• All quest progress will be reset to not_started\n" : "") +
+        "\n⚠️ THIS ACTION CANNOT BE UNDONE! ⚠️\n\n" +
+        "Are you absolutely sure you want to continue?"
+      )
+
+      if (!confirmed) return
+
+      // Perform the actual reset
+      const response = await fetch('/api/admin/reset-leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey?.toString(),
+          resetType
+        })
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "✅ Leaderboard Reset Complete",
+          description: `Successfully reset ${result.totalReset} records. Details: ${Object.entries(result.resetCounts).filter(([_, count]) => (count as number) > 0).map(([type, count]) => `${type}: ${count}`).join(', ')}`,
+        })
+
+        // Log the successful reset
+        console.log("🔍 Admin Reset Completed:", {
+          resetType: result.resetType,
+          resetCounts: result.resetCounts,
+          totalReset: result.totalReset,
+          resetBy: result.resetBy,
+          resetAt: result.resetAt
+        })
+
+        await loadAdminData() // Refresh data
+      } else {
+        toast({
+          title: "Reset Failed",
+          description: result.error,
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error("Reset leaderboard error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reset leaderboard data. Check console for details.",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMonitorReferralQuests = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/admin/monitor-referral-quests?wallet=${publicKey?.toString()}&action=monitor`)
+      const result = await response.json()
+      if (result.success) {
+        const stats = result.statistics
+        toast({
+          title: "Referral Quest Monitoring",
+          description: `${stats.eligibleUsers} users eligible, ${stats.questCompleted} completed, ${stats.questPending} pending auto-completion.`
+        })
+
+        // Optionally trigger auto-completion for pending users
+        if (stats.questPending > 0) {
+          const autoCompleteResponse = await fetch(`/api/admin/monitor-referral-quests?wallet=${publicKey?.toString()}&action=auto-complete`)
+          const autoResult = await autoCompleteResponse.json()
+          if (autoResult.success) {
+            toast({
+              title: "Auto-Completion Complete",
+              description: `${autoResult.summary.successful} quests auto-completed, ${autoResult.summary.failed} failed.`
+            })
+          }
+        }
+
+        await loadAdminData() // Refresh data
+      } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to monitor referral quests", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Calculate stats from real data
   const totalUsers = adminData?.users?.length || 0
   const totalMints = adminData?.nfts?.length || 0
@@ -200,13 +338,24 @@ export function AdminDashboardContent() {
             </Button>
           )}
 
-          <Button
-            onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
-            variant="outline"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export Data
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
+              variant="outline"
+              className="bg-blue-600/20 border-blue-500 text-blue-300 hover:bg-blue-600/30"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export JSON
+            </Button>
+            <Button
+              onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-csv`, '_blank')}
+              variant="outline"
+              className="bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/30"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -310,10 +459,53 @@ export function AdminDashboardContent() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-          <Download className="h-4 w-4 mr-2" />
-          Export Data
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-data`, '_blank')}
+            variant="outline"
+            className="border-blue-500/50 text-blue-300 hover:bg-blue-600/20"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            JSON
+          </Button>
+          <Button
+            onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-csv`, '_blank')}
+            variant="outline"
+            className="border-green-500/50 text-green-300 hover:bg-green-600/20"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
+
+          {/* Reset Leaderboard Buttons */}
+          <Button
+            onClick={() => handleResetLeaderboard("referrals")}
+            variant="outline"
+            className="border-red-500/50 text-red-300 hover:bg-red-600/20"
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reset Referrals
+          </Button>
+          <Button
+            onClick={() => handleResetLeaderboard("xp")}
+            variant="outline"
+            className="border-orange-500/50 text-orange-300 hover:bg-orange-600/20"
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reset XP
+          </Button>
+          <Button
+            onClick={() => handleResetLeaderboard("all")}
+            variant="outline"
+            className="border-red-600/50 text-red-400 hover:bg-red-700/20"
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reset All Data
+          </Button>
+        </div>
       </div>
 
       {/* Comprehensive Admin Data Tabs */}
@@ -535,7 +727,54 @@ export function AdminDashboardContent() {
         <TabsContent value="quests" className="mt-0">
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
             <CardHeader>
-              <CardTitle className="text-white">Quest System & XP Tracking</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Quest System & XP Tracking</CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-quest-data`, '_blank')}
+                    variant="outline"
+                    className="bg-purple-600/20 border-purple-500 text-purple-300 hover:bg-purple-600/30"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Quest JSON
+                  </Button>
+                  <Button
+                    onClick={handleResetWeeklyQuests}
+                    variant="outline"
+                    className="bg-orange-600/20 border-orange-500 text-orange-300 hover:bg-orange-600/30"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset Weekly Quests
+                  </Button>
+                  <Button
+                    onClick={handleMonitorReferralQuests}
+                    variant="outline"
+                    className="bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/30"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Monitor Referrals
+                  </Button>
+                  <Button
+                    onClick={() => window.open(`/api/admin/dashboard?wallet=${publicKey?.toString()}&action=export-quest-csv`, '_blank')}
+                    variant="outline"
+                    className="bg-indigo-600/20 border-indigo-500 text-indigo-300 hover:bg-indigo-600/30"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Quest CSV
+                  </Button>
+
+                  {/* Leaderboard Reset Buttons */}
+                  <Button
+                    onClick={() => handleResetLeaderboard("quests")}
+                    variant="outline"
+                    className="bg-red-600/20 border-red-500 text-red-300 hover:bg-red-600/30"
+                    disabled={loading}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset Quest Data
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">

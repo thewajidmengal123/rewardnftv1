@@ -246,7 +246,7 @@ export function CollectionAdminContent() {
               </div>
               <div>
                 <label className="text-gray-300 text-sm">Price</label>
-                <div className="bg-gray-700 px-3 py-2 rounded mt-1">10 USDC</div>
+                <div className="bg-gray-700 px-3 py-2 rounded mt-1">5 USDC</div>
               </div>
               <div>
                 <label className="text-gray-300 text-sm">Max Per Wallet</label>

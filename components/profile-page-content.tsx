@@ -224,7 +224,7 @@ export function ProfilePageContent() {
         referralStats: {
           totalReferrals: referralStats?.totalReferrals || user?.totalReferrals || 0,
           activeReferrals: referralStats?.activeReferrals || 0,
-          totalEarned: referralStats?.totalEarned || (user?.totalReferrals || 0) * 4, // $4 per referral
+          totalEarned: referralStats?.totalEarned || (user?.totalReferrals || 0) * 5, // $5 per referral
         },
       }
 

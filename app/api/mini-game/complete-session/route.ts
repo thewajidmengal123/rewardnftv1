@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Temporary in-memory storage for development (replace with Firebase when credentials are set up)
-const playSessionsStore = new Map<string, any[]>()
+import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,15 +14,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get user's sessions from in-memory store
-    const userSessions = playSessionsStore.get(walletAddress) || []
-
-    // Find the session for today
-    const sessionIndex = userSessions.findIndex(session =>
-      session.playDate === playDate && session.status === 'started'
+    // Find the active session for today
+    const sessionsRef = collection(db, 'miniGameSessions')
+    const sessionQuery = query(
+      sessionsRef,
+      where('walletAddress', '==', walletAddress),
+      where('playDate', '==', playDate),
+      where('status', '==', 'started')
     )
 
-    if (sessionIndex === -1) {
+    const sessionSnapshot = await getDocs(sessionQuery)
+
+    if (sessionSnapshot.empty) {
       return NextResponse.json({
         success: false,
         error: 'No active session found for today'
@@ -31,24 +33,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the session with completion data
-    userSessions[sessionIndex] = {
-      ...userSessions[sessionIndex],
+    const sessionDoc = sessionSnapshot.docs[0]
+    const sessionRef = doc(db, 'miniGameSessions', sessionDoc.id)
+
+    await updateDoc(sessionRef, {
       status: 'completed',
       gameScore,
       clicks,
       xpEarned,
-      completedAt: new Date(completedAt),
-      updatedAt: Date.now()
-    }
-
-    // Save back to store
-    playSessionsStore.set(walletAddress, userSessions)
+      completedAt,
+      updatedAt: serverTimestamp()
+    })
 
     console.log(`✅ Mini-game session completed for ${walletAddress} on ${playDate} - Score: ${gameScore}, XP: ${xpEarned}`)
 
     return NextResponse.json({
       success: true,
-      message: 'Session completed successfully'
+      message: 'Session completed successfully',
+      sessionId: sessionDoc.id
     })
 
   } catch (error) {

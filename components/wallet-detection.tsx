@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { AlertCircle, ExternalLink } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CURRENT_NETWORK } from "@/config/solana"
+import { ClientWrapper } from "@/components/client-wrapper"
 
-export function WalletDetection() {
+function WalletDetectionContent() {
   const [hasPhantom, setHasPhantom] = useState<boolean | null>(null)
   const [isCorrectNetwork, setIsCorrectNetwork] = useState<boolean | null>(null)
   const [currentNetwork, setCurrentNetwork] = useState<string | null>(null)
@@ -102,4 +103,12 @@ export function WalletDetection() {
   }
 
   return null // Phantom is installed and on correct network, no need to show anything
+}
+
+export function WalletDetection() {
+  return (
+    <ClientWrapper>
+      <WalletDetectionContent />
+    </ClientWrapper>
+  )
 }

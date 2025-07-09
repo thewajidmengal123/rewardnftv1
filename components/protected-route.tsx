@@ -97,7 +97,7 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
             </div>
             <h1 className="text-3xl font-bold text-white mb-4">Referrals Coming Soon!</h1>
             <p className="text-lg text-gray-300 mb-6">
-              You need to mint at least one NFT to unlock the referral program and start earning USDC rewards.
+              You need to mint at least one NFT to unlock the referral program and start tracking referrals.
             </p>
             <div className="bg-teal-900/20 border border-teal-700/50 rounded-xl p-4 mb-6">
               <p className="text-teal-300 text-sm">
@@ -105,7 +105,7 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
               </p>
               <ul className="text-left text-gray-300 text-sm mt-2 space-y-1">
                 <li>• Your unique referral link</li>
-                <li>• 4 USDC per successful referral</li>
+                <li>• Referral tracking and analytics</li>
                 <li>• Real-time leaderboard rankings</li>
                 <li>• Referral history tracking</li>
               </ul>
