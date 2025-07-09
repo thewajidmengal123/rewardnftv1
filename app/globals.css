@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background: #000000;
+  min-height: 100vh;
+}
+
+
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(20, 184, 166, 0.6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(20, 184, 166, 0.8);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+  }
+
+  .glass-card-hover {
+    transition: all 0.3s ease;
+  }
+
+  .glass-card-hover:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(20, 184, 166, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 50%, #0891b2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border: 1px solid transparent;
+    border-radius: 12px;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, #14b8a6, #06b6d4);
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+  }
+
+  .gradient-button {
+    background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%);
+    color: #000000;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 24px;
+    transition: all 0.2s ease;
+  }
+
+  .gradient-button:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+  }
+
+  /* Dark theme enhancements to match reference design */
+  .dark-card {
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+  }
+
+  .dark-card-hover {
+    transition: all 0.3s ease;
+  }
+
+  .dark-card-hover:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(20, 184, 166, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .gradient-button:active {
+    transform: translateY(0);
+  }
+
+  /* Enhanced success page styling */
+  .success-gradient-bg {
+    background: linear-gradient(135deg,
+      rgba(0, 0, 0, 0.95) 0%,
+      rgba(17, 24, 39, 0.9) 25%,
+      rgba(0, 0, 0, 0.95) 50%,
+      rgba(17, 24, 39, 0.9) 75%,
+      rgba(0, 0, 0, 0.95) 100%);
+  }
+
+  .nft-card-glow {
+    box-shadow:
+      0 0 20px rgba(20, 184, 166, 0.1),
+      0 0 40px rgba(20, 184, 166, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .nft-card-glow:hover {
+    box-shadow:
+      0 0 30px rgba(20, 184, 166, 0.2),
+      0 0 60px rgba(20, 184, 166, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  /* Animated gradient borders */
+  .animated-border {
+    position: relative;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border-radius: 16px;
+  }
+
+  .animated-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2);
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    animation: borderRotate 3s linear infinite;
+  }
+
+  @keyframes borderRotate {
+    0% { background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2); }
+    33% { background: linear-gradient(135deg, #06b6d4, #0891b2, #14b8a6); }
+    66% { background: linear-gradient(135deg, #0891b2, #14b8a6, #06b6d4); }
+    100% { background: linear-gradient(135deg, #14b8a6, #06b6d4, #0891b2); }
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 0%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 174 72% 56%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 8%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 174 72% 56%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 8%;
+    --input: 0 0% 8%;
+    --ring: 174 72% 56%;
+    --chart-1: 174 72% 56%;
+    --chart-2: 188 94% 68%;
+    --chart-3: 186 100% 94%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 200 98% 39%;
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 174 72% 56%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 8%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 8%;
+    --sidebar-ring: 174 72% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

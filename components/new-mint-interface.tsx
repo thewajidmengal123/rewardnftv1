@@ -1,0 +1,520 @@
+"use client"
+
+import { useState, useEffect, Suspense } from "react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { useWallet } from "@/contexts/wallet-context"
+import { useFirebaseReferrals, useReferralCodeHandler } from "@/hooks/use-firebase-referrals"
+import { SimpleNFTMintingService, NFT_CONFIG, type MintProgress } from "@/services/simple-nft-minting-service"
+import { ProfessionalErrorModal } from "@/components/professional-error-modal"
+
+import { Loader2, Info } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
+import { PublicKey } from "@solana/web3.js"
+import EnhancedUSDCService from "@/services/enhanced-usdc-service"
+
+// Loading component for Suspense fallback
+function NewMintInterfaceLoading() {
+  return (
+    <div className="grid lg:grid-cols-2 gap-12 items-start">
+      <div className="space-y-6">
+        <div className="relative rounded-2xl overflow-hidden">
+          <div className="relative h-96 animate-pulse bg-gray-800"></div>
+        </div>
+      </div>
+      <div className="space-y-6">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-8 space-y-8">
+          <div className="h-8 bg-gray-800 rounded animate-pulse"></div>
+          <div className="space-y-4">
+            <div className="h-6 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-6 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-14 bg-gray-800 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Component that uses useSearchParams
+function NewMintInterfaceInner() {
+  const { connected, publicKey, signTransaction, connection } = useWallet()
+  const { user } = useFirebaseReferrals()
+  const mintAmount = 1 // Fixed to 1 NFT per wallet
+  const [usdcBalance, setUsdcBalance] = useState<number>(0)
+  const [loading, setLoading] = useState(false)
+  const [mintProgress, setMintProgress] = useState<MintProgress | null>(null)
+  const [walletMintCount, setWalletMintCount] = useState(0)
+  const [referrerWallet, setReferrerWallet] = useState<string | null>(null)
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean
+    error: string
+    title?: string
+  }>({
+    isOpen: false,
+    error: "",
+    title: ""
+  })
+
+  const [supplyInfo, setSupplyInfo] = useState({
+    totalSupply: 468,
+    maxSupply: 1000,
+    available: 532
+  })
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const usdcService = new EnhancedUSDCService(connection)
+
+  const nftService = new SimpleNFTMintingService(connection)
+
+  // Set collection mint (this should be set from your deployed collection)
+  // For now, we'll use a placeholder - in production, this should be your actual collection mint
+  useEffect(() => {
+    // TODO: Replace with your actual collection mint address
+    // nftService.setCollectionMint(new PublicKey("YOUR_COLLECTION_MINT_ADDRESS"))
+  }, [])
+
+  // Handle referral codes from URL
+  useReferralCodeHandler()
+
+  // Check for referral code in URL and track referral via API
+  useEffect(() => {
+    const referralCode = searchParams.get("ref")
+    if (referralCode && connected && publicKey) {
+      console.log("🔗 Processing referral code from URL:", referralCode)
+
+      // Track referral via API
+      const trackReferralViaAPI = async () => {
+        try {
+          const response = await fetch('/api/referrals/track', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              referralCode,
+              walletAddress: publicKey.toString()
+            })
+          })
+
+          const result = await response.json()
+
+          if (result.success) {
+            console.log("✅ Referral tracked successfully via API:", result.data)
+            setReferrerWallet(result.data.referrer.walletAddress)
+
+            // Remove referral code from URL after successful tracking
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete("ref")
+            window.history.replaceState({}, "", newUrl.toString())
+          } else {
+            console.warn("⚠️ Failed to track referral:", result.error)
+          }
+        } catch (error) {
+          console.error("Error tracking referral via API:", error)
+        }
+      }
+
+      trackReferralViaAPI()
+    }
+  }, [searchParams, connected, publicKey])
+
+  // Load referrer wallet from API if user was already referred
+  useEffect(() => {
+    if (connected && publicKey && !referrerWallet) {
+      const loadReferrerFromAPI = async () => {
+        try {
+          const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
+          const result = await response.json()
+
+          if (result.success && result.isReferred) {
+            console.log("🔗 User was referred by:", result.referrer.walletAddress)
+            setReferrerWallet(result.referrer.walletAddress)
+          }
+        } catch (error) {
+          console.error("Error loading referrer from API:", error)
+        }
+      }
+
+      loadReferrerFromAPI()
+    }
+  }, [connected, publicKey, referrerWallet])
+
+  // Check wallet status
+  useEffect(() => {
+    if (connected && publicKey) {
+      checkWalletStatus()
+    }
+  }, [connected, publicKey])
+
+  const checkWalletStatus = async () => {
+    if (!publicKey) return
+
+    try {
+      // Get USDC balance specifically
+      const usdcBal = await usdcService.getUSDCBalance(publicKey)
+      setUsdcBalance(usdcBal)
+      // Check wallet mint count
+      const mintCount = await nftService.getWalletMintCount(publicKey)
+      console.log(`🔍 Wallet ${publicKey.toString()} mint count:`, mintCount)
+      setWalletMintCount(mintCount)
+
+      // Get supply info
+      const supply = await nftService.getSupplyInfo()
+      setSupplyInfo(supply)
+
+      // Check if referred (from user data)
+      if (user?.referredBy) {
+        setReferrerWallet(user.referredBy)
+      }
+    } catch (error) {
+      console.error("Error checking wallet status:", error)
+      // Only show error modal for critical wallet status errors
+      if (error instanceof Error && error.message.includes("network")) {
+        showError(
+          `🌐 Network Connection Error\n\nUnable to check your wallet status due to network issues.\n\n🔍 Error Details:\n${error.message}\n\n💡 Solutions:\n• Check your internet connection\n• Refresh the page and try again\n• The Solana network may be experiencing high traffic`,
+          "Wallet Status Check Failed"
+        )
+      }
+    }
+  }
+
+
+
+  const totalPrice = mintAmount * NFT_CONFIG.pricePerNFT
+  const hasReachedLimit = walletMintCount >= NFT_CONFIG.maxPerWallet
+
+  // Error handling functions
+  const showError = (error: string, title: string = "Transaction Error") => {
+    setErrorModal({
+      isOpen: true,
+      error,
+      title
+    })
+  }
+
+  const closeErrorModal = () => {
+    setErrorModal({
+      isOpen: false,
+      error: "",
+      title: ""
+    })
+  }
+
+  const retryMint = () => {
+    closeErrorModal()
+    handleMint()
+  }
+
+  const handleMintClick = () => {
+    if (!connected || !publicKey || !signTransaction) {
+      showError(
+        "🔗 Wallet Connection Required\n\nPlease connect your Solana wallet to mint NFTs.\n\n💡 Steps:\n1. Click the 'Connect Wallet' button\n2. Select your preferred wallet (Phantom, Solflare, etc.)\n3. Approve the connection\n4. Try minting again",
+        "Wallet Not Connected"
+      )
+      return
+    }
+
+    if (hasReachedLimit) {
+      showError(
+        `🚫 You Cannot Mint NFT\n\nYou have already minted your NFT. Our platform allows only 1 NFT per wallet to ensure fair distribution.\n\n📊 Your Status:\n• NFTs Minted: ${walletMintCount} / 1\n• Status: Limit Reached\n\n💡 This policy ensures everyone gets a fair chance to participate in our NFT collection.`,
+        "Cannot Mint - Already Minted"
+      )
+      return
+    }
+
+    if (usdcBalance < totalPrice) {
+      const shortage = totalPrice - usdcBalance
+      showError(
+        `💳 Insufficient USDC Balance\n\nYou need more USDC tokens to complete this mint.\n\n📊 Balance Details:\n• Current USDC: ${usdcBalance.toFixed(2)} USDC\n• Required USDC: ${totalPrice.toFixed(2)} USDC\n• Shortage: ${shortage.toFixed(2)} USDC\n\n💰 NFT Pricing:\n• Price per NFT: ${NFT_CONFIG.pricePerNFT} USDC\n• Quantity: ${mintAmount} NFT(s)\n\n💡 How to get USDC:\n1. 🏪 Buy from exchanges (Coinbase, Binance, etc.)\n2. 🔄 Swap SOL to USDC (Jupiter, Raydium, Orca)\n3. 📤 Transfer from another wallet`,
+        "Insufficient USDC"
+      )
+      return
+    }
+
+    // Proceed directly with minting (no modal)
+    handleMint()
+  }
+
+  const handleMint = async () => {
+    // Validation is now handled in handleMintClick
+    if (!connected || !publicKey || !signTransaction) return
+
+    setLoading(true)
+
+    try {
+      // Get referrer wallet from API (not localStorage or direct Firebase)
+      let referrerPublicKey: PublicKey | undefined
+
+      console.log("🔍 Current referrerWallet state:", referrerWallet)
+
+      // If we don't have referrer wallet in state, check via API
+      if (!referrerWallet) {
+        try {
+          const response = await fetch(`/api/referrals/track?wallet=${encodeURIComponent(publicKey.toString())}&action=check-referred`)
+          const result = await response.json()
+
+          if (result.success && result.isReferred) {
+            console.log("🎯 Found referrer from API:", result.referrer.walletAddress)
+            setReferrerWallet(result.referrer.walletAddress)
+            referrerPublicKey = new PublicKey(result.referrer.walletAddress)
+          }
+        } catch (error) {
+          console.error("Error getting referrer from API:", error)
+        }
+      } else {
+        try {
+          referrerPublicKey = new PublicKey(referrerWallet)
+          console.log("✅ Using referrer wallet from state:", referrerWallet)
+        } catch (error) {
+          console.error("Invalid referrer wallet address:", error)
+        }
+      }
+
+      // Use the new collection minting service
+      const result = await nftService.mintNFTs(
+        publicKey,
+        mintAmount,
+        signTransaction,
+        referrerPublicKey,
+        (progress: MintProgress) => {
+          setMintProgress(progress)
+          console.log("Minting progress:", progress)
+        }
+      )
+
+      if (result.success && result.mintAddresses && result.nftData) {
+        // Store minted NFTs in localStorage for immediate access with proper metadata
+        const existingNFTs = JSON.parse(localStorage.getItem(`minted_nfts_${publicKey.toString()}`) || '[]')
+        const newNFTs = result.nftData.map((nft) => ({
+          mintAddress: nft.mint,
+          mintedAt: new Date().toISOString(),
+          transactionSignature: nft.signature,
+          name: nft.name,
+          image: nft.image,
+          metadata: nft.metadata
+        }))
+        const allNFTs = [...existingNFTs, ...newNFTs]
+        localStorage.setItem(`minted_nfts_${publicKey.toString()}`, JSON.stringify(allNFTs))
+
+        // Process NFT mint completion for Firebase and referral system
+        if (result.mintAddresses[0]) {
+          try {
+            const { processNFTMintCompletion } = await import("@/utils/firebase-referral-integration")
+            await processNFTMintCompletion(
+              publicKey.toString(),
+              result.mintAddresses[0],
+              result.signatures?.[0] || ''
+            )
+          } catch (error) {
+            console.error("Error processing NFT mint completion:", error)
+          }
+        }
+
+        // Redirect to success page with NFT data
+        const mintParams = result.nftData.map((nft, i) => `mint${i + 1}=${nft.mint}`).join('&')
+        const sigParams = result.nftData.map((nft, i) => `sig${i + 1}=${nft.signature}`).join('&')
+        router.push(`/mint/success?${mintParams}&${sigParams}&usdc=${result.usdcSignature}&total=${result.totalCost}`)
+      } else {
+        console.error("Minting failed:", result.error)
+        showError(result.error || "Unknown minting error occurred", "NFT Minting Failed")
+      }
+    } catch (error) {
+      console.error("Minting error:", error)
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during minting"
+      showError(
+        `❌ Unexpected Minting Error\n\n🔍 Technical Details:\n${errorMessage}\n\n💡 Suggestions:\n• Check your internet connection\n• Ensure your wallet is connected\n• Verify you have sufficient SOL for fees\n• Try refreshing the page and minting again\n• Contact support if the issue persists`,
+        "Minting Error"
+      )
+    } finally {
+      setLoading(false)
+      setMintProgress(null)
+    }
+  }
+
+  const getButtonText = () => {
+    if (!connected) return "Connect Wallet"
+    if (hasReachedLimit) return `🚫 Cannot Mint - Already Minted (${walletMintCount}/1)`
+    if (usdcBalance < totalPrice) return `Insufficient USDC (${usdcBalance.toFixed(2)}/${totalPrice})`
+    if (loading) return mintProgress ? mintProgress.message : "Minting..."
+    return "Mint NFT (5 USDC)"
+  }
+
+  const isButtonDisabled = () => {
+    return !connected || hasReachedLimit || usdcBalance < totalPrice || loading
+  }
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-12 items-start">
+      {/* Left Side - NFT Preview - Full Size Image */}
+      <div className="space-y-6">
+        <div className="relative rounded-2xl overflow-hidden">
+          <div className="relative">
+            <img
+              src="https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
+              alt="RewardNFT Collection"
+              className="w-full h-auto"
+              onError={(e) => {
+                e.currentTarget.src = "https://quicknode.quicknode-ipfs.com/ipfs/QmWrmCfPm6L85p1o8KMc9WZCsdwsgW89n37nQMJ6UCVYNW"
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-6 left-6 text-white">
+              <h3 className="text-3xl font-bold mb-2 text-white">RewardNFT Collection</h3>
+              <p className="text-gray-300 text-lg">Exclusive Rare Reward NFT</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Mint Details - matching reference design */}
+      <div className="space-y-6">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-8 space-y-8">
+          <h2 className="text-3xl font-bold text-white">Mint Details</h2>
+
+          {/* Price per NFT */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-400 text-lg">Price per NFT</span>
+            <span className="text-white font-bold text-xl">5 USDC</span>
+          </div>
+
+          {/* Minted */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-400 text-lg">Status</span>
+            <span className="text-white font-bold text-xl">
+              {hasReachedLimit ? "Minted" : `${supplyInfo.totalSupply} Minted`}
+            </span>
+          </div>
+
+          {/* Mint Limit Info */}
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-400 text-lg">Mint Limit</span>
+            <span className="text-white font-bold text-xl">1 NFT per wallet</span>
+          </div>
+
+          {/* Total Price */}
+          <div className="flex justify-between items-center py-3 border-t border-gray-800/50">
+            <span className="text-gray-400 text-lg">Total Cost</span>
+            <span className="text-white font-bold text-2xl">{totalPrice} USDC</span>
+          </div>
+
+          {/* Referral Info */}
+          {referrerWallet && (
+            <div className="bg-teal-900/30 border border-teal-700/50 rounded-xl p-4">
+              <p className="text-teal-400 text-sm">
+                🎉 You were referred! Your referral will be tracked for analytics.
+              </p>
+            </div>
+          )}
+
+          {/* Progress Indicator */}
+          {mintProgress && (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">{mintProgress.message}</span>
+                {mintProgress.currentNFT && mintProgress.totalNFTs && (
+                  <span className="text-teal-400">
+                    {mintProgress.currentNFT}/{mintProgress.totalNFTs}
+                  </span>
+                )}
+              </div>
+              <Progress value={mintProgress.progress} className="h-3" />
+            </div>
+          )}
+
+          {/* Mint Button with Fee Info */}
+          <div className="space-y-3">
+            <Button
+              onClick={handleMintClick}
+              disabled={isButtonDisabled()}
+              className="w-full h-14 text-xl font-bold bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black border-0 rounded-xl transition-all duration-200 hover:scale-105"
+            >
+              {loading && <Loader2 className="w-6 h-6 mr-3 animate-spin" />}
+              {getButtonText()}
+            </Button>
+
+            {connected && !hasReachedLimit && usdcBalance >= totalPrice && !loading && (
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                <Info className="w-4 h-4" />
+                <span>Network fees will be shown before transaction</span>
+              </div>
+            )}
+          </div>
+
+          {/* Terms */}
+          <p className="text-sm text-gray-400 text-center">
+            By minting, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </div>
+
+        {/* Wallet Info */}
+        {connected && (
+          <div className="bg-gray-900/30 backdrop-blur-sm border border-gray-800/50 rounded-xl p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-lg">Your USDC Balance:</span>
+              <span className="text-white font-bold text-lg">{usdcBalance.toFixed(2)} USDC</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-lg">Mint Status:</span>
+              <Badge
+                variant={hasReachedLimit ? "secondary" : "outline"}
+                className={hasReachedLimit ? "bg-red-900/50 text-red-300 border-red-700" : "bg-teal-900/50 text-teal-300 border-teal-700"}
+              >
+                {hasReachedLimit ? `🚫 Cannot Mint - Already Minted (${walletMintCount}/1)` : "✅ Available to Mint"}
+              </Badge>
+            </div>
+
+            {/* Show clear message when user has already minted */}
+            {hasReachedLimit && (
+              <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 mt-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">!</span>
+                  </div>
+                  <h3 className="text-red-300 font-bold text-lg">You Cannot Mint NFT</h3>
+                </div>
+                <p className="text-red-200 text-sm leading-relaxed">
+                  You have already minted your NFT. Our platform allows only <strong>1 NFT per wallet</strong> to ensure fair distribution for all users.
+                </p>
+                <div className="mt-3 p-3 bg-red-800/30 rounded border border-red-600/30">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-red-300">Your NFTs Minted:</span>
+                    <span className="text-red-100 font-bold">{walletMintCount} / 1</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-red-300">Status:</span>
+                    <span className="text-red-100 font-bold">Limit Reached</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Professional Error Modal */}
+      <ProfessionalErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={closeErrorModal}
+        error={errorModal.error}
+        title={errorModal.title}
+        onRetry={retryMint}
+        showRetryButton={true}
+        showSupportButton={true}
+      />
+
+
+    </div>
+  )
+}
+
+// Main export component with Suspense boundary
+export function NewMintInterface() {
+  return (
+    <Suspense fallback={<NewMintInterfaceLoading />}>
+      <NewMintInterfaceInner />
+    </Suspense>
+  )
+}

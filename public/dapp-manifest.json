@@ -1,0 +1,32 @@
+{
+  "name": "RewardNFT",
+  "description": "Mint NFTs and earn rewards on Solana",
+  "url": "https://rewardnft.com",
+  "icons": ["https://rewardnft.com/images/logo.png"],
+  "start_url": "https://rewardnft.com",
+  "version": "1.0.0",
+  "network": "mainnet-beta",
+  "features": {
+    "nft_minting": true,
+    "token_transfers": true,
+    "rewards": true
+  },
+  "permissions": {
+    "connect": true,
+    "sign_transactions": true,
+    "sign_messages": false
+  },
+  "security": {
+    "trusted_domains": [
+      "rewardnft.com",
+      "www.rewardnft.com"
+    ],
+    "programs": [
+      "11111111111111111111111111111111",
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+      "ComputeBudget111111111111111111111111111111"
+    ]
+  }
+}
