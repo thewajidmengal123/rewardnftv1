@@ -9,6 +9,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+   experimental: {
+    esmExternals: true
+  },
   trailingSlash: true,
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -16,12 +19,11 @@ const nextConfig = {
         ...config.resolve.fallback,
         fs: false,
         net: false,
-        tls: false,
-        crypto: false,
+        tls: false
       }
     }
     return config
-  },
+  }
 }
 
 export default nextConfig
