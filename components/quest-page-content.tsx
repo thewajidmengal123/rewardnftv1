@@ -147,6 +147,26 @@ export function QuestPageContent() {
           }, 3000)
           break
 
+          case "Engage_x":
+          // Open X profile and mark as completed
+          window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              xFollowed: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "X Followed!",
+                description: "Quest completed! You earned 100 XP",
+              })
+            }
+          }, 3000)
+          break
+          
         case "join_telegram":
           // Open Telegram and mark as completed
           window.open("https://t.me/rewardsNFT", "_blank")
