@@ -126,30 +126,30 @@ export function QuestPageContent() {
             }
           }, 3000)
           break
-
-        case "follow_x":
-          // Open X profile and mark as completed
-          window.open("https://x.com/RewardNFT_", "_blank")
+       
+        case "engage_tweet":
+          // Open specific tweet for engagement
+          window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
 
           // Wait a moment then mark as completed
           setTimeout(async () => {
             const success = await updateQuestProgress(questId, 1, {
-              xFollowed: true,
+              tweetEngaged: true,
               timestamp: Date.now()
             })
 
             if (success) {
               toast({
-                title: "X Followed!",
-                description: "Quest completed! You earned 100 XP",
+                title: "Tweet Engaged!",
+                description: "Quest completed! You earned 150 XP",
               })
             }
           }, 3000)
           break
-
-          case "Engage_x":
+          
+        case "follow_x":
           // Open X profile and mark as completed
-          window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
+          window.open("https://x.com/RewardNFT_", "_blank")
 
           // Wait a moment then mark as completed
           setTimeout(async () => {
