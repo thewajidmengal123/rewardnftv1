@@ -183,7 +183,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       referralStats: {
         totalReferrals: referralData?.stats?.totalReferrals || testData?.stats?.totalReferrals || debugData?.stats?.totalReferrals || 0,
         activeReferrals: referralData?.stats?.activeReferrals || testData?.stats?.activeReferrals || debugData?.stats?.activeReferrals || 0,
-        totalEarned: (referralData?.stats?.totalReferrals || testData?.stats?.totalReferrals || debugData?.stats?.totalReferrals || 0) * 5, // $5 per referral
+        totalEarned: (referralData?.stats?.totalReferrals || testData?.stats?.totalReferrals || debugData?.stats?.totalReferrals || 0) * 5, // $10 per referral
       },
     }
 

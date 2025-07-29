@@ -77,7 +77,7 @@ export function HomePageContent() {
                     variant="outline"
                     className="border-teal-500/30 text-teal-400 hover:bg-teal-600/10 text-lg px-8 hover:scale-105 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/25"
                   >
-                    <Link href="/mint">Mint NFT - $5</Link>
+                    <Link href="/mint">Mint NFT - $10</Link>
                   </Button>
                 </div>
 

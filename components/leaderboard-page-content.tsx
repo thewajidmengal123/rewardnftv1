@@ -442,7 +442,7 @@ export function LeaderboardPageContent() {
                                   ${(user.totalReferrals * 5).toFixed(2)}
                                 </div>
                                 <div className="text-gray-400 text-xs">
-                                  total earned ($5 per referral)
+                                  total earned ($10 per referral)
                                 </div>
                               </div>
                             </td>
