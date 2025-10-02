@@ -86,6 +86,24 @@ export function QuestPageContent() {
             }
           }, 3000) // 3 second delay to simulate Discord connection
           break
+case "XNET_fallOut":
+   // Open specific tweet
+   window.open("https://earn.superteam.fun/listing/xnet-youtube-fall-out", "_blank")
+
+   setTimeout(async () => {
+      const success = await updateQuestProgress(questId, 1, {
+         tweetEngaged: true,
+         timestamp: Date.now()
+      })
+
+      if (success) {
+         toast({
+            title: "XNET YouTube "fALL OUT"",
+            description: "Quest completed! You earned 150 XP",
+         })
+      }
+   }, 3000)
+   break
 
         case "follow_linkedin":
           // Open LinkedIn and mark as completed
