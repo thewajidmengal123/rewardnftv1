@@ -144,7 +144,26 @@ case "XNET_fallOut":
             }
           }, 3000)
           break
-       
+
+   case "BD Follow":
+          // Open specific tweet for engagement
+          window.open("https://x.com/thewajidmengal", "_blank")
+
+          // Wait a moment then mark as completed
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              tweetEngaged: true,
+              timestamp: Date.now()
+            })
+
+            if (success) {
+              toast({
+                title: "Follow Now!",
+                description: "Quest completed! You earned 150 XP",
+              })
+            }
+          }, 3000)
+          break
         case "engage_tweet":
           // Open specific tweet for engagement
           window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
