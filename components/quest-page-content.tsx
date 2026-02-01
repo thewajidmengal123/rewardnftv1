@@ -150,7 +150,7 @@ export function QuestPageContent() {
           
         case "follow_x":
           // Open X profile and mark as completed
-          window.open("https://x.com/RewardNFT_", "_blank")
+          window.open("https://x.com/thewajidmengal", "_blank")
 
           // Wait a moment then mark as completed
           setTimeout(async () => {
