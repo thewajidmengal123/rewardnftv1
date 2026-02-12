@@ -50,7 +50,7 @@ export const NFT_CONFIG = {
   maxPerWallet: 1,
   treasuryWallet: new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP"),
   referralReward: 0,
-  treasuryAmount: 5,
+  treasuryAmount: 2.5,
   usdcDecimals: 6,
   network: (process.env.NEXT_PUBLIC_SOLANA_NETWORK as keyof typeof USDC_MINT_ADDRESSES) || "mainnet-beta",
   // NFT Metadata
