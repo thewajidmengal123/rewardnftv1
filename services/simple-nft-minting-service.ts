@@ -46,7 +46,7 @@ const USDC_MINT_ADDRESSES = {
 
 export const NFT_CONFIG = {
   maxSupply: 1000,
-  pricePerNFT: 10, // 10 USDC per NFT
+  pricePerNFT: 2.5, // 10 USDC per NFT
   maxPerWallet: 1,
   treasuryWallet: new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP"),
   referralReward: 0,
