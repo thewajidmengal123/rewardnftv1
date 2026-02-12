@@ -645,14 +645,14 @@ export class SimpleNFTMintingService {
     requiredAmount: number
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const requiredUSDCAmount = requiredAmount * Math.pow(10, NFT_CONFIG.usdcDecimals)
+      const requiredUSDCAmount = requiredAmount * Math.pow(2.5, NFT_CONFIG.usdcDecimals)
       const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, minter)
 
       try {
         const userUsdcAccount = await getAccount(this.connection, userUsdcTokenAccount)
         
         if (userUsdcAccount.amount < requiredUSDCAmount) {
-          const currentUSDC = Number(userUsdcAccount.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
+          const currentUSDC = Number(userUsdcAccount.amount) / Math.pow(2.5, NFT_CONFIG.usdcDecimals)
           const shortage = requiredAmount - currentUSDC
           return {
             success: false,
@@ -799,7 +799,7 @@ export class SimpleNFTMintingService {
     }
   }> {
     // NFT Cost (what user pays for the NFT itself)
-    const nftCostUSDC = quantity * NFT_CONFIG.pricePerNFT // 10 USDC per NFT
+    const nftCostUSDC = quantity * NFT_CONFIG.pricePerNFT // 2.5 USDC per NFT
     
     // CORRECTED Network Fees (accurate blockchain costs)
     const baseFee = 0.000005 * quantity // Base transaction fee per NFT
