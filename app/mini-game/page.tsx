@@ -1,4 +1,4 @@
-import { MiniGamePageContent } from "@/components/mini-game-page-content"
+import MiniGamePageContent from "@/components/mini-game-page-content"
 import { ProtectedRoute } from "@/components/protected-route"
 
 export const metadata = {
