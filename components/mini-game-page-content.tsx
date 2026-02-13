@@ -537,7 +537,7 @@ const sendXpToServer = async (xp: number) => {
       <div className="max-w-6xl mx-auto px-4 pb-12">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Game Area */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <Card className="bg-gray-900/50 border-gray-800 overflow-hidden">
               <CardContent className="p-0">
                 {/* Game Canvas Container */}
@@ -545,7 +545,7 @@ const sendXpToServer = async (xp: number) => {
                   className="relative mx-auto"
                   style={{ 
                     width: '100%', 
-                    maxWidth: GAME_WIDTH,
+                    maxWidth: '100%',
                     aspectRatio: `${GAME_WIDTH}/${GAME_HEIGHT}`
                   }}
                   onClick={jump}
