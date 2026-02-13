@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy, Play, RotateCcw, Sparkles, Zap, Target, TrendingUp, Clock } from "lucide-react";
-import confetti from "canvas-confetti";
+let confetti: any;
 
 // ============================================
 // ENDLESS RUNNER GAME - REWARDNFT PLATFORM
