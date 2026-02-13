@@ -103,15 +103,16 @@ export class SimpleNFTMintingService {
   private usdcMint: PublicKey
   private umi: any
 
-  constructor(connection: Connection) {
-    this.connection = connection
-    this.collectionService = new SimpleCollectionService(connection)
-    this.usdcService = new EnhancedUSDCService(connection)
-    this.usdcMint = new PublicKey(USDC_MINT_ADDRESSES[NFT_CONFIG.network as keyof typeof USDC_MINT_ADDRESSES])
-    
-    // Initialize UMI once
-    this.umi = createUmi(this.connection.rpcEndpoint).use(mplTokenMetadata())
-  }
+ constructor(connection: Connection) {
+  // Use direct mainnet RPC instead of passed connection
+  this.connection = new Connection("https://wandering-solemn-scion.solana-mainnet.quiknode.pro/1dfef1eef37249801430636b37c4ad6f22c3188d", "confirmed")
+  
+  this.collectionService = new SimpleCollectionService(this.connection)
+  this.usdcService = new EnhancedUSDCService(this.connection)
+  this.usdcMint = new PublicKey(USDC_MINT_ADDRESSES[NFT_CONFIG.network])
+  
+  this.umi = createUmi(this.connection.rpcEndpoint).use(mplTokenMetadata())
+}
 
   // Main optimized minting function
   async mintNFTs(
