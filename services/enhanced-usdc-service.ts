@@ -33,26 +33,26 @@ export class EnhancedUSDCService {
 
 async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
   try {
-    // 👇 YEH ADD KARO (4 lines)
     console.log("🔍 DEBUG: Starting USDC balance check...")
     console.log("   Wallet:", walletAddress.toString())
     console.log("   Network:", this.currentNetwork)
     console.log("   USDC Mint:", this.usdcMintAddress.toString())
     
-    // Pehle se tha (aage ka code same)
+    // Use RPC method (more reliable)
     const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, walletAddress)
+    console.log("   Token Account:", tokenAccount.toString())
     
     try {
-      const accountInfo = await getAccount(this.connection, tokenAccount)
-      const balance = Number(accountInfo.amount) / Math.pow(10, 6)
-      console.log(`Found USDC balance: ${balance}`)
-      return balance
+      const balance = await this.connection.getTokenAccountBalance(tokenAccount)
+      console.log("   Balance from RPC:", balance.value.uiAmount)
+      return balance.value.uiAmount || 0
     } catch (error) {
-      console.log(`No USDC token account found`)
+      console.log("   ❌ Token account not found, balance: 0")
       return 0
     }
+    
   } catch (error) {
-    console.error(`Error:`, error)
+    console.error("   ❌ Error in getUSDCBalance:", error)
     return 0
   }
 }
