@@ -216,24 +216,33 @@ export default function MiniGamePageContent() {
     sendXpToServer(earnedXp);
   }, [gameState.score, gameState.highScore, totalXp]);
 
-  // Send XP to server (integrates with your existing system)
-  const sendXpToServer = async (xp: number) => {
+// Send XP to server (integrates with your existing system)
+const sendXpToServer = async (xp: number) => {
   try {
     // Get wallet from localStorage or your auth system
     const walletAddress = localStorage.getItem('walletAddress') || 'guest'
     
-    await fetch('/api/mini-game/complete-session', {
+    // Use XP API for direct leaderboard update
+    const response = await fetch('/api/xp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         walletAddress,
-        playDate: new Date().toISOString().split('T')[0],
-        gameScore: gameState.score,
-        clicks: 0,
-        xpEarned: xp,
-        completedAt: new Date().toISOString(),
+        xpAmount: xp,
+        source: 'mini-game',
+        details: {
+          score: gameState.score,
+          playedAt: new Date().toISOString()
+        }
       }),
     });
+    
+    const data = await response.json();
+    if (data.success) {
+      console.log('✅ XP awarded:', data.data);
+    } else {
+      console.error('❌ Failed to award XP:', data.error);
+    }
   } catch (error) {
     console.error('Failed to send XP:', error);
   }
