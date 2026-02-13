@@ -40,7 +40,7 @@ export type LeaderboardType = "referrals" | "earnings" | "quests" | "xp" | "over
 
 export class FirebaseLeaderboardService {
   private readonly LEADERBOARD_COLLECTION = "leaderboard"
-  private readonly CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+  private readonly CACHE_DURATION = 30 * 1000 // 30 seconds (for testing) // 5 minutes
 
   // Cache for leaderboard data
   private cache = new Map<string, { data: any; timestamp: number }>()
@@ -113,11 +113,38 @@ export class FirebaseLeaderboardService {
     type: LeaderboardType = "referrals",
     limitCount = 10
   ): Promise<LeaderboardEntry[]> {
-    // For XP leaderboard, immediately use API to avoid Firebase timeout issues
-    if (type === "xp") {
-      console.log(`🏆 XP leaderboard requested - using API fallback immediately`)
-      throw new Error("Using API fallback for XP leaderboard")
+   // For XP leaderboard, query userXP collection directly
+if (type === "xp") {
+  console.log(`🏆 XP leaderboard requested - querying userXP collection directly`)
+  
+  const userXPQuery = query(
+    collection(db, "userXP"),
+    orderBy("totalXP", "desc"),
+    limit(limitCount)
+  )
+  
+  const userXPSnapshot = await getDocs(userXPQuery)
+  
+  const leaderboard: LeaderboardEntry[] = userXPSnapshot.docs.map((doc, index) => {
+    const data = doc.data()
+    return {
+      rank: index + 1,
+      walletAddress: data.walletAddress,
+      displayName: `User ${data.walletAddress?.slice(0, 8) || 'Unknown'}`,
+      totalReferrals: 0,
+      totalEarned: 0,
+      questsCompleted: data.questsCompleted || 0,
+      nftsMinted: 0,
+      totalXP: data.totalXP || 0,
+      level: data.level || 1,
+      score: data.totalXP || 0,
+      lastActive: data.lastActive?.toDate() || new Date(),
     }
+  })
+  
+  console.log(`🏆 XP leaderboard: ${leaderboard.length} entries from userXP collection`)
+  return leaderboard
+}
 
     // For other leaderboard types, get ALL users first then sort in memory
     // This avoids Firebase orderBy issues with missing fields
