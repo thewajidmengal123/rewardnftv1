@@ -766,7 +766,7 @@ export class SimpleNFTMintingService {
     return await this.collectionService.getSupplyInfo()
   }
 
-  async getUSDCBalance(wallet: PublicKey): Promise<number> {
+async getUSDCBalance(wallet: PublicKey): Promise<number> {
   try {
     console.log("🔍 DEBUG: Fetching USDC balance...")
     console.log("   Wallet Address:", wallet.toString())
@@ -775,22 +775,15 @@ export class SimpleNFTMintingService {
     const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, wallet)
     console.log("   Token Account Address:", userUsdcTokenAccount.toString())
     
-    // Check if account exists on-chain
-    const accountInfo = await this.connection.getAccountInfo(userUsdcTokenAccount)
-    console.log("   Account Exists:", accountInfo !== null)
-    
-    if (!accountInfo) {
-      console.log("   ⚠️ Token account not found, returning 0")
+    // Use RPC method (more reliable)
+    try {
+      const balance = await this.connection.getTokenTokenAccountBalance(userUsdcTokenAccount)
+      console.log("   Balance from RPC:", balance.value.uiAmount)
+      return balance.value.uiAmount || 0
+    } catch (error) {
+      console.log("   ❌ Token account not found, returning 0")
       return 0
     }
-    
-    const account = await getAccount(this.connection, userUsdcTokenAccount)
-    console.log("   Raw Amount (base units):", account.amount.toString())
-    
-    const balance = Number(account.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
-    console.log("   Calculated Balance:", balance)
-    
-    return balance
   } catch (error) {
     console.error("   ❌ Error in getUSDCBalance:", error)
     return 0
