@@ -542,60 +542,30 @@ export default function MiniGamePageContent() {
                   <div className="absolute inset-0">
                     {/* Runner Character */}
                     {gameState.isPlaying && !gameState.isGameOver && (
-                      <motion.div
-                        className="absolute"
-                        style={{
-                          left: RUNNER_X,
-                          top: runnerY,
-                          width: RUNNER_WIDTH,
-                          height: RUNNER_HEIGHT,
-                        }}
-                        animate={!isJumping ? { y: [0, -3, 0] } : {}}
-                        transition={{ repeat: Infinity, duration: 0.3 }}
-                      >
-                        {/* Runner Body */}
-                        <div className="relative w-full h-full">
-                          {/* Head */}
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full">
-                            {/* Eye */}
-                            <div className="absolute top-2 right-1 w-2 h-2 bg-white rounded-full" />
-                          </div>
-                          {/* Body */}
-                          <div className="absolute top-5 left-1/2 -translate-x-1/2 w-5 h-7 bg-gradient-to-b from-blue-500 to-purple-600 rounded-lg" />
-                          {/* Arms */}
-                          <motion.div
-                            className="absolute top-6 -left-1 w-3 h-1 bg-purple-400 rounded-full origin-right"
-                            animate={{ rotate: [20, -20, 20] }}
-                            transition={{ repeat: Infinity, duration: 0.2 }}
-                          />
-                          <motion.div
-                            className="absolute top-6 -right-1 w-3 h-1 bg-purple-400 rounded-full origin-left"
-                            animate={{ rotate: [-20, 20, -20] }}
-                            transition={{ repeat: Infinity, duration: 0.2 }}
-                          />
-                          {/* Legs */}
-                          <motion.div
-                            className="absolute bottom-0 left-1 w-2 h-5 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full origin-top"
-                            animate={!isJumping ? { rotate: [30, -30, 30] } : { rotate: 45 }}
-                            transition={{ repeat: Infinity, duration: 0.2 }}
-                          />
-                          <motion.div
-                            className="absolute bottom-0 right-1 w-2 h-5 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full origin-top"
-                            animate={!isJumping ? { rotate: [-30, 30, -30] } : { rotate: -15 }}
-                            transition={{ repeat: Infinity, duration: 0.2 }}
-                          />
-                          {/* Trail effect */}
-                          {!isJumping && (
-                            <motion.div
-                              className="absolute top-1/2 -left-4 w-4 h-1 bg-gradient-to-r from-purple-500/50 to-transparent rounded-full"
-                              animate={{ opacity: [0.5, 0.2, 0.5], x: [-4, -8, -4] }}
-                              transition={{ repeat: Infinity, duration: 0.3 }}
-                            />
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-
+  <motion.div
+    className="absolute"
+    style={{
+      left: RUNNER_X,
+      top: runnerY,
+      width: RUNNER_WIDTH,
+      height: RUNNER_HEIGHT,
+      zIndex: 10,
+    }}
+    animate={!isJumping ? { y: [0, -3, 0] } : {}}
+    transition={{ repeat: Infinity, duration: 0.3 }}
+  >
+    {/* Your Custom Character Image */}
+    <img 
+      src="/images/character-jump.png"
+      alt="Runner"
+      className="w-full h-full object-contain"
+      style={{
+        filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))',
+      }}
+    />
+  </motion.div>
+)}
+                      
                     {/* Obstacles */}
                     {obstacles.map(renderObstacle)}
 
