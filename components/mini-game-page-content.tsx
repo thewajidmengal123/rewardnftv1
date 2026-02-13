@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy, Play, RotateCcw, Sparkles, Zap, Target, TrendingUp, Clock } from "lucide-react";
-
+import { useWallet } from "@/contexts/wallet-context";
 
 // ============================================
 // ENDLESS RUNNER GAME - REWARDNFT PLATFORM
@@ -60,6 +60,7 @@ const RUNNER_X = 100;
 
 export default function MiniGamePageContent() {
   // Game State
+    const { publicKey } = useWallet()
   const [gameState, setGameState] = useState<GameState>({
     isPlaying: false,
     isGameOver: false,
@@ -220,8 +221,12 @@ export default function MiniGamePageContent() {
 const sendXpToServer = async (xp: number) => {
   try {
     // Get wallet from localStorage or your auth system
-    const walletAddress = localStorage.getItem('walletAddress') || 'guest'
-    
+       // Get wallet from context
+    if (!publicKey) {
+      console.error('Wallet not connected')
+      return
+    }
+    const walletAddress = publicKey.toString()
     // Use XP API for direct leaderboard update
     const response = await fetch('/api/xp', {
       method: 'POST',
