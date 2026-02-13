@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trophy, Play, RotateCcw, Sparkles, Zap, Target, TrendingUp, Clock } from "lucide-react";
-let confetti: any;
+
 
 // ============================================
 // ENDLESS RUNNER GAME - REWARDNFT PLATFORM
@@ -210,15 +210,7 @@ export default function MiniGamePageContent() {
     // Show XP popup
     setShowXpPopup(true);
 
-    // Confetti for good scores
-    if (gameState.score >= 500) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#a855f7', '#3b82f6', '#ec4899'],
-      });
-    }
+
 
     // Send XP to server (same API as your existing game)
     sendXpToServer(earnedXp);
