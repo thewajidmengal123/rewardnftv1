@@ -46,7 +46,23 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`✅ Mini-game session completed for ${walletAddress} on ${playDate} - Score: ${gameScore}, XP: ${xpEarned}`)
-
+    // Update user's total XP in users collection
+    const userQuery = query(collection(db, 'users'), where('walletAddress', '==', walletAddress))
+    const userSnapshot = await getDocs(userQuery)
+    
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0]
+      const userRef = doc(db, 'users', userDoc.id)
+      const currentXp = userDoc.data().xp || 0
+      
+      await updateDoc(userRef, {
+        xp: currentXp + xpEarned,
+        totalXpEarned: (userDoc.data().totalXpEarned || 0) + xpEarned,
+        updatedAt: serverTimestamp()
+      })
+      
+      console.log(`✅ User XP updated: ${currentXp} → ${currentXp + xpEarned}`)
+    }
     return NextResponse.json({
       success: true,
       message: 'Session completed successfully',
