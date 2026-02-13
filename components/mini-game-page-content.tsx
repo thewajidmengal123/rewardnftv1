@@ -44,19 +44,19 @@ interface Particle {
 }
 
 // Game Constants
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 400;
-const GROUND_Y = 320;
+const GAME_WIDTH = 1000;
+const GAME_HEIGHT = 500;
+const GROUND_Y = 420;
 const GRAVITY = 0.8;
 const JUMP_FORCE = -15;
 const BASE_SPEED = 5;
 const MAX_SPEED = 15;
-const SPEED_INCREMENT = 0.001;
+const SPEED_INCREMENT = 0.002;
 
 // Character (Runner) properties
-const RUNNER_WIDTH = 50;
-const RUNNER_HEIGHT = 60;
-const RUNNER_X = 100;
+const RUNNER_WIDTH = 70;
+const RUNNER_HEIGHT = 80;
+const RUNNER_X = 150;
 
 export default function MiniGamePageContent() {
   // Game State
