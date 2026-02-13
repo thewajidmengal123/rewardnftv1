@@ -4,18 +4,17 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { ProtectedRoute } from "@/components/protected-route"
-import { Trophy, Star, Zap, Play, Clock, RotateCcw, Run, MousePointer } from "lucide-react"
+import { Trophy, Star, Play, RotateCcw, Run, MousePointer, Clock } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 // ============================================
 // MERGED GAME - CLICK CHALLENGE + ENDLESS RUNNER
 // ============================================
 
-type GameType = 'click' | 'runner' | null;
+type GameType = 'click' | 'runner' | null
 
 // Runner Game Constants
 const GAME_WIDTH = 800
@@ -56,15 +55,12 @@ interface RunnerGameState {
   timeCycle: number
 }
 
-export function MiniGamePageContent() {
+export default function MiniGamePageContent() {
   const { connected, publicKey } = useWallet()
   
-  // Game Selection
   const [selectedGame, setSelectedGame] = useState<GameType>(null)
   
-  // ============================================
-  // CLICK GAME STATE (EXISTING - UNCHANGED)
-  // ============================================
+  // Click Game State
   const [clickGameState, setClickGameState] = useState<'menu' | 'playing' | 'gameOver'>('menu')
   const [clickScore, setClickScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(20)
@@ -79,9 +75,7 @@ export function MiniGamePageContent() {
   const lastXPSaveTime = useRef<number>(0)
   const xpSaveInProgress = useRef(false)
 
-  // ============================================
-  // RUNNER GAME STATE (NEW)
-  // ============================================
+  // Runner Game State
   const [runnerGameState, setRunnerGameState] = useState<RunnerGameState>({
     isPlaying: false,
     isGameOver: false,
@@ -96,7 +90,6 @@ export function MiniGamePageContent() {
   const [runnerY, setRunnerY] = useState(GROUND_Y - 80)
   const [runnerVy, setRunnerVy] = useState(0)
   const [isJumping, setIsJumping] = useState(false)
-  const [runnerFrame, setRunnerFrame] = useState(0)
   const [obstacles, setObstacles] = useState<RunnerObstacle[]>([])
   const [particles, setParticles] = useState<Particle[]>([])
   
@@ -108,41 +101,26 @@ export function MiniGamePageContent() {
 
   // Load character image
   useEffect(() => {
-    const img = new Image()
-    img.src = '/images/character-jump.png' // Your character image path
-    img.onload = () => {
-      characterImageRef.current = img
-      console.log('✅ Character image loaded successfully')
-    }
-    img.onerror = () => {
-      console.warn('⚠️ Character image failed to load, using fallback')
+    if (typeof window !== 'undefined') {
+      const img = new Image()
+      img.src = '/images/character-jump.png'
+      img.onload = () => {
+        characterImageRef.current = img
+      }
+      img.onerror = () => {
+        console.warn('Character image failed to load')
+      }
     }
   }, [])
 
-  // ============================================
-  // CLICK GAME LOGIC (EXISTING - UNCHANGED)
-  // ============================================
-  useEffect(() => {
-    const pendingQuestId = localStorage.getItem('pendingQuestId')
-    if (pendingQuestId) {
-      toast({
-        title: "Quest Active!",
-        description: "Score 1500+ points in 20 seconds to complete the mini-game quest!",
-      })
-    }
-  }, [connected, publicKey])
-
+  // Click Game Logic
   useEffect(() => {
     return () => {
       if (clickGameInterval) clearInterval(clickGameInterval)
-      setGameEnded(false)
-      setXpSaved(false)
-      xpSaveInProgress.current = false
-      clickGameSessionRef.current = null
     }
   }, [clickGameInterval])
 
-  const startClickGame = async () => {
+  const startClickGame = useCallback(() => {
     if (clickGameInterval) {
       clearInterval(clickGameInterval)
       setClickGameInterval(null)
@@ -177,7 +155,7 @@ export function MiniGamePageContent() {
     }, 1000)
 
     setClickGameInterval(interval)
-  }
+  }, [clickGameInterval])
 
   const endClickGame = useCallback(() => {
     if (gameEnded) return
@@ -247,7 +225,7 @@ export function MiniGamePageContent() {
         throw new Error(result.error || 'Failed to save XP')
       }
     } catch (error) {
-      console.error('❌ XP save error:', error)
+      console.error('XP save error:', error)
       setXpSaved(false)
       xpSaveInProgress.current = false
       toast({
@@ -362,10 +340,7 @@ export function MiniGamePageContent() {
     }
   }
 
-  // ============================================
-  // RUNNER GAME LOGIC (NEW)
-  // ============================================
-  
+  // Runner Game Logic
   useEffect(() => {
     if (!runnerGameState.isPlaying) return
     
@@ -544,8 +519,6 @@ export function MiniGamePageContent() {
         return newY
       })
 
-      setRunnerFrame(prev => (prev + 1) % 8)
-
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - runnerGameState.speed }))
@@ -615,7 +588,6 @@ export function MiniGamePageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [runnerJump, selectedGame])
 
-  // Draw runner background
   useEffect(() => {
     const canvas = runnerCanvasRef.current
     if (!canvas) return
@@ -711,10 +683,6 @@ export function MiniGamePageContent() {
     }
   }
 
-  // ============================================
-  // MAIN RENDER
-  // ============================================
-  
   if (!connected) {
     return (
       <ProtectedRoute requiresNFT={true}>
@@ -733,7 +701,6 @@ export function MiniGamePageContent() {
     )
   }
 
-  // Game Selection Screen
   if (!selectedGame) {
     return (
       <ProtectedRoute requiresNFT={true}>
@@ -790,7 +757,6 @@ export function MiniGamePageContent() {
     )
   }
 
-  // CLICK GAME RENDER (EXISTING)
   if (selectedGame === 'click') {
     return (
       <ProtectedRoute requiresNFT={true}>
@@ -839,17 +805,6 @@ export function MiniGamePageContent() {
                       </div>
                     </CardContent>
                   </Card>
-
-                  {localStorage.getItem('pendingQuestId') && (
-                    <Card className="bg-purple-900/30 border-purple-700">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 text-purple-300">
-                          <Star className="w-5 h-5" />
-                          <span>Quest Active: Score 1500+ points in 20 seconds!</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -913,10 +868,7 @@ export function MiniGamePageContent() {
     )
   }
 
-  // RUNNER GAME RENDER (NEW)
   if (selectedGame === 'runner') {
-    const colors = getTimeOfDayColors()
-    
     return (
       <ProtectedRoute requiresNFT={true}>
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative overflow-hidden">
@@ -946,7 +898,6 @@ export function MiniGamePageContent() {
 
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
                           
-                          {/* CHARACTER - Using your uploaded image */}
                           {runnerGameState.isPlaying && !runnerGameState.isGameOver && (
                             <div className="absolute transition-none" style={{ left: 100, top: runnerY, width: 80, height: 80 }}>
                               {characterImageRef.current ? (
@@ -961,7 +912,6 @@ export function MiniGamePageContent() {
                                   }}
                                 />
                               ) : (
-                                // Fallback while image loads
                                 <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center animate-pulse">
                                   <span className="text-3xl">🏃</span>
                                 </div>
@@ -978,13 +928,12 @@ export function MiniGamePageContent() {
                           {!runnerGameState.isPlaying && !runnerGameState.isGameOver && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-auto">
                               <div className="text-center">
-                                {/* Character Preview on Start Screen */}
-                                <div className="mb-6 float-anim">
+                                <div className="mb-6">
                                   {characterImageRef.current ? (
                                     <img 
                                       src="/images/character-jump.png" 
                                       alt="Character Preview" 
-                                      className="w-32 h-32 mx-auto object-contain drop-shadow-2xl"
+                                      className="w-32 h-32 mx-auto object-contain drop-shadow-2xl animate-bounce"
                                     />
                                   ) : (
                                     <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center">
@@ -1104,19 +1053,6 @@ export function MiniGamePageContent() {
                       </div>
                     </CardContent>
                   </Card>
-
-                  <Card className="bg-gradient-to-br from-green-900/30 to-teal-900/30 border-green-500/30">
-                    <CardHeader>
-                      <CardTitle className="text-green-300">How to Play</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-gray-300">
-                      <p>• Press SPACE or TAP to jump</p>
-                      <p>• Avoid obstacles (cactus, rocks, spikes, birds)</p>
-                      <p>• Speed increases with level</p>
-                      <p>• Day/Night cycle affects visibility</p>
-                      <p>• Earn 1 XP per point (max 250)</p>
-                    </CardContent>
-                  </Card>
                 </div>
               </div>
             </div>
@@ -1128,5 +1064,3 @@ export function MiniGamePageContent() {
 
   return null
 }
-
-export default MiniGamePageContent
