@@ -46,11 +46,11 @@ const USDC_MINT_ADDRESSES = {
 
 export const NFT_CONFIG = {
   maxSupply: 1000,
-  pricePerNFT: 2.5, // 10 USDC per NFT
+  pricePerNFT: 10, // 10 USDC per NFT
   maxPerWallet: 1,
   treasuryWallet: new PublicKey("A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP"),
   referralReward: 0,
-  treasuryAmount: 2.5,
+  treasuryAmount: 10,
   usdcDecimals: 6,
   network: (process.env.NEXT_PUBLIC_SOLANA_NETWORK as keyof typeof USDC_MINT_ADDRESSES) || "mainnet-beta",
   // NFT Metadata
@@ -839,7 +839,7 @@ async getUSDCBalance(wallet: PublicKey): Promise<number> {
     }
   }> {
     // NFT Cost (what user pays for the NFT itself)
-    const nftCostUSDC = quantity * NFT_CONFIG.pricePerNFT // 2.5 USDC per NFT
+    const nftCostUSDC = quantity * NFT_CONFIG.pricePerNFT // 10 USDC per NFT
     
     // CORRECTED Network Fees (accurate blockchain costs)
     const baseFee = 0.000005 * quantity // Base transaction fee per NFT
