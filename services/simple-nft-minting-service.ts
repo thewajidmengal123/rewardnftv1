@@ -769,24 +769,49 @@ export class SimpleNFTMintingService {
 
 async getUSDCBalance(wallet: PublicKey): Promise<number> {
   try {
-    console.log("🔍 DEBUG: Fetching USDC balance...")
-    console.log("   Wallet Address:", wallet.toString())
+    console.log("🔍 DEBUG SimpleNFT: Starting USDC balance check...")
+    console.log("   Wallet:", wallet.toString())
     console.log("   USDC Mint:", this.usdcMint.toString())
     
     const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, wallet)
-    console.log("   Token Account Address:", userUsdcTokenAccount.toString())
-    
-    // Use RPC method (more reliable)
+    console.log("   Token Account:", userUsdcTokenAccount.toString())
+
+    // FIXED: Use direct RPC fetch
     try {
-      const balance = await this.connection.getTokenTokenAccountBalance(userUsdcTokenAccount)
-      console.log("   Balance from RPC:", balance.value.uiAmount)
-      return balance.value.uiAmount || 0
-    } catch (error) {
-      console.log("   ❌ Token account not found, returning 0")
+      const response = await fetch("https://api.mainnet-beta.solana.com", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTokenAccountBalance',
+          params: [userUsdcTokenAccount.toString()]
+        })
+      })
+      
+      if (!response.ok) {
+        console.log("   HTTP Error:", response.status)
+        return 0
+      }
+      
+      const data = await response.json()
+      console.log("   RPC Response:", data)
+      
+      if (data.result?.value?.uiAmount !== undefined) {
+        console.log("   ✅ Balance:", data.result.value.uiAmount)
+        return data.result.value.uiAmount
+      }
+      
+      console.log("   ⚠️ No balance data")
+      return 0
+      
+    } catch (fetchError: any) {
+      console.log("   ❌ Fetch Error:", fetchError.message)
       return 0
     }
+
   } catch (error) {
-    console.error("   ❌ Error in getUSDCBalance:", error)
+    console.error("   ❌ Outer Error:", error)
     return 0
   }
 }
