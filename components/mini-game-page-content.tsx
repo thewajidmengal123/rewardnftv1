@@ -46,8 +46,8 @@ interface Particle {
 // Game Constants
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 500;
-const GROUND_Y = 380;
-const GRAVITY = 0.8;
+const GROUND_Y = 420;
+const GRAVITY = 0.5;
 const JUMP_FORCE = -15;
 const BASE_SPEED = 5;
 const MAX_SPEED = 15;
