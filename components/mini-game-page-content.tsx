@@ -370,12 +370,47 @@ const sendXpToServer = async (xp: number) => {
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision]);
 
   // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        jump();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [jump]);
+
   // Touch controls for mobile
-useEffect(() => {
-  const handleTouchStart = (e: TouchEvent) => {
-    e.preventDefault();
-    jump();
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      jump();
+    };
+
+    const gameContainer = document.getElementById('game-container');
+    if (gameContainer) {
+      gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+    }
+
+    return () => {
+      if (gameContainer) {
+        gameContainer.removeEventListener('touchstart', handleTouchStart);
+      }
+    };
+  }, [jump]);
+  const gameContainer = document.getElementById('game-container');
+  if (gameContainer) {
+    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+  }
+
+  return () => {
+    if (gameContainer) {
+      gameContainer.removeEventListener('touchstart', handleTouchStart);
+    }
   };
+}, [jump]);
 
   const gameContainer = document.getElementById('game-container');
   if (gameContainer) {
