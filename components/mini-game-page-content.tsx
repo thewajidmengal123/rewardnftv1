@@ -218,20 +218,26 @@ export default function MiniGamePageContent() {
 
   // Send XP to server (integrates with your existing system)
   const sendXpToServer = async (xp: number) => {
-    try {
-      await fetch('/api/mini-game/complete-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          score: gameState.score, 
-          xp,
-          gameType: 'endless-runner'
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to send XP:', error);
-    }
-  };
+  try {
+    // Get wallet from localStorage or your auth system
+    const walletAddress = localStorage.getItem('walletAddress') || 'guest'
+    
+    await fetch('/api/mini-game/complete-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress,
+        playDate: new Date().toISOString().split('T')[0],
+        gameScore: gameState.score,
+        clicks: 0,
+        xpEarned: xp,
+        completedAt: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to send XP:', error);
+  }
+};
 
   // Collision detection
   const checkCollision = useCallback(() => {
