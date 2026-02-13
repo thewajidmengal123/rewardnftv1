@@ -154,21 +154,28 @@ export default function MiniGamePageContent() {
   };
 
   // Spawn obstacle
-  const spawnObstacle = useCallback(() => {
-    const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    const obstacle: Obstacle = {
-      id: obstacleIdRef.current++,
-      x: GAME_WIDTH + Math.random() * 200,
-      y: type === 'spike' ? GROUND_Y - 30 : GROUND_Y - 40,
-      width: type === 'cactus' ? 30 : type === 'rock' ? 35 : 40,
-      height: type === 'cactus' ? 50 : type === 'rock' ? 40 : 30,
-      type,
-    };
-    
-    setObstacles(prev => [...prev, obstacle]);
-  }, []);
+const spawnObstacle = useCallback(() => {
+  const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  
+  // Calculate Y position based on new GROUND_Y
+  const obstacleY = type === 'spike' 
+    ? GROUND_Y - 35  // Spike ke liye
+    : type === 'cactus' 
+      ? GROUND_Y - 60  // Cactus ke liye
+      : GROUND_Y - 50; // Rock ke liye
+  
+  const obstacle: Obstacle = {
+    id: obstacleIdRef.current++,
+    x: GAME_WIDTH + Math.random() * 200,
+    y: obstacleY,
+    width: type === 'cactus' ? 35 : type === 'rock' ? 40 : 45,
+    height: type === 'cactus' ? 60 : type === 'rock' ? 50 : 35,
+    type,
+  };
+  
+  setObstacles(prev => [...prev, obstacle]);
+}, []);
 
   // Start game
   const startGame = () => {
