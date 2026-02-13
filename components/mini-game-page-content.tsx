@@ -30,7 +30,7 @@ interface Obstacle {
   y: number;
   width: number;
   height: number;
-  type: 'cactus' | 'rock' | 'spike';
+  type: 'car' | 'bus' | 'bike';
 }
 
 interface Particle {
