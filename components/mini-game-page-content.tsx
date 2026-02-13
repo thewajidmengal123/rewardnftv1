@@ -9,7 +9,7 @@ import { Trophy, Play, RotateCcw, Sparkles, Zap, Target, TrendingUp, Clock } fro
 import confetti from "canvas-confetti";
 
 // ============================================
-// ENDLESS RUNNER GAME - REWARDNFT PLATFORM
+// ENDLESS RUNNER GAME - REWARDNFT PLATFORM 
 // ============================================
 // Same XP system, same leaderboard integration
 // Just replace your existing mini-game-page-content.tsx with this file
