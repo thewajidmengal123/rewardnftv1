@@ -767,14 +767,35 @@ export class SimpleNFTMintingService {
   }
 
   async getUSDCBalance(wallet: PublicKey): Promise<number> {
-    try {
-      const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, wallet)
-      const account = await getAccount(this.connection, userUsdcTokenAccount)
-      return Number(account.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
-    } catch (error) {
+  try {
+    console.log("🔍 DEBUG: Fetching USDC balance...")
+    console.log("   Wallet Address:", wallet.toString())
+    console.log("   USDC Mint:", this.usdcMint.toString())
+    
+    const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, wallet)
+    console.log("   Token Account Address:", userUsdcTokenAccount.toString())
+    
+    // Check if account exists on-chain
+    const accountInfo = await this.connection.getAccountInfo(userUsdcTokenAccount)
+    console.log("   Account Exists:", accountInfo !== null)
+    
+    if (!accountInfo) {
+      console.log("   ⚠️ Token account not found, returning 0")
       return 0
     }
+    
+    const account = await getAccount(this.connection, userUsdcTokenAccount)
+    console.log("   Raw Amount (base units):", account.amount.toString())
+    
+    const balance = Number(account.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
+    console.log("   Calculated Balance:", balance)
+    
+    return balance
+  } catch (error) {
+    console.error("   ❌ Error in getUSDCBalance:", error)
+    return 0
   }
+}
 
   // CORRECTED cost breakdown with accurate estimates
   async getCompleteCostBreakdown(quantity: number): Promise<{
