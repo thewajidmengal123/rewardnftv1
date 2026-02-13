@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { ProtectedRoute } from "@/components/protected-route"
-import { Gamepad2, Trophy, Star, Zap, Play, Clock, Timer, RotateCcw, Run, MousePointer } from "lucide-react"
+import { Trophy, Star, Play, RotateCcw, Run, MousePointer, Clock } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-import { motion, AnimatePresence } from "framer-motion"
-import confetti from "canvas-confetti"
+import dynamic from "next/dynamic"
+
+// Dynamic imports to avoid SSR issues
+const motion = dynamic(() => import("framer-motion").then(mod => mod.motion), { ssr: false })
+const AnimatePresence = dynamic(() => import("framer-motion").then(mod => mod.AnimatePresence), { ssr: false })
 
 // ============================================
 // MERGED REWARD NFT GAME - CLICK + RUNNER
@@ -29,7 +31,6 @@ const GRAVITY = 0.8
 const JUMP_FORCE = -15
 const BASE_SPEED = 5
 const MAX_SPEED = 15
-const SPEED_INCREMENT = 0.001
 
 interface RunnerObstacle {
   id: number
@@ -58,7 +59,7 @@ interface RunnerGameState {
   distance: number
   level: number
   timeOfDay: 'day' | 'evening' | 'night'
-  timeCycle: number // 0-100 progress through day cycle
+  timeCycle: number
 }
 
 // ============================================
@@ -69,6 +70,7 @@ export function MiniGamePageContent() {
   
   // Game Selection State
   const [selectedGame, setSelectedGame] = useState<GameType>(null)
+  const [mounted, setMounted] = useState(false)
   
   // ============================================
   // CLICK GAME STATE (EXISTING - UNCHANGED)
@@ -83,6 +85,8 @@ export function MiniGamePageContent() {
   const [totalXpEarned, setTotalXpEarned] = useState(0)
   const [gameEnded, setGameEnded] = useState(false)
   const [xpSaved, setXpSaved] = useState(false)
+  const [pendingQuestId, setPendingQuestId] = useState<string | null>(null)
+  
   const clickGameSessionRef = useRef<string | null>(null)
   const lastXPSaveTime = useRef<number>(0)
   const xpSaveInProgress = useRef(false)
@@ -101,68 +105,65 @@ export function MiniGamePageContent() {
     timeCycle: 0,
   })
   
-  // Runner physics
   const [runnerY, setRunnerY] = useState(GROUND_Y - 60)
   const [runnerVy, setRunnerVy] = useState(0)
   const [isJumping, setIsJumping] = useState(false)
   const [runnerFrame, setRunnerFrame] = useState(0)
-  
-  // Runner obstacles
   const [obstacles, setObstacles] = useState<RunnerObstacle[]>([])
-  const obstacleIdRef = useRef(0)
-  
-  // Particles
   const [particles, setParticles] = useState<Particle[]>([])
-  const particleIdRef = useRef(0)
   
-  // Runner refs
+  const obstacleIdRef = useRef(0)
+  const particleIdRef = useRef(0)
   const runnerCanvasRef = useRef<HTMLCanvasElement>(null)
   const runnerGameLoopRef = useRef<number>()
   const characterImageRef = useRef<HTMLImageElement | null>(null)
 
   // ============================================
-  // CHARACTER IMAGE LOADING (NEW)
+  // MOUNT EFFECT
   // ============================================
   useEffect(() => {
-    const img = new Image()
-    img.src = '/images/character.png'
-    img.onload = () => {
-      characterImageRef.current = img
-      console.log('✅ Character image loaded')
+    setMounted(true)
+    
+    // Load character image
+    if (typeof window !== 'undefined') {
+      const img = new Image()
+      img.src = '/images/character.png'
+      img.onload = () => {
+        characterImageRef.current = img
+      }
+      img.onerror = () => {
+        console.warn('Character image failed to load, using fallback')
+      }
+      
+      // Check localStorage safely
+      try {
+        const pending = localStorage.getItem('pendingQuestId')
+        if (pending) {
+          setPendingQuestId(pending)
+          toast({
+            title: "Quest Active!",
+            description: "Score 1500+ points to complete the mini-game quest!",
+          })
+        }
+        
+        const savedXp = localStorage.getItem('runnerTotalXp')
+        if (savedXp) setTotalXpEarned(parseInt(savedXp))
+      } catch (e) {
+        console.error('localStorage access error:', e)
+      }
     }
-    img.onerror = () => {
-      console.warn('⚠️ Character image failed to load, using fallback')
+    
+    return () => {
+      if (clickGameInterval) clearInterval(clickGameInterval)
+      if (runnerGameLoopRef.current) clearInterval(runnerGameLoopRef.current)
     }
   }, [])
 
   // ============================================
   // CLICK GAME LOGIC (EXISTING - UNCHANGED)
   // ============================================
-  useEffect(() => {
-    const pendingQuestId = localStorage.getItem('pendingQuestId')
-    if (pendingQuestId) {
-      toast({
-        title: "Quest Active!",
-        description: "Score 1500+ points in 20 seconds to complete the mini-game quest!",
-      })
-    }
-  }, [connected, publicKey])
-
-  useEffect(() => {
-    return () => {
-      if (clickGameInterval) clearInterval(clickGameInterval)
-      setGameEnded(false)
-      setXpSaved(false)
-      xpSaveInProgress.current = false
-      clickGameSessionRef.current = null
-    }
-  }, [clickGameInterval])
-
-  const startClickGame = async () => {
-    if (clickGameInterval) {
-      clearInterval(clickGameInterval)
-      setClickGameInterval(null)
-    }
+  const startClickGame = useCallback(() => {
+    if (clickGameInterval) clearInterval(clickGameInterval)
 
     const sessionId = `click-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     clickGameSessionRef.current = sessionId
@@ -193,7 +194,7 @@ export function MiniGamePageContent() {
     }, 1000)
 
     setClickGameInterval(interval)
-  }
+  }, [clickGameInterval])
 
   const endClickGame = useCallback(() => {
     if (gameEnded) return
@@ -216,7 +217,7 @@ export function MiniGamePageContent() {
     if (clickScore >= 1500 && !questCompleted) {
       checkAndCompleteMinigameQuest(clickScore)
     }
-  }, [clickGameInterval, clickScore, questCompleted, xpEarned, publicKey, gameEnded, xpSaved])
+  }, [clickGameInterval, clickScore, questCompleted, xpEarned, publicKey, gameEnded, xpSaved, clicks])
 
   const saveXPToBackend = async (xpAmount: number, source: string, score: number, clicks: number) => {
     if (!publicKey) return
@@ -255,7 +256,14 @@ export function MiniGamePageContent() {
       const result = await xpResponse.json()
 
       if (result.success) {
-        setTotalXpEarned(prev => prev + finalXPAmount)
+        setTotalXpEarned(prev => {
+          const newTotal = prev + finalXPAmount
+          try {
+            localStorage.setItem('runnerTotalXp', newTotal.toString())
+          } catch (e) {}
+          return newTotal
+        })
+        
         toast({
           title: "🎮 XP Rewarded!",
           description: `You earned ${finalXPAmount} XP!`,
@@ -264,7 +272,7 @@ export function MiniGamePageContent() {
         throw new Error(result.error || 'Failed to save XP')
       }
     } catch (error) {
-      console.error('❌ XP save error:', error)
+      console.error('XP save error:', error)
       setXpSaved(false)
       xpSaveInProgress.current = false
       toast({
@@ -335,7 +343,9 @@ export function MiniGamePageContent() {
           title: "🎉 Quest Completed!",
           description: `Mini-game quest completed with ${finalScore} points!`,
         })
-        localStorage.removeItem('pendingQuestId')
+        try {
+          localStorage.removeItem('pendingQuestId')
+        } catch (e) {}
       }
     } catch (error) {
       console.error('Quest completion error:', error)
@@ -350,40 +360,51 @@ export function MiniGamePageContent() {
     const timeMultiplier = timeLeft > 15 ? 1.5 : timeLeft > 10 ? 1.2 : 1.0
     
     const now = Date.now()
-    const lastClickTime = localStorage.getItem('lastClickTime')
+    let lastClickTime = 0
+    try {
+      lastClickTime = parseInt(localStorage.getItem('lastClickTime') || '0')
+    } catch (e) {}
+    
     let speedBonus = 1.0
-
-    if (lastClickTime && now - parseInt(lastClickTime) < 500) {
+    if (lastClickTime && now - lastClickTime < 500) {
       speedBonus = 1.3
     }
 
-    localStorage.setItem('lastClickTime', now.toString())
+    try {
+      localStorage.setItem('lastClickTime', now.toString())
+    } catch (e) {}
 
     const finalPoints = Math.floor(basePoints * timeMultiplier * speedBonus)
     setClickScore(prev => prev + finalPoints)
-    setClicks(prev => prev + 1)
+    setClicks(prev => {
+      const newClicks = prev + 1
+      
+      // Calculate XP based on clicks
+      setXpEarned(currentXP => {
+        if (currentXP >= 250) return currentXP
+        
+        let xpToAward = 0
+        if (newClicks < 50) xpToAward = 3
+        else if (newClicks < 100) xpToAward = 2
+        else xpToAward = 1
 
-    const currentXP = xpEarned
-    if (currentXP < 250) {
-      let xpToAward = 0
-      if (clicks < 50) xpToAward = 3
-      else if (clicks < 100) xpToAward = 2
-      else xpToAward = 1
-
-      const newXP = Math.min(currentXP + xpToAward, 250)
-      setXpEarned(newXP)
-
-      if (newXP >= 250) {
-        setTimeout(() => endClickGame(), 100)
-      }
-    }
+        const newXP = Math.min(currentXP + xpToAward, 250)
+        
+        if (newXP >= 250) {
+          setTimeout(() => endClickGame(), 100)
+        }
+        
+        return newXP
+      })
+      
+      return newClicks
+    })
   }
 
   // ============================================
   // RUNNER GAME LOGIC (NEW)
   // ============================================
   
-  // Time cycle progression
   useEffect(() => {
     if (!runnerGameState.isPlaying) return
     
@@ -430,7 +451,7 @@ export function MiniGamePageContent() {
           skyTop: '#0f0f1a',
           skyBottom: '#1a1a2e',
           ground: '#1a1a2e',
-          sun: '#F0E68C', // Moon
+          sun: '#F0E68C',
           obstacle: '#a855f7'
         }
     }
@@ -516,15 +537,38 @@ export function MiniGamePageContent() {
       checkAndCompleteMinigameQuest(runnerGameState.score)
     }
 
-    if (runnerGameState.score >= 500) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#a855f7', '#3b82f6', '#ec4899'],
-      })
+    // Simple confetti without canvas-confetti
+    if (runnerGameState.score >= 500 && typeof window !== 'undefined') {
+      createSimpleConfetti()
     }
   }, [runnerGameState.score, questCompleted, publicKey, gameEnded, xpSaved])
+
+  const createSimpleConfetti = () => {
+    const colors = ['#a855f7', '#3b82f6', '#ec4899', '#10b981', '#f59e0b']
+    for (let i = 0; i < 50; i++) {
+      setTimeout(() => {
+        const div = document.createElement('div')
+        div.style.position = 'fixed'
+        div.style.left = Math.random() * 100 + 'vw'
+        div.style.top = '-10px'
+        div.style.width = '10px'
+        div.style.height = '10px'
+        div.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]
+        div.style.borderRadius = '50%'
+        div.style.pointerEvents = 'none'
+        div.style.zIndex = '9999'
+        div.style.transition = 'all 3s ease-out'
+        document.body.appendChild(div)
+        
+        setTimeout(() => {
+          div.style.transform = `translateY(${window.innerHeight}px) rotate(${Math.random() * 360}deg)`
+          div.style.opacity = '0'
+        }, 10)
+        
+        setTimeout(() => div.remove(), 3000)
+      }, i * 20)
+    }
+  }
 
   const checkRunnerCollision = useCallback(() => {
     const runnerRect = {
@@ -556,7 +600,6 @@ export function MiniGamePageContent() {
     return false
   }, [obstacles, runnerY, endRunnerGame])
 
-  // Runner game loop
   useEffect(() => {
     if (!runnerGameState.isPlaying) return
 
@@ -638,7 +681,6 @@ export function MiniGamePageContent() {
     }
   }, [runnerGameState.isPlaying, runnerGameState.speed, runnerVy, checkRunnerCollision])
 
-  // Runner keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
@@ -716,10 +758,6 @@ export function MiniGamePageContent() {
     }
   }, [runnerGameState.distance, runnerGameState.timeOfDay])
 
-  // ============================================
-  // RENDER HELPERS
-  // ============================================
-  
   const renderRunnerObstacle = (obstacle: RunnerObstacle) => {
     const colors = getTimeOfDayColors()
     
@@ -800,8 +838,8 @@ export function MiniGamePageContent() {
   }
 
   // ============================================
-  // MAIN RENDER
-  // ============================================
+  // RENDER
+  // ==========================================
   
   if (!connected) {
     return (
@@ -831,67 +869,48 @@ export function MiniGamePageContent() {
           <div className="relative z-10 container mx-auto px-4 py-8">
             <div className="max-w-4xl mx-auto">
               
-              {/* Header */}
               <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold mb-4">
+                <h1 className="text-4xl md:text-6xl font-bold mb-4">
                   <span className="bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 bg-clip-text text-transparent">
                     Choose Your Game
                   </span>
                 </h1>
-                <p className="text-gray-300">Select a game mode to start earning XP!</p>
+                <p className="text-gray-400 text-lg">Select a game mode to start earning XP!</p>
               </div>
 
-              {/* Game Cards */}
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Click Game Card */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+              <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+                <div
+                  onClick={() => setSelectedGame('click')}
+                  className="group cursor-pointer bg-gray-800/50 border-2 border-gray-700 hover:border-purple-500/50 rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105"
                 >
-                  <Card 
-                    className="bg-gray-800/50 border-gray-700 cursor-pointer hover:border-purple-500/50 transition-all h-full"
-                    onClick={() => setSelectedGame('click')}
-                  >
-                    <CardContent className="p-8 text-center">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
-                        <MousePointer className="w-10 h-10 text-white" />
-                      </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">Click Challenge</h2>
-                      <p className="text-gray-400 mb-4">Click as fast as you can in 20 seconds!</p>
-                      <div className="flex justify-center gap-2 text-sm">
-                        <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full">Max 250 XP</span>
-                        <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full">Target: 1500 pts</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                  <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
+                    <MousePointer className="w-10 h-10 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2 text-center">Click Challenge</h2>
+                  <p className="text-gray-400 mb-4 text-center">Click as fast as you can in 20 seconds!</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm">Max 250 XP</span>
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm">Target: 1500 pts</span>
+                  </div>
+                </div>
 
-                {/* Runner Game Card */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <div
+                  onClick={() => setSelectedGame('runner')}
+                  className="group cursor-pointer bg-gray-800/50 border-2 border-gray-700 hover:border-green-500/50 rounded-2xl p-6 md:p-8 transition-all duration-300 hover:scale-105"
                 >
-                  <Card 
-                    className="bg-gray-800/50 border-gray-700 cursor-pointer hover:border-green-500/50 transition-all h-full"
-                    onClick={() => setSelectedGame('runner')}
-                  >
-                    <CardContent className="p-8 text-center">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-500 rounded-2xl flex items-center justify-center">
-                        <Run className="w-10 h-10 text-white" />
-                      </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">Endless Runner</h2>
-                      <p className="text-gray-400 mb-4">Jump over obstacles and survive!</p>
-                      <div className="flex justify-center gap-2 text-sm">
-                        <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full">Max 250 XP</span>
-                        <span className="px-3 py-1 bg-teal-500/20 text-teal-300 rounded-full">Day/Night Cycle</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                  <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-500 rounded-2xl flex items-center justify-center">
+                    <Run className="w-10 h-10 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2 text-center">Endless Runner</h2>
+                  <p className="text-gray-400 mb-4 text-center">Jump over obstacles & survive!</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-sm">Max 250 XP</span>
+                    <span className="px-3 py-1 bg-teal-500/20 text-teal-300 rounded-full text-sm">Day/Night Cycle</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Back Button */}
-              <div className="text-center mt-8">
+              <div className="text-center mt-12">
                 <Button
                   asChild
                   variant="outline"
@@ -907,9 +926,7 @@ export function MiniGamePageContent() {
     )
   }
 
-  // ============================================
-  // CLICK GAME RENDER (EXISTING - UNCHANGED)
-  // ============================================
+  // CLICK GAME RENDER
   if (selectedGame === 'click') {
     return (
       <ProtectedRoute requiresNFT={true}>
@@ -919,27 +936,18 @@ export function MiniGamePageContent() {
           <div className="relative z-10 container mx-auto px-4 py-8">
             <div className="max-w-4xl mx-auto">
               
-              {/* Header */}
               <div className="text-center mb-8">
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedGame(null)}
-                  className="mb-4 text-gray-400 hover:text-white"
-                >
+                <button onClick={() => setSelectedGame(null)} className="mb-4 text-gray-400 hover:text-white flex items-center gap-2 mx-auto">
                   ← Back to Games
-                </Button>
+                </button>
                 <h1 className="text-4xl font-bold mb-4">
-                  <span className="text-purple-400">Click</span>{" "}
-                  <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                    Challenge
-                  </span>
+                  <span className="text-purple-400">Click</span>
+                  <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent"> Challenge</span>
                 </h1>
-                <p className="text-gray-300">Click as fast as you can to score points and earn XP! Get 1500+ points in 20 seconds to complete the quest!</p>
+                <p className="text-gray-300">Click fast to score! Get 1500+ points for quest completion!</p>
               </div>
 
-              {/* Game Area */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Stats */}
+              <div className="grid lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <Card className="bg-gray-800/50 border-gray-700">
                     <CardHeader>
@@ -949,42 +957,37 @@ export function MiniGamePageContent() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Score:</span>
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
+                        <span className="text-gray-400">Score</span>
                         <span className="text-2xl font-bold text-yellow-400">{clickScore}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Time Left:</span>
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
+                        <span className="text-gray-400">Time Left</span>
                         <span className="text-xl font-bold text-blue-400">{timeLeft}s</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Clicks:</span>
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
+                        <span className="text-gray-400">Clicks</span>
                         <span className="text-lg font-bold text-green-400">{clicks}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Quest Target:</span>
-                        <span className="text-lg font-bold text-purple-400">1500+</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">XP Earned:</span>
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
+                        <span className="text-gray-400">XP Earned</span>
                         <span className="text-lg font-bold text-cyan-400">{xpEarned}/250</span>
                       </div>
                     </CardContent>
                   </Card>
 
-                  {localStorage.getItem('pendingQuestId') && (
+                  {pendingQuestId && (
                     <Card className="bg-purple-900/30 border-purple-700">
                       <CardContent className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Star className="w-5 h-5 text-purple-400" />
-                          <span className="text-purple-300">Quest Active: Score 1500+ points in 20 seconds!</span>
+                        <div className="flex items-center gap-2 text-purple-300">
+                          <Star className="w-5 h-5" />
+                          <span>Quest Active: Score 1500+ points in 20 seconds!</span>
                         </div>
                       </CardContent>
                     </Card>
                   )}
                 </div>
 
-                {/* Play Area */}
                 <div className="space-y-4">
                   {clickGameState === 'menu' && (
                     <Card className="bg-gray-800/50 border-gray-700">
@@ -1008,19 +1011,18 @@ export function MiniGamePageContent() {
                   {clickGameState === 'playing' && (
                     <Card className="bg-gray-800/50 border-gray-700">
                       <CardContent className="p-8 text-center">
-                        <Button
+                        <button
                           onClick={handleClickGameClick}
-                          size="lg"
                           disabled={xpEarned >= 250}
                           className={`w-48 h-48 rounded-full font-bold text-2xl transform transition-transform ${
                             xpEarned >= 250
                               ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white cursor-not-allowed'
-                              : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white hover:scale-105'
+                              : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white hover:scale-105 active:scale-95'
                           }`}
                         >
-                          {xpEarned >= 250 ? 'MAX XP!' : 'CLICK ME!'}
-                        </Button>
-                        <p className="text-gray-300 mt-4">
+                          {xpEarned >= 250 ? 'MAX XP!' : 'CLICK!'}
+                        </button>
+                        <p className="text-gray-300 mt-6">
                           {xpEarned >= 250 ? 'Maximum XP reached! Game ending...' : 'Keep clicking to score points and earn XP!'}
                         </p>
                       </CardContent>
@@ -1039,7 +1041,17 @@ export function MiniGamePageContent() {
                           <div className="text-2xl font-bold text-cyan-400 mb-2">
                             🌟 XP Rewarded: {Math.max(xpEarned, 10)}
                           </div>
+                          <div className="text-cyan-300 text-sm">XP added to your account!</div>
                         </div>
+
+                        {clickScore >= 1500 && (
+                          <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                            <div className="text-green-400 font-bold">🎉 Quest Target Reached!</div>
+                            {questCompleted && (
+                              <div className="text-green-300 text-sm mt-2">✅ Quest completed! Bonus XP awarded!</div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                           <Button
@@ -1082,9 +1094,7 @@ export function MiniGamePageContent() {
     )
   }
 
-  // ============================================
-  // RUNNER GAME RENDER (NEW)
-  // ============================================
+  // RUNNER GAME RENDER
   if (selectedGame === 'runner') {
     const colors = getTimeOfDayColors()
     
@@ -1096,27 +1106,18 @@ export function MiniGamePageContent() {
           <div className="relative z-10 container mx-auto px-4 py-8">
             <div className="max-w-6xl mx-auto">
               
-              {/* Header */}
               <div className="text-center mb-8">
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedGame(null)}
-                  className="mb-4 text-gray-400 hover:text-white"
-                >
+                <button onClick={() => setSelectedGame(null)} className="mb-4 text-gray-400 hover:text-white flex items-center gap-2 mx-auto">
                   ← Back to Games
-                </Button>
+                </button>
                 <h1 className="text-4xl font-bold mb-4">
-                  <span className="text-green-400">Endless</span>{" "}
-                  <span className="bg-gradient-to-r from-green-400 via-teal-500 to-blue-500 bg-clip-text text-transparent">
-                    Runner
-                  </span>
+                  <span className="text-green-400">Endless</span>
+                  <span className="bg-gradient-to-r from-green-400 via-teal-500 to-blue-500 bg-clip-text text-transparent"> Runner</span>
                 </h1>
-                <p className="text-gray-300">Jump over obstacles and survive as long as possible!</p>
-                <p className="text-green-400 text-sm mt-2">Press SPACE or TAP to jump • Day/Night Cycle Active</p>
+                <p className="text-gray-300">Jump over obstacles! Press SPACE or TAP to jump</p>
               </div>
 
               <div className="grid lg:grid-cols-3 gap-6">
-                {/* Game Area */}
                 <div className="lg:col-span-2">
                   <Card className="bg-gray-800/50 border-gray-800 overflow-hidden">
                     <CardContent className="p-0">
@@ -1133,7 +1134,6 @@ export function MiniGamePageContent() {
                           runnerJump()
                         }}
                       >
-                        {/* Background Canvas */}
                         <canvas
                           ref={runnerCanvasRef}
                           width={GAME_WIDTH}
@@ -1141,12 +1141,9 @@ export function MiniGamePageContent() {
                           className="absolute inset-0 w-full h-full"
                         />
 
-                        {/* Game Elements */}
-                        <div className="absolute inset-0 overflow-hidden">
-                          
-                          {/* Character */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
                           {runnerGameState.isPlaying && !runnerGameState.isGameOver && (
-                            <motion.div
+                            <div
                               className="absolute"
                               style={{
                                 left: 100,
@@ -1154,10 +1151,7 @@ export function MiniGamePageContent() {
                                 width: 50,
                                 height: 60,
                               }}
-                              animate={!isJumping ? { y: [0, -3, 0] } : {}}
-                              transition={{ repeat: Infinity, duration: 0.3 }}
                             >
-                              {/* Use character image if loaded, else fallback */}
                               {characterImageRef.current ? (
                                 <img 
                                   src="/images/character.png" 
@@ -1170,41 +1164,18 @@ export function MiniGamePageContent() {
                                   }}
                                 />
                               ) : (
-                                // Fallback character design
-                                <div className="relative w-full h-full">
-                                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-green-400 to-teal-500 rounded-full">
-                                    <div className="absolute top-2 right-1 w-2 h-2 bg-white rounded-full" />
-                                  </div>
+                                <div className="relative w-full h-full animate-bounce">
+                                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-green-400 to-teal-500 rounded-full" />
                                   <div className="absolute top-5 left-1/2 -translate-x-1/2 w-5 h-7 bg-gradient-to-b from-blue-500 to-green-600 rounded-lg" />
-                                  <motion.div
-                                    className="absolute top-6 -left-1 w-3 h-1 bg-green-400 rounded-full origin-right"
-                                    animate={{ rotate: [20, -20, 20] }}
-                                    transition={{ repeat: Infinity, duration: 0.2 }}
-                                  />
-                                  <motion.div
-                                    className="absolute top-6 -right-1 w-3 h-1 bg-green-400 rounded-full origin-left"
-                                    animate={{ rotate: [-20, 20, -20] }}
-                                    transition={{ repeat: Infinity, duration: 0.2 }}
-                                  />
-                                  <motion.div
-                                    className="absolute bottom-0 left-1 w-2 h-5 bg-gradient-to-b from-green-500 to-teal-500 rounded-full origin-top"
-                                    animate={!isJumping ? { rotate: [30, -30, 30] } : { rotate: 45 }}
-                                    transition={{ repeat: Infinity, duration: 0.2 }}
-                                  />
-                                  <motion.div
-                                    className="absolute bottom-0 right-1 w-2 h-5 bg-gradient-to-b from-green-500 to-teal-500 rounded-full origin-top"
-                                    animate={!isJumping ? { rotate: [-30, 30, -30] } : { rotate: -15 }}
-                                    transition={{ repeat: Infinity, duration: 0.2 }}
-                                  />
+                                  <div className="absolute bottom-0 left-1 w-2 h-5 bg-gradient-to-b from-green-500 to-teal-500 rounded-full" />
+                                  <div className="absolute bottom-0 right-1 w-2 h-5 bg-gradient-to-b from-green-500 to-teal-500 rounded-full" />
                                 </div>
                               )}
-                            </motion.div>
+                            </div>
                           )}
 
-                          {/* Obstacles */}
                           {obstacles.map(renderRunnerObstacle)}
 
-                          {/* Particles */}
                           {particles.map(particle => (
                             <div
                               key={particle.id}
@@ -1218,17 +1189,10 @@ export function MiniGamePageContent() {
                             />
                           ))}
 
-                          {/* Start Screen */}
                           {!runnerGameState.isPlaying && !runnerGameState.isGameOver && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-auto">
                               <div className="text-center">
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="text-6xl mb-4"
-                                >
-                                  🏃
-                                </motion.div>
+                                <div className="text-6xl mb-4 animate-bounce">🏃</div>
                                 <h2 className="text-3xl font-bold mb-2">Ready to Run?</h2>
                                 <p className="text-gray-400 mb-6">Jump over obstacles and earn XP!</p>
                                 <Button
@@ -1242,23 +1206,16 @@ export function MiniGamePageContent() {
                             </div>
                           )}
 
-                          {/* Game Over Screen */}
                           {runnerGameState.isGameOver && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                              <motion.div
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="text-center"
-                              >
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto">
+                              <div className="text-center">
                                 <div className="text-6xl mb-4">💥</div>
                                 <h2 className="text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
                                 <p className="text-2xl text-white mb-2">Score: {runnerGameState.score}</p>
-                                <p className="text-lg text-green-400 mb-4">Level Reached: {runnerGameState.level}</p>
+                                <p className="text-lg text-green-400 mb-4">Level {runnerGameState.level}</p>
                                 
-                                <div className="bg-cyan-900/30 border border-cyan-700 rounded-lg p-4 mb-4">
-                                  <div className="text-xl font-bold text-cyan-400">
-                                    🌟 XP Rewarded: {Math.min(runnerGameState.score, 250)}
-                                  </div>
+                                <div className="bg-cyan-900/30 border border-cyan-700 rounded-lg p-4 mb-6">
+                                  <div className="text-xl font-bold text-cyan-400">🌟 XP: {Math.min(runnerGameState.score, 250)}</div>
                                 </div>
 
                                 <div className="flex gap-3 justify-center">
@@ -1274,15 +1231,14 @@ export function MiniGamePageContent() {
                                     variant="outline"
                                     className="border-gray-600"
                                   >
-                                    Back to Games
+                                    Back
                                   </Button>
                                 </div>
-                              </motion.div>
+                              </div>
                             </div>
                           )}
                         </div>
 
-                        {/* HUD */}
                         {runnerGameState.isPlaying && (
                           <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                             <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
@@ -1311,15 +1267,11 @@ export function MiniGamePageContent() {
                     </CardContent>
                   </Card>
 
-                  {/* Mobile Controls Hint */}
-                  <div className="mt-4 flex justify-center gap-4 md:hidden">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg">
-                      <span className="text-gray-400">Tap to Jump</span>
-                    </div>
+                  <div className="mt-4 text-center md:hidden">
+                    <p className="text-gray-400 text-sm">Tap anywhere to jump</p>
                   </div>
                 </div>
 
-                {/* Stats Panel */}
                 <div className="space-y-4">
                   <Card className="bg-gray-800/50 border-gray-800">
                     <CardHeader>
@@ -1329,21 +1281,21 @@ export function MiniGamePageContent() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
                         <span className="text-gray-400">Current Score</span>
                         <span className="text-2xl font-bold text-yellow-400">{runnerGameState.score}</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
                         <span className="text-gray-400">Level</span>
                         <span className="text-2xl font-bold text-green-400">{runnerGameState.level}</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
                         <span className="text-gray-400">Speed</span>
                         <span className="text-2xl font-bold text-blue-400">
                           {runnerGameState.speed.toFixed(1)}x
                         </span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                      <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
                         <span className="text-gray-400">XP Available</span>
                         <span className="text-2xl font-bold text-cyan-400">
                           {Math.min(runnerGameState.score, 250)}/250
@@ -1352,7 +1304,6 @@ export function MiniGamePageContent() {
                     </CardContent>
                   </Card>
 
-                  {/* Time Cycle Indicator */}
                   <Card className="bg-gray-800/50 border-gray-800">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1382,7 +1333,6 @@ export function MiniGamePageContent() {
                     </CardContent>
                   </Card>
 
-                  {/* Instructions */}
                   <Card className="bg-gradient-to-br from-green-900/30 to-teal-900/30 border-green-500/30">
                     <CardHeader>
                       <CardTitle className="text-green-300">How to Play</CardTitle>
@@ -1406,3 +1356,8 @@ export function MiniGamePageContent() {
 
   return null
 }
+
+// Export with dynamic import to avoid SSR issues
+export default dynamic(() => Promise.resolve(MiniGamePageContent), {
+  ssr: false
+})
