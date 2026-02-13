@@ -370,14 +370,24 @@ const sendXpToServer = async (xp: number) => {
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision]);
 
   // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault();
-        jump();
-      }
-    };
+  // Touch controls for mobile
+useEffect(() => {
+  const handleTouchStart = (e: TouchEvent) => {
+    e.preventDefault();
+    jump();
+  };
 
+  const gameContainer = document.getElementById('game-container');
+  if (gameContainer) {
+    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+  }
+
+  return () => {
+    if (gameContainer) {
+      gameContainer.removeEventListener('touchstart', handleTouchStart);
+    }
+  };
+}, [jump]);
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
@@ -542,9 +552,9 @@ const sendXpToServer = async (xp: number) => {
 
       {/* Game Container */}
       <div className="max-w-6xl mx-auto px-4 pb-12">
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Game Area */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <Card className="bg-gray-900/50 border-gray-800 overflow-hidden">
               <CardContent className="p-0">
                 {/* Game Canvas Container */}
@@ -803,6 +813,17 @@ const sendXpToServer = async (xp: number) => {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Mobile Responsive Styles */}
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          #game-container {
+            max-width: 100vw !important;
+            min-height: 100vh !important;
+            border-radius: 0 !important;
+          }
+          /* baaki mobile styles yahan */
+        }
+      `}</style>
     </div>
   );
 }
