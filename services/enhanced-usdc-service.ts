@@ -31,35 +31,31 @@ export class EnhancedUSDCService {
     console.log(`USDC Mint Address: ${this.usdcMintAddress.toString()}`)
   }
 
-  async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
+async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
+  try {
+    // 👇 YEH ADD KARO (4 lines)
+    console.log("🔍 DEBUG: Starting USDC balance check...")
+    console.log("   Wallet:", walletAddress.toString())
+    console.log("   Network:", this.currentNetwork)
+    console.log("   USDC Mint:", this.usdcMintAddress.toString())
+    
+    // Pehle se tha (aage ka code same)
+    const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, walletAddress)
+    
     try {
-      // Use the network-specific USDC mint address
-      const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, walletAddress)
-
-      try {
-        const accountInfo = await getAccount(this.connection, tokenAccount)
-        const balance = Number(accountInfo.amount) / Math.pow(10, 6) // USDC has 6 decimals
-console.log("🔍 DEBUG: Starting USDC balance check...")
-console.log("   Wallet:", walletAddress.toString())
-console.log("   Network:", this.currentNetwork)
-console.log("   USDC Mint:", this.usdcMintAddress.toString())
-        
-        console.log(`Found USDC balance: ${balance} for network: ${this.currentNetwork}`)
-        console.log(`USDC Mint: ${this.usdcMintAddress.toString()}`)
-
-        return balance
-      } catch (error) {
-        // Token account doesn't exist for this mint
-        console.log(`No USDC token account found for wallet: ${walletAddress.toString()}`)
-        console.log(`Network: ${this.currentNetwork}, USDC Mint: ${this.usdcMintAddress.toString()}`)
-        return 0
-      }
+      const accountInfo = await getAccount(this.connection, tokenAccount)
+      const balance = Number(accountInfo.amount) / Math.pow(10, 6)
+      console.log(`Found USDC balance: ${balance}`)
+      return balance
     } catch (error) {
-      console.error(`Error getting USDC balance for network ${this.currentNetwork}:`, error)
+      console.log(`No USDC token account found`)
       return 0
     }
+  } catch (error) {
+    console.error(`Error:`, error)
+    return 0
   }
-
+}
   async getAllTokenBalances(walletAddress: PublicKey): Promise<TokenBalance[]> {
     try {
       const tokenBalances: TokenBalance[] = []
