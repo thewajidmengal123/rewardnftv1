@@ -848,17 +848,6 @@ const sendXpToServer = async (xp: number) => {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Mobile Responsive Styles */}
-      <style jsx global>{`
-        @media (max-width: 768px) {
-          #game-container {
-            max-width: 100vw !important;
-            min-height: 100vh !important;
-            border-radius: 0 !important;
-          }
-          /* baaki mobile styles yahan */
-        }
-      `}</style>
     </div>
   );
 }
