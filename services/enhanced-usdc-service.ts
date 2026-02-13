@@ -39,7 +39,11 @@ export class EnhancedUSDCService {
       try {
         const accountInfo = await getAccount(this.connection, tokenAccount)
         const balance = Number(accountInfo.amount) / Math.pow(10, 6) // USDC has 6 decimals
-
+console.log("🔍 DEBUG: Starting USDC balance check...")
+console.log("   Wallet:", walletAddress.toString())
+console.log("   Network:", this.currentNetwork)
+console.log("   USDC Mint:", this.usdcMintAddress.toString())
+        
         console.log(`Found USDC balance: ${balance} for network: ${this.currentNetwork}`)
         console.log(`USDC Mint: ${this.usdcMintAddress.toString()}`)
 
