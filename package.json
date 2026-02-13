@@ -71,6 +71,10 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "canvas-confetti": "^1.9.2",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest"
     "zod": "^3.24.1"
   },
   "devDependencies": {
