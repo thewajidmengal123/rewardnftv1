@@ -375,7 +375,7 @@ export class SimpleNFTMintingService {
     referrerWallet?: PublicKey
   ): Promise<any[]> {
     const instructions = []
-    const usdcAmount = NFT_CONFIG.pricePerNFT * Math.pow(2.5, NFT_CONFIG.usdcDecimals)
+    const usdcAmount = NFT_CONFIG.pricePerNFT * Math.pow(10, NFT_CONFIG.usdcDecimals)
 
     // Get token accounts
     const userUsdcAccount = await getAssociatedTokenAddress(this.usdcMint, minter)
@@ -645,14 +645,14 @@ export class SimpleNFTMintingService {
     requiredAmount: number
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const requiredUSDCAmount = requiredAmount * Math.pow(2.5, NFT_CONFIG.usdcDecimals)
+      const requiredUSDCAmount = requiredAmount * Math.pow(10, NFT_CONFIG.usdcDecimals)
       const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, minter)
 
       try {
         const userUsdcAccount = await getAccount(this.connection, userUsdcTokenAccount)
         
         if (userUsdcAccount.amount < requiredUSDCAmount) {
-          const currentUSDC = Number(userUsdcAccount.amount) / Math.pow(2.5, NFT_CONFIG.usdcDecimals)
+          const currentUSDC = Number(userUsdcAccount.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
           const shortage = requiredAmount - currentUSDC
           return {
             success: false,
@@ -770,7 +770,7 @@ export class SimpleNFTMintingService {
     try {
       const userUsdcTokenAccount = await getAssociatedTokenAddress(this.usdcMint, wallet)
       const account = await getAccount(this.connection, userUsdcTokenAccount)
-      return Number(account.amount) / Math.pow(2.5, NFT_CONFIG.usdcDecimals)
+      return Number(account.amount) / Math.pow(10, NFT_CONFIG.usdcDecimals)
     } catch (error) {
       return 0
     }
