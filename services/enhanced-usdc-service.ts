@@ -46,7 +46,7 @@ async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
     console.log("   Token Account:", tokenAccount.toString())
 
     try {
-      const response = await fetch("https://api.mainnet-beta.solana.com", {
+      const response = await fetch("https://rpc.ankr.com/solana", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
