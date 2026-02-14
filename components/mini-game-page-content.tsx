@@ -572,7 +572,7 @@ const sendXpToServer = async (xp: number) => {
                   className="relative mx-auto"
                   style={{ 
                     width: '100%', 
-                    maxWidth: GAME_WIDTH,
+                    maxWidth: '100%',
                     aspectRatio: `${GAME_WIDTH}/${GAME_HEIGHT}`
                   }}
                   onClick={jump}
@@ -823,6 +823,30 @@ const sendXpToServer = async (xp: number) => {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Mobile Responsive Styles */}
+<style jsx global>{`
+  @media (max-width: 768px) {
+    #game-container {
+      max-width: 100vw !important;
+      height: auto !important;
+      min-height: 300px;
+    }
+    .game-title {
+      font-size: 1.5rem !important;
+    }
+    .game-stats {
+      font-size: 0.75rem !important;
+    }
+  }
+  @media (max-width: 480px) {
+    #game-container {
+      min-height: 250px;
+    }
+    .game-title {
+      font-size: 1.25rem !important;
+    }
+  }
+`}</style>
     </div>
   );
 }
