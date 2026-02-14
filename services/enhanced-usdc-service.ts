@@ -42,16 +42,35 @@ async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
     console.log("   Network:", this.currentNetwork)
     console.log("   USDC Mint:", this.usdcMintAddress.toString())
     
-    // Use RPC method (more reliable)
     const tokenAccount = await getAssociatedTokenAddress(this.usdcMintAddress, walletAddress)
     console.log("   Token Account:", tokenAccount.toString())
-    
+
     try {
-      const balance = await this.connection.getTokenAccountBalance(tokenAccount)
-      console.log("   Balance from RPC:", balance.value.uiAmount)
-      return balance.value.uiAmount || 0
-    } catch (error) {
-      console.log("   ❌ Token account not found, balance: 0")
+      const response = await fetch("https://api.mainnet-beta.solana.com", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTokenAccountBalance',
+          params: [tokenAccount.toString()]
+        })
+      })
+      
+      const data = await response.json()
+      console.log("   RPC Response:", data)
+      
+      if (data.result?.value?.uiAmount !== undefined) {
+        const balance = data.result.value.uiAmount
+        console.log("   ✅ Balance found:", balance)
+        return balance
+      }
+      
+      console.log("   ⚠️ No balance data")
+      return 0
+      
+    } catch (rpcError: any) {
+      console.log("   ❌ RPC Error:", rpcError.message)
       return 0
     }
     
