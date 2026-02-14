@@ -1,4 +1,4 @@
-import { type Connection, PublicKey, Transaction } from "@solana/web3.js"
+import { Connection, PublicKey, Transaction } from "@solana/web3.js"
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token"
 import {
   CURRENT_NETWORK,
