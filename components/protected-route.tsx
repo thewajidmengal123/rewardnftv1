@@ -57,10 +57,10 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
       }
     }
 
-// NFT check removed - all pages public
-setIsLoading(false)
-    }
-  }, [connected, publicKey, requiresNFT])
+useEffect(() => {
+  // NFT check removed - all pages public
+  setIsLoading(false)
+}, [])  // ✅ Empty array - sirf ek baar chalega
 
   if (!connected) {
     return (
