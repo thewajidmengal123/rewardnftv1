@@ -46,7 +46,7 @@ interface Particle {
 // Game Constants
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 500;
-const GROUND_Y = 420;
+const GROUND_Y = 380;
 const GRAVITY = 0.8;
 const JUMP_FORCE = -15;
 const BASE_SPEED = 5;
@@ -159,11 +159,11 @@ const spawnObstacle = useCallback(() => {
   const type = types[Math.floor(Math.random() * types.length)];
   
   // Calculate Y position based on new GROUND_Y
-  const obstacleY = type === 'spike' 
-    ? GROUND_Y - 35  // Spike ke liye
-    : type === 'cactus' 
-      ? GROUND_Y - 60  // Cactus ke liye
-      : GROUND_Y - 50; // Rock ke liye
+ const obstacleY = type === 'spike' 
+  ? GROUND_Y - 100   // 380 - 35 = 345 (neeche)
+  : type === 'cactus' 
+    ? GROUND_Y - 100  // 380 - 60 = 320 (aur neeche)
+    : GROUND_Y - 100; // 380 - 50 = 330 (aur neeche)
   
   const obstacle: Obstacle = {
     id: obstacleIdRef.current++,
