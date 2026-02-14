@@ -1,11 +1,13 @@
 import { type Connection, PublicKey, Transaction } from "@solana/web3.js"
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token"
 import {
+  import {
   CURRENT_NETWORK,
   getCurrentUSDCAddress,
   isMainnet,
   isDevnet,
-  PLATFORM_WALLET_ADDRESS
+  PLATFORM_WALLET_ADDRESS,
+  SOLANA_RPC_ENDPOINTS  // ✅ Yeh add karo
 } from "@/config/solana"
 
 interface TokenBalance {
@@ -22,21 +24,15 @@ export class EnhancedUSDCService {
   private usdcMintAddress: PublicKey
   private currentNetwork: string
 
-  constructor(connection?: Connection) {  // ? ka matlab optional hai
+ constructor(connection?: Connection) {
   this.currentNetwork = CURRENT_NETWORK
   this.usdcMintAddress = getCurrentUSDCAddress()
-  
-  // Agar connection diya gaya hai toh use karo, warna config se banao
-  if (connection) {
-    this.connection = connection  // Purana tarika
-    console.log(`Using provided connection`)
-  } else {
-    // Naya tarika - config se lo
-    const rpcUrl = SOLANA_RPC_ENDPOINTS[this.currentNetwork as keyof typeof SOLANA_RPC_ENDPOINTS]
-    this.connection = new Connection(rpcUrl, 'confirmed')
-    console.log(`Using config connection: ${rpcUrl}`)
-  }
-  
+
+  // Hamesha config se RPC lo
+  const rpcUrl = SOLANA_RPC_ENDPOINTS[this.currentNetwork as keyof typeof SOLANA_RPC_ENDPOINTS]
+  this.connection = new Connection(rpcUrl, 'confirmed')
+  console.log(`Using RPC: ${rpcUrl}`)
+
   console.log(`🌐 Network: ${this.currentNetwork}`)
   console.log(`💰 USDC: ${this.usdcMintAddress.toString()}`)
 }
