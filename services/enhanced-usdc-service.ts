@@ -22,15 +22,15 @@ export class EnhancedUSDCService {
   private connection: Connection
   private usdcMintAddress: PublicKey
   private currentNetwork: string
-
+  private rpcUrl: string
  constructor(connection?: Connection) {
   this.currentNetwork = CURRENT_NETWORK
   this.usdcMintAddress = getCurrentUSDCAddress()
 
   // Hamesha config se RPC lo
-  const rpcUrl = SOLANA_RPC_ENDPOINTS[this.currentNetwork as keyof typeof SOLANA_RPC_ENDPOINTS]
-  this.connection = new Connection(rpcUrl, 'confirmed')
-  console.log(`Using RPC: ${rpcUrl}`)
+ this.rpcUrl = SOLANA_RPC_ENDPOINTS[this.currentNetwork as keyof typeof SOLANA_RPC_ENDPOINTS]  // ✅ const hataya, this. lagaya
+this.connection = new Connection(this.rpcUrl, 'confirmed')  // ✅ rpcUrl ki jagah this.rpcUrl
+console.log(`Using RPC: ${this.rpcUrl}`)  // ✅ rpcUrl ki jagah this.rpcUrl
 
   console.log(`🌐 Network: ${this.currentNetwork}`)
   console.log(`💰 USDC: ${this.usdcMintAddress.toString()}`)
@@ -46,7 +46,7 @@ async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
     console.log("   Token Account:", tokenAccount.toString())
 
     try {
-      const response = await fetch("https://rpc.ankr.com/solana", {
+      const response = await fetch(this.rpcUrl, {  // ✅ pura URL hataya, this.rpcUrl lagaya
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
