@@ -105,7 +105,7 @@ export class SimpleNFTMintingService {
 
  constructor(connection: Connection) {
   // Use direct mainnet RPC instead of passed connection
-  this.connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed")
+  this.connection = new Connection("https://mainnet.helius-rpc.com/?api-key=18fec3d0-97ce-4d0a-8692-9d116157ee54", "confirmed")
   
   this.collectionService = new SimpleCollectionService(this.connection)
   this.usdcService = new EnhancedUSDCService() // Khali chhodo
