@@ -400,29 +400,7 @@ const sendXpToServer = async (xp: number) => {
       }
     };
   }, [jump]);
-  const gameContainer = document.getElementById('game-container');
-  if (gameContainer) {
-    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-  }
-
-  return () => {
-    if (gameContainer) {
-      gameContainer.removeEventListener('touchstart', handleTouchStart);
-    }
-  };
-}, [jump]);
-
-  const gameContainer = document.getElementById('game-container');
-  if (gameContainer) {
-    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-  }
-
-  return () => {
-    if (gameContainer) {
-      gameContainer.removeEventListener('touchstart', handleTouchStart);
-    }
-  };
-}, [jump]);
+ 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
