@@ -105,10 +105,10 @@ export class SimpleNFTMintingService {
 
  constructor(connection: Connection) {
   // Use direct mainnet RPC instead of passed connection
-  this.connection = new Connection("https://wandering-solemn-scion.solana-mainnet.quiknode.pro/1dfef1eef37249801430636b37c4ad6f22c3188d", "confirmed")
+  this.connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed")
   
   this.collectionService = new SimpleCollectionService(this.connection)
-  this.usdcService = new EnhancedUSDCService(this.connection)
+  this.usdcService = new EnhancedUSDCService() // Khali chhodo
   this.usdcMint = new PublicKey(USDC_MINT_ADDRESSES[NFT_CONFIG.network])
   
   this.umi = createUmi(this.connection.rpcEndpoint).use(mplTokenMetadata())
