@@ -14,7 +14,7 @@ export const CURRENT_NETWORK: SolanaNetwork = (process.env.NEXT_PUBLIC_SOLANA_NE
 
 // RPC Endpoints with environment variable support
 export const SOLANA_RPC_ENDPOINTS = {
-  "mainnet-beta": process.env.NEXT_PUBLIC_SOLANA_MAINNET_RPC || "https://api.mainnet-beta.solana.com",
+"mainnet-beta": process.env.NEXT_PUBLIC_SOLANA_MAINNET_RPC || "https://mainnet.helius-rpc.com/?api-key=18fec3d0-97ce-4d0a-8692-9d116157ee54",
   devnet: process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC || "https://api.devnet.solana.com",
   testnet: process.env.NEXT_PUBLIC_SOLANA_TESTNET_RPC || "https://api.testnet.solana.com",
 }
@@ -23,7 +23,7 @@ export const SOLANA_RPC_ENDPOINTS = {
 export const DEFAULT_RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC ||
   process.env.NEXT_PUBLIC_RPC_ENDPOINT ||
-  "https://api.mainnet-beta.solana.com"
+  SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK]
 
 /** EXPLORER CONFIGURATION **/
 export const SOLANA_EXPLORER_URLS = {
