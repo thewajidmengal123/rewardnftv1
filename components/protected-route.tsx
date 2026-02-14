@@ -116,9 +116,9 @@ useEffect(() => {
             Mint Your First NFT
           </Button>
         </div>
-      </div>
-    )
-  }
-
-  return <>{children}</>
-}
+   119 |   </div>
+120 | </div>
+121 | }  // ✅ if (false) close
+122 |
+123 | return <>{children}</>
+124 | }  // component close
