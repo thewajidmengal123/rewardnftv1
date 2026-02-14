@@ -22,15 +22,24 @@ export class EnhancedUSDCService {
   private usdcMintAddress: PublicKey
   private currentNetwork: string
 
-  constructor(connection: Connection) {
-    this.connection = connection
-    this.currentNetwork = CURRENT_NETWORK
-    this.usdcMintAddress = getCurrentUSDCAddress()
-
-    console.log(`Enhanced USDC Service initialized for network: ${this.currentNetwork}`)
-    console.log(`USDC Mint Address: ${this.usdcMintAddress.toString()}`)
+  constructor(connection?: Connection) {  // ? ka matlab optional hai
+  this.currentNetwork = CURRENT_NETWORK
+  this.usdcMintAddress = getCurrentUSDCAddress()
+  
+  // Agar connection diya gaya hai toh use karo, warna config se banao
+  if (connection) {
+    this.connection = connection  // Purana tarika
+    console.log(`Using provided connection`)
+  } else {
+    // Naya tarika - config se lo
+    const rpcUrl = SOLANA_RPC_ENDPOINTS[this.currentNetwork as keyof typeof SOLANA_RPC_ENDPOINTS]
+    this.connection = new Connection(rpcUrl, 'confirmed')
+    console.log(`Using config connection: ${rpcUrl}`)
   }
-
+  
+  console.log(`🌐 Network: ${this.currentNetwork}`)
+  console.log(`💰 USDC: ${this.usdcMintAddress.toString()}`)
+}
 async getUSDCBalance(walletAddress: PublicKey): Promise<number> {
   try {
     console.log("🔍 DEBUG: Starting USDC balance check...")
