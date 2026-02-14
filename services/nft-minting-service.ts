@@ -8,7 +8,7 @@ import {
   getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token"
 import { NFT_MINT_COST_USDC } from "@/config/solana"
-import { USDCService } from "./usdc-service"
+import { EnhancedUSDCService } from "./enhanced-usdc-service"
 import { enhancedRPCService } from "@/services/enhanced-rpc-service"
 
 export interface MintResult {
@@ -20,13 +20,13 @@ export interface MintResult {
 
 export class NFTMintingService {
   private connection: Connection
-  private usdcService: USDCService
+  private usdcService: EnhancedUSDCService
   private mintedWallets: Set<string> = new Set()
 
   constructor(connection?: Connection) {
     // Use provided connection or get from RPC service
     this.connection = connection || enhancedRPCService.getConnection()
-    this.usdcService = new USDCService(this.connection)
+    this.usdcService = new EnhancedUSDCService()
     this.loadMintedWallets()
   }
 
