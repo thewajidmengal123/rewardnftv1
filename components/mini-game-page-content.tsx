@@ -401,12 +401,7 @@ const sendXpToServer = async (xp: number) => {
     };
   }, [jump]);
  
-   // Keyboard controls
-useEffect(() => {
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, [jump]);
-
+  
   // Draw background
   useEffect(() => {
     const canvas = canvasRef.current;
