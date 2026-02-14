@@ -40,13 +40,11 @@ interface Particle {
   color: string;
 }
 
-// Fixed Game Dimensions - Desktop size always
-const GAME_WIDTH = 1000;
-const GAME_HEIGHT = 500;
-const GROUND_Y = 380;
-const RUNNER_WIDTH = 90;
-const RUNNER_HEIGHT = 100;
-const RUNNER_X = 180;
+// Game Dimensions - Fixed for desktop, responsive for mobile
+const DESKTOP_WIDTH = 1000;
+const DESKTOP_HEIGHT = 500;
+const MOBILE_WIDTH = 375;  // iPhone width
+const MOBILE_HEIGHT = 200; // Proportional height
 
 // Game Constants
 const GRAVITY = 0.8;
@@ -58,39 +56,45 @@ const SPEED_INCREMENT = 0.002;
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+  const [gameWidth, setGameWidth] = useState(DESKTOP_WIDTH);
+  const [gameHeight, setGameHeight] = useState(DESKTOP_HEIGHT);
 
-  // Calculate scale based on container width
+  // Calculate game dimensions based on screen
   useEffect(() => {
-    const calculateScale = () => {
-      if (!containerRef.current) return;
+    const updateDimensions = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
       
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = window.innerHeight * 0.6; // Max 60% of viewport height
-      
-      // Calculate scale to fit container while maintaining aspect ratio
-      const scaleX = containerWidth / GAME_WIDTH;
-      const scaleY = containerHeight / GAME_HEIGHT;
-      
-      // Use the smaller scale to ensure game fits both width and height
-      const newScale = Math.min(scaleX, scaleY, 1); // Max scale 1 (no upscaling)
-      
-      setScale(newScale);
-      setIsMobile(window.innerWidth < 768);
+      if (mobile) {
+        // Mobile: Use full container width
+        const containerWidth = containerRef.current?.clientWidth || window.innerWidth - 32;
+        setGameWidth(containerWidth);
+        setGameHeight((containerWidth / DESKTOP_WIDTH) * DESKTOP_HEIGHT);
+      } else {
+        // Desktop: Fixed size
+        setGameWidth(DESKTOP_WIDTH);
+        setGameHeight(DESKTOP_HEIGHT);
+      }
     };
 
-    calculateScale();
-    window.addEventListener('resize', calculateScale);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
     
-    // Recalculate after a short delay to ensure container is rendered
-    const timer = setTimeout(calculateScale, 100);
+    const timer = setTimeout(updateDimensions, 100);
     
     return () => {
-      window.removeEventListener('resize', calculateScale);
+      window.removeEventListener('resize', updateDimensions);
       clearTimeout(timer);
     };
   }, []);
+
+  // Responsive constants based on game width
+  const scale = gameWidth / DESKTOP_WIDTH;
+  const GROUND_Y = isMobile ? 320 * scale : 380;
+  const RUNNER_WIDTH = 90 * scale;
+  const RUNNER_HEIGHT = 100 * scale;
+  const RUNNER_X = 180 * scale;
 
   // Game State
   const [gameState, setGameState] = useState<GameState>({
@@ -111,25 +115,23 @@ export default function MiniGamePageContent() {
   // Obstacles
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const obstacleIdRef = useRef(0);
-  const lastObstacleXRef = useRef(GAME_WIDTH);
+  const lastObstacleXRef = useRef(gameWidth);
 
   // Particles
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
 
-  // XP System (Same as original)
+  // XP System
   const [xpEarned, setXpEarned] = useState(0);
   const [totalXp, setTotalXp] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
-
-  // Timer for quest
   const [gameTime, setGameTime] = useState(0);
 
-  // Canvas ref for background
+  // Canvas ref
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameLoopRef = useRef<number>();
 
-  // Load high score from localStorage
+  // Load saved data
   useEffect(() => {
     const saved = localStorage.getItem('runnerHighScore');
     if (saved) {
@@ -141,12 +143,12 @@ export default function MiniGamePageContent() {
     }
   }, []);
 
-  // Update runner position when game resets
+  // Update runner position when dimensions change
   useEffect(() => {
     if (!gameState.isPlaying) {
       setRunnerY(GROUND_Y - RUNNER_HEIGHT);
     }
-  }, [gameState.isPlaying]);
+  }, [GROUND_Y, RUNNER_HEIGHT, gameState.isPlaying]);
 
   // Jump function
   const jump = useCallback(() => {
@@ -158,7 +160,7 @@ export default function MiniGamePageContent() {
     }
   }, [gameState.isPlaying, gameState.isGameOver, isJumping]);
 
-  // Create jump particles
+  // Create particles
   const createJumpParticles = () => {
     const newParticles: Particle[] = [];
     for (let i = 0; i < 8; i++) {
@@ -175,7 +177,6 @@ export default function MiniGamePageContent() {
     setParticles(prev => [...prev, ...newParticles]);
   };
 
-  // Create collision particles
   const createCollisionParticles = (x: number, y: number) => {
     const newParticles: Particle[] = [];
     for (let i = 0; i < 15; i++) {
@@ -197,19 +198,19 @@ export default function MiniGamePageContent() {
     const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
     const type = types[Math.floor(Math.random() * types.length)];
     
-    const obstacleY = GROUND_Y - (type === 'spike' ? 35 : type === 'cactus' ? 60 : 50);
+    const obstacleY = GROUND_Y - (type === 'spike' ? 35 * scale : type === 'cactus' ? 60 * scale : 50 * scale);
     
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
-      x: GAME_WIDTH + Math.random() * 200,
+      x: gameWidth + Math.random() * 200 * scale,
       y: obstacleY,
-      width: type === 'cactus' ? 35 : type === 'rock' ? 40 : 45,
-      height: type === 'cactus' ? 60 : type === 'rock' ? 50 : 35,
+      width: (type === 'cactus' ? 35 : type === 'rock' ? 40 : 45) * scale,
+      height: (type === 'cactus' ? 60 : type === 'rock' ? 50 : 35) * scale,
       type,
     };
     
     setObstacles(prev => [...prev, obstacle]);
-  }, []);
+  }, [gameWidth, GROUND_Y, scale]);
 
   // Start game
   const startGame = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
@@ -233,8 +234,8 @@ export default function MiniGamePageContent() {
     setParticles([]);
     setGameTime(0);
     obstacleIdRef.current = 0;
-    lastObstacleXRef.current = GAME_WIDTH;
-  }, [gameState.highScore]);
+    lastObstacleXRef.current = gameWidth;
+  }, [gameState.highScore, GROUND_Y, RUNNER_HEIGHT, gameWidth]);
 
   // Game over
   const gameOver = useCallback(() => {
@@ -256,7 +257,7 @@ export default function MiniGamePageContent() {
     sendXpToServer(earnedXp);
   }, [gameState.score, gameState.highScore, totalXp, publicKey]);
 
-  // Send XP to server
+  // Send XP
   const sendXpToServer = async (xp: number) => {
     try {
       if (!publicKey) {
@@ -282,8 +283,6 @@ export default function MiniGamePageContent() {
       const data = await response.json();
       if (data.success) {
         console.log('✅ XP awarded:', data.data);
-      } else {
-        console.error('❌ Failed to award XP:', data.error);
       }
     } catch (error) {
       console.error('Failed to send XP:', error);
@@ -293,18 +292,18 @@ export default function MiniGamePageContent() {
   // Collision detection
   const checkCollision = useCallback(() => {
     const runnerRect = {
-      x: RUNNER_X + 10,
-      y: runnerY + 10,
-      width: RUNNER_WIDTH - 20,
-      height: RUNNER_HEIGHT - 20,
+      x: RUNNER_X + 10 * scale,
+      y: runnerY + 10 * scale,
+      width: RUNNER_WIDTH - 20 * scale,
+      height: RUNNER_HEIGHT - 20 * scale,
     };
 
     for (const obstacle of obstacles) {
       const obstacleRect = {
-        x: obstacle.x + 5,
-        y: obstacle.y + 5,
-        width: obstacle.width - 10,
-        height: obstacle.height - 10,
+        x: obstacle.x + 5 * scale,
+        y: obstacle.y + 5 * scale,
+        width: obstacle.width - 10 * scale,
+        height: obstacle.height - 10 * scale,
       };
 
       if (
@@ -319,7 +318,7 @@ export default function MiniGamePageContent() {
       }
     }
     return false;
-  }, [obstacles, runnerY, gameOver]);
+  }, [obstacles, runnerY, gameOver, RUNNER_X, RUNNER_WIDTH, RUNNER_HEIGHT, scale]);
 
   // Game loop
   useEffect(() => {
@@ -348,17 +347,17 @@ export default function MiniGamePageContent() {
           .filter(obs => obs.x > -100);
         
         const lastObs = newObstacles[newObstacles.length - 1];
-        const minGap = 250 + Math.random() * 200;
-        if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
+        const minGap = (250 + Math.random() * 200) * scale;
+        if (!lastObs || lastObs.x < gameWidth - minGap) {
           if (Math.random() < 0.02 + gameState.speed * 0.001) {
             const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
             const type = types[Math.floor(Math.random() * types.length)];
             newObstacles.push({
               id: obstacleIdRef.current++,
-              x: GAME_WIDTH + Math.random() * 100,
-              y: type === 'spike' ? GROUND_Y - 35 : GROUND_Y - 50,
-              width: type === 'cactus' ? 35 : type === 'rock' ? 40 : 45,
-              height: type === 'cactus' ? 60 : type === 'rock' ? 50 : 35,
+              x: gameWidth + Math.random() * 100 * scale,
+              y: type === 'spike' ? GROUND_Y - 35 * scale : GROUND_Y - 50 * scale,
+              width: (type === 'cactus' ? 35 : type === 'rock' ? 40 : 45) * scale,
+              height: (type === 'cactus' ? 60 : type === 'rock' ? 50 : 35) * scale,
               type,
             });
           }
@@ -388,7 +387,7 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision]);
+  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, GROUND_Y, RUNNER_HEIGHT, gameWidth, scale, MAX_SPEED, SPEED_INCREMENT]);
 
   // Keyboard controls
   useEffect(() => {
@@ -403,7 +402,7 @@ export default function MiniGamePageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch controls for mobile
+  // Touch controls
   useEffect(() => {
     const gameContainer = document.getElementById('game-container');
     if (!gameContainer) return;
@@ -434,47 +433,56 @@ export default function MiniGamePageContent() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+    // Clear
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+    // Gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, gameHeight);
     gradient.addColorStop(0, '#0f0f1a');
     gradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.fillRect(0, 0, gameWidth, gameHeight);
 
+    // Stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 50; i++) {
-      const x = (i * 73 + gameState.distance * 0.1) % GAME_WIDTH;
-      const y = (i * 37) % (GAME_HEIGHT / 2);
-      const size = (i % 3) + 1;
+      const x = (i * 73 + gameState.distance * 0.1) % gameWidth;
+      const y = (i * 37) % (gameHeight / 2);
+      const size = Math.max(1, (i % 3) + 1 * scale);
       ctx.globalAlpha = 0.3 + (i % 5) * 0.1;
       ctx.fillRect(x, y, size, size);
     }
     ctx.globalAlpha = 1;
 
-    const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
+    // Ground
+    const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, gameHeight);
     groundGradient.addColorStop(0, '#2d2d44');
     groundGradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = groundGradient;
-    ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+    ctx.fillRect(0, GROUND_Y, gameWidth, gameHeight - GROUND_Y);
 
+    // Ground line
     ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, GROUND_Y);
-    ctx.lineTo(GAME_WIDTH, GROUND_Y);
+    ctx.lineTo(gameWidth, GROUND_Y);
     ctx.stroke();
 
+    // Moving ground details
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 1;
     for (let i = 0; i < 10; i++) {
-      const x = ((i * 100 - gameState.distance) % (GAME_WIDTH + 100)) - 50;
+      const x = ((i * 100 - gameState.distance) % (gameWidth + 100)) - 50;
       ctx.beginPath();
-      ctx.moveTo(x, GROUND_Y + 10);
-      ctx.lineTo(x + 30, GROUND_Y + 10);
+      ctx.moveTo(x, GROUND_Y + 10 * scale);
+      ctx.lineTo(x + 30 * scale, GROUND_Y + 10 * scale);
       ctx.stroke();
     }
-  }, [gameState.distance]);
+  }, [gameState.distance, gameWidth, gameHeight, GROUND_Y, scale]);
 
-  // Render obstacle based on type
+  // Render obstacle
   const renderObstacle = (obstacle: Obstacle) => {
     const baseClasses = "absolute transition-none";
     
@@ -492,9 +500,9 @@ export default function MiniGamePageContent() {
             }}
           >
             <div className="relative w-full h-full">
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-full bg-gradient-to-t from-green-600 to-green-400 rounded-full" />
-              <div className="absolute bottom-4 -left-1 w-2 h-4 bg-gradient-to-r from-green-600 to-green-400 rounded-full rotate-[-30deg]" />
-              <div className="absolute bottom-6 -right-1 w-2 h-4 bg-gradient-to-l from-green-600 to-green-400 rounded-full rotate-[30deg]" />
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-full bg-gradient-to-t from-green-600 to-green-400 rounded-full" style={{ width: 12 * scale }} />
+              <div className="absolute bottom-4 bg-gradient-to-r from-green-600 to-green-400 rounded-full rotate-[-30deg]" style={{ left: -4 * scale, width: 8 * scale, height: 16 * scale }} />
+              <div className="absolute bottom-6 bg-gradient-to-l from-green-600 to-green-400 rounded-full rotate-[30deg]" style={{ right: -4 * scale, width: 8 * scale, height: 16 * scale }} />
             </div>
           </div>
         );
@@ -525,12 +533,17 @@ export default function MiniGamePageContent() {
               height: obstacle.height,
             }}
           >
-            <div className="w-full h-full relative">
+            <div className="w-full h-full relative flex items-end justify-center gap-0.5">
               {[0, 1, 2].map(i => (
                 <div
                   key={i}
-                  className="absolute bottom-0 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[30px] border-l-transparent border-r-transparent border-b-red-500"
-                  style={{ left: i * 12 + 4 }}
+                  className="w-0 h-0 border-l-transparent border-r-transparent border-b-red-500"
+                  style={{ 
+                    borderLeftWidth: 6 * scale,
+                    borderRightWidth: 6 * scale,
+                    borderBottomWidth: 30 * scale,
+                    marginLeft: i * 2 * scale
+                  }}
                 />
               ))}
             </div>
@@ -586,14 +599,15 @@ export default function MiniGamePageContent() {
           <div className="lg:col-span-2">
             <Card className="bg-gray-900/50 border-gray-800 overflow-hidden">
               <CardContent className="p-0">
-                {/* Game Container - Responsive scaling */}
+                {/* Game Container - Full width on mobile, fixed on desktop */}
                 <div 
                   ref={containerRef}
                   id="game-container"
-                  className="relative w-full flex items-center justify-center bg-black/40"
+                  className="relative w-full cursor-pointer select-none touch-manipulation bg-black/40 flex items-center justify-center"
                   style={{ 
-                    minHeight: isMobile ? '300px' : '500px',
-                    overflow: 'hidden'
+                    height: isMobile ? gameHeight : DESKTOP_HEIGHT,
+                    minHeight: isMobile ? 200 : 500,
+                    maxHeight: isMobile ? 300 : 600
                   }}
                   onClick={() => {
                     if (!gameState.isPlaying && !gameState.isGameOver) {
@@ -603,21 +617,19 @@ export default function MiniGamePageContent() {
                     }
                   }}
                 >
-                  {/* Scaled Game Wrapper */}
+                  {/* Game Canvas Wrapper */}
                   <div 
                     className="relative"
                     style={{
-                      width: GAME_WIDTH,
-                      height: GAME_HEIGHT,
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'center center',
+                      width: gameWidth,
+                      height: gameHeight,
                     }}
                   >
                     {/* Background Canvas */}
                     <canvas
                       ref={canvasRef}
-                      width={GAME_WIDTH}
-                      height={GAME_HEIGHT}
+                      width={gameWidth}
+                      height={gameHeight}
                       className="absolute inset-0"
                     />
 
@@ -635,7 +647,7 @@ export default function MiniGamePageContent() {
                             height: RUNNER_HEIGHT,
                             zIndex: 10,
                           }}
-                          animate={!isJumping ? { y: [0, -3, 0] } : {}}
+                          animate={!isJumping ? { y: [0, -3 * scale, 0] } : {}}
                           transition={{ repeat: Infinity, duration: 0.3 }}
                         >
                           <img 
@@ -657,10 +669,12 @@ export default function MiniGamePageContent() {
                       {particles.map(particle => (
                         <div
                           key={particle.id}
-                          className="absolute w-2 h-2 rounded-full"
+                          className="absolute rounded-full"
                           style={{
                             left: particle.x,
                             top: particle.y,
+                            width: 8 * scale,
+                            height: 8 * scale,
                             backgroundColor: particle.color,
                             opacity: particle.life / 40,
                           }}
@@ -674,15 +688,15 @@ export default function MiniGamePageContent() {
                             <motion.div
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
-                              className="text-6xl mb-4"
+                              className="text-5xl md:text-6xl mb-4"
                             >
                               🏃
                             </motion.div>
-                            <h2 className="text-3xl font-bold mb-2">Ready to Run?</h2>
-                            <p className="text-gray-400 mb-6">Jump over obstacles and earn XP!</p>
+                            <h2 className="text-2xl md:text-3xl font-bold mb-2">Ready to Run?</h2>
+                            <p className="text-gray-400 mb-6 text-sm md:text-base">Jump over obstacles and earn XP!</p>
                             <Button
                               onClick={(e) => startGame(e)}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 md:px-8 py-4 md:py-6 text-base md:text-lg"
                             >
                               <Play className="w-5 h-5 mr-2" />
                               Start Game
@@ -699,15 +713,15 @@ export default function MiniGamePageContent() {
                             animate={{ scale: 1, opacity: 1 }}
                             className="text-center"
                           >
-                            <div className="text-6xl mb-4">💥</div>
-                            <h2 className="text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
-                            <p className="text-2xl text-white mb-2">Score: {gameState.score}</p>
+                            <div className="text-5xl md:text-6xl mb-4">💥</div>
+                            <h2 className="text-3xl md:text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
+                            <p className="text-xl md:text-2xl text-white mb-2">Score: {gameState.score}</p>
                             {gameState.score > gameState.highScore && (
                               <p className="text-yellow-400 mb-4">🎉 New High Score!</p>
                             )}
                             <Button
                               onClick={(e) => startGame(e)}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 md:px-8 py-4 md:py-6 text-base md:text-lg"
                             >
                               <RotateCcw className="w-5 h-5 mr-2" />
                               Play Again
@@ -719,14 +733,14 @@ export default function MiniGamePageContent() {
 
                     {/* Score Overlay */}
                     {gameState.isPlaying && (
-                      <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
-                          <div className="text-sm text-gray-400">Score</div>
-                          <div className="text-2xl font-bold text-white">{gameState.score}</div>
+                      <div className="absolute top-2 md:top-4 left-2 md:left-4 right-2 md:right-4 flex justify-between items-start pointer-events-none">
+                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 md:px-4 md:py-2">
+                          <div className="text-xs md:text-sm text-gray-400">Score</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{gameState.score}</div>
                         </div>
-                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
-                          <div className="text-sm text-gray-400">Speed</div>
-                          <div className="text-2xl font-bold text-purple-400">
+                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 md:px-4 md:py-2">
+                          <div className="text-xs md:text-sm text-gray-400">Speed</div>
+                          <div className="text-lg md:text-2xl font-bold text-purple-400">
                             {gameState.speed.toFixed(1)}x
                           </div>
                         </div>
@@ -740,9 +754,9 @@ export default function MiniGamePageContent() {
             {/* Controls Hint */}
             <div className="mt-4 flex justify-center gap-4">
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg text-sm md:text-base">
-                <span className="px-2 py-1 bg-gray-700 rounded">SPACE</span>
+                <span className="px-2 py-1 bg-gray-700 rounded text-xs md:text-sm">SPACE</span>
                 <span className="text-gray-400">or</span>
-                <span className="px-2 py-1 bg-gray-700 rounded">CLICK</span>
+                <span className="px-2 py-1 bg-gray-700 rounded text-xs md:text-sm">CLICK</span>
                 <span className="text-gray-400">to Jump</span>
               </div>
             </div>
