@@ -60,8 +60,7 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
 useEffect(() => {
   // NFT check removed - all pages public
   setIsLoading(false)
-}, [])  // ✅ Empty array - sirf ek baar chalega
-
+}, [])  // Empty dependency array
   if (!connected) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
