@@ -40,47 +40,57 @@ interface Particle {
   color: string;
 }
 
+// Fixed Game Dimensions - Desktop size always
+const GAME_WIDTH = 1000;
+const GAME_HEIGHT = 500;
+const GROUND_Y = 380;
+const RUNNER_WIDTH = 90;
+const RUNNER_HEIGHT = 100;
+const RUNNER_X = 180;
+
+// Game Constants
+const GRAVITY = 0.8;
+const JUMP_FORCE = -15;
+const BASE_SPEED = 5;
+const MAX_SPEED = 15;
+const SPEED_INCREMENT = 0.002;
+
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet();
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Responsive dimensions - Fixed
-  const [dimensions, setDimensions] = useState({ 
-    width: typeof window !== 'undefined' && window.innerWidth < 768 ? 800 : 1000, 
-    height: typeof window !== 'undefined' && window.innerWidth < 768 ? 400 : 500, 
-    isMobile: false 
-  });
-  
+  const [scale, setScale] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Calculate scale based on container width
   useEffect(() => {
-    const updateDimensions = () => {
-      const isMobile = window.innerWidth < 768;
-      setDimensions({
-        width: isMobile ? 800 : 1000,
-        height: isMobile ? 400 : 500,
-        isMobile
-      });
+    const calculateScale = () => {
+      if (!containerRef.current) return;
+      
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = window.innerHeight * 0.6; // Max 60% of viewport height
+      
+      // Calculate scale to fit container while maintaining aspect ratio
+      const scaleX = containerWidth / GAME_WIDTH;
+      const scaleY = containerHeight / GAME_HEIGHT;
+      
+      // Use the smaller scale to ensure game fits both width and height
+      const newScale = Math.min(scaleX, scaleY, 1); // Max scale 1 (no upscaling)
+      
+      setScale(newScale);
+      setIsMobile(window.innerWidth < 768);
     };
+
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
     
-    // Initial check
-    updateDimensions();
+    // Recalculate after a short delay to ensure container is rendered
+    const timer = setTimeout(calculateScale, 100);
     
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    return () => {
+      window.removeEventListener('resize', calculateScale);
+      clearTimeout(timer);
+    };
   }, []);
-
-  const GAME_WIDTH = dimensions.width;
-  const GAME_HEIGHT = dimensions.height;
-  const GROUND_Y = dimensions.isMobile ? 320 : 380;
-  const RUNNER_WIDTH = dimensions.isMobile ? 70 : 90;
-  const RUNNER_HEIGHT = dimensions.isMobile ? 80 : 100;
-  const RUNNER_X = dimensions.isMobile ? 120 : 180;
-
-  // Game Constants
-  const GRAVITY = 0.8;
-  const JUMP_FORCE = -15;
-  const BASE_SPEED = 5;
-  const MAX_SPEED = 15;
-  const SPEED_INCREMENT = 0.002;
 
   // Game State
   const [gameState, setGameState] = useState<GameState>({
@@ -131,12 +141,12 @@ export default function MiniGamePageContent() {
     }
   }, []);
 
-  // Update runner position when dimensions change
+  // Update runner position when game resets
   useEffect(() => {
     if (!gameState.isPlaying) {
       setRunnerY(GROUND_Y - RUNNER_HEIGHT);
     }
-  }, [GROUND_Y, RUNNER_HEIGHT, gameState.isPlaying]);
+  }, [gameState.isPlaying]);
 
   // Jump function
   const jump = useCallback(() => {
@@ -199,11 +209,10 @@ export default function MiniGamePageContent() {
     };
     
     setObstacles(prev => [...prev, obstacle]);
-  }, [GAME_WIDTH, GROUND_Y]);
+  }, []);
 
-  // Start game - Fixed for mobile
+  // Start game
   const startGame = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
-    // Prevent default only if event exists
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -225,13 +234,12 @@ export default function MiniGamePageContent() {
     setGameTime(0);
     obstacleIdRef.current = 0;
     lastObstacleXRef.current = GAME_WIDTH;
-  }, [gameState.highScore, BASE_SPEED, GROUND_Y, RUNNER_HEIGHT, GAME_WIDTH]);
+  }, [gameState.highScore]);
 
   // Game over
   const gameOver = useCallback(() => {
     setGameState(prev => ({ ...prev, isPlaying: false, isGameOver: true }));
     
-    // Calculate XP (1 point = 1 XP, max 250 XP per game)
     const earnedXp = Math.min(gameState.score, 250);
     setXpEarned(earnedXp);
     
@@ -239,20 +247,16 @@ export default function MiniGamePageContent() {
     setTotalXp(newTotalXp);
     localStorage.setItem('runnerTotalXp', newTotalXp.toString());
     
-    // Update high score
     if (gameState.score > gameState.highScore) {
       setGameState(prev => ({ ...prev, highScore: gameState.score }));
       localStorage.setItem('runnerHighScore', gameState.score.toString());
     }
 
-    // Show XP popup
     setShowXpPopup(true);
-
-    // Send XP to server (same API as your existing game)
     sendXpToServer(earnedXp);
   }, [gameState.score, gameState.highScore, totalXp, publicKey]);
 
-  // Send XP to server (integrates with your existing system)
+  // Send XP to server
   const sendXpToServer = async (xp: number) => {
     try {
       if (!publicKey) {
@@ -315,14 +319,13 @@ export default function MiniGamePageContent() {
       }
     }
     return false;
-  }, [obstacles, runnerY, gameOver, RUNNER_X, RUNNER_WIDTH, RUNNER_HEIGHT]);
+  }, [obstacles, runnerY, gameOver]);
 
   // Game loop
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
     const gameLoop = () => {
-      // Update runner physics
       setRunnerY(prev => {
         let newY = prev + runnerVy;
         let newVy = runnerVy + GRAVITY;
@@ -337,16 +340,13 @@ export default function MiniGamePageContent() {
         return newY;
       });
 
-      // Update runner animation frame
       setRunnerFrame(prev => (prev + 1) % 8);
 
-      // Update obstacles
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed }))
           .filter(obs => obs.x > -100);
         
-        // Spawn new obstacle
         const lastObs = newObstacles[newObstacles.length - 1];
         const minGap = 250 + Math.random() * 200;
         if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
@@ -367,14 +367,12 @@ export default function MiniGamePageContent() {
         return newObstacles;
       });
 
-      // Update particles
       setParticles(prev => 
         prev
           .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 1 }))
           .filter(p => p.life > 0)
       );
 
-      // Update score and speed
       setGameState(prev => ({
         ...prev,
         score: prev.score + 1,
@@ -382,10 +380,7 @@ export default function MiniGamePageContent() {
         speed: Math.min(MAX_SPEED, prev.speed + SPEED_INCREMENT),
       }));
 
-      // Update game time
       setGameTime(prev => prev + 1/60);
-
-      // Check collision
       checkCollision();
     };
 
@@ -393,7 +388,7 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, GROUND_Y, RUNNER_HEIGHT, GAME_WIDTH, MAX_SPEED, SPEED_INCREMENT]);
+  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision]);
 
   // Keyboard controls
   useEffect(() => {
@@ -408,7 +403,7 @@ export default function MiniGamePageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch controls for mobile - Fixed
+  // Touch controls for mobile
   useEffect(() => {
     const gameContainer = document.getElementById('game-container');
     if (!gameContainer) return;
@@ -417,7 +412,6 @@ export default function MiniGamePageContent() {
       e.preventDefault();
       e.stopPropagation();
       
-      // If game is not playing, start it
       if (!gameState.isPlaying && !gameState.isGameOver) {
         startGame();
       } else if (gameState.isPlaying && !gameState.isGameOver) {
@@ -440,14 +434,12 @@ export default function MiniGamePageContent() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Draw gradient background
     const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
     gradient.addColorStop(0, '#0f0f1a');
     gradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Draw stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 50; i++) {
       const x = (i * 73 + gameState.distance * 0.1) % GAME_WIDTH;
@@ -458,14 +450,12 @@ export default function MiniGamePageContent() {
     }
     ctx.globalAlpha = 1;
 
-    // Draw ground
     const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
     groundGradient.addColorStop(0, '#2d2d44');
     groundGradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = groundGradient;
     ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
 
-    // Draw ground line
     ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -473,7 +463,6 @@ export default function MiniGamePageContent() {
     ctx.lineTo(GAME_WIDTH, GROUND_Y);
     ctx.stroke();
 
-    // Draw moving ground details
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 1;
     for (let i = 0; i < 10; i++) {
@@ -483,7 +472,7 @@ export default function MiniGamePageContent() {
       ctx.lineTo(x + 30, GROUND_Y + 10);
       ctx.stroke();
     }
-  }, [gameState.distance, GAME_WIDTH, GAME_HEIGHT, GROUND_Y]);
+  }, [gameState.distance]);
 
   // Render obstacle based on type
   const renderObstacle = (obstacle: Obstacle) => {
@@ -555,11 +544,11 @@ export default function MiniGamePageContent() {
       {/* Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-pink-600/20" />
-        <div className="relative max-w-6xl mx-auto px-4 py-12 text-center">
+        <div className="relative max-w-6xl mx-auto px-4 py-8 md:py-12 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/30 mb-6"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/30 mb-4 md:mb-6"
           >
             <Zap className="w-4 h-4 text-purple-400" />
             <span className="text-sm text-purple-300">Endless Runner Challenge</span>
@@ -569,7 +558,7 @@ export default function MiniGamePageContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl md:text-6xl font-bold mb-4"
+            className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4"
           >
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
               Neon Runner
@@ -580,31 +569,31 @@ export default function MiniGamePageContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-gray-400 max-w-2xl mx-auto"
+            className="text-gray-400 max-w-2xl mx-auto text-sm md:text-base px-4"
           >
             Jump over obstacles and survive as long as possible! Earn XP based on your score.
-            <br />
+            <br className="hidden md:block" />
             <span className="text-purple-400">Press SPACE or CLICK to jump</span>
           </motion.p>
         </div>
       </div>
 
       {/* Game Container */}
-      <div className="max-w-7xl mx-auto px-4 pb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-7xl mx-auto px-4 pb-8 md:pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          
           {/* Game Area */}
           <div className="lg:col-span-2">
             <Card className="bg-gray-900/50 border-gray-800 overflow-hidden">
               <CardContent className="p-0">
-                {/* Game Canvas Container - Fixed sizing */}
+                {/* Game Container - Responsive scaling */}
                 <div 
                   ref={containerRef}
                   id="game-container"
-                  className="relative w-full cursor-pointer select-none"
+                  className="relative w-full flex items-center justify-center bg-black/40"
                   style={{ 
-                    height: dimensions.isMobile ? '300px' : '500px',
-                    maxWidth: dimensions.isMobile ? '100%' : '1000px',
-                    margin: '0 auto'
+                    minHeight: isMobile ? '300px' : '500px',
+                    overflow: 'hidden'
                   }}
                   onClick={() => {
                     if (!gameState.isPlaying && !gameState.isGameOver) {
@@ -614,141 +603,146 @@ export default function MiniGamePageContent() {
                     }
                   }}
                 >
-                  {/* Background Canvas */}
-                  <canvas
-                    ref={canvasRef}
-                    width={GAME_WIDTH}
-                    height={GAME_HEIGHT}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    style={{ 
-                      width: '100%', 
-                      height: '100%',
-                      imageRendering: 'pixelated'
+                  {/* Scaled Game Wrapper */}
+                  <div 
+                    className="relative"
+                    style={{
+                      width: GAME_WIDTH,
+                      height: GAME_HEIGHT,
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'center center',
                     }}
-                  />
+                  >
+                    {/* Background Canvas */}
+                    <canvas
+                      ref={canvasRef}
+                      width={GAME_WIDTH}
+                      height={GAME_HEIGHT}
+                      className="absolute inset-0"
+                    />
 
-                  {/* Game Elements - Scale based on container */}
-                  <div className="absolute inset-0" style={{ 
-                    transform: `scale(${dimensions.isMobile ? 1 : 1})`,
-                    transformOrigin: 'top left'
-                  }}>
-                    {/* Runner Character */}
-                    {gameState.isPlaying && !gameState.isGameOver && (
-                      <motion.div
-                        className="absolute"
-                        style={{
-                          left: RUNNER_X,
-                          top: runnerY,
-                          width: RUNNER_WIDTH,
-                          height: RUNNER_HEIGHT,
-                          zIndex: 10,
-                        }}
-                        animate={!isJumping ? { y: [0, -3, 0] } : {}}
-                        transition={{ repeat: Infinity, duration: 0.3 }}
-                      >
-                        <img 
-                          src="/images/character-jump.png"
-                          alt="Runner"
-                          className="w-full h-full object-contain"
+                    {/* Game Elements */}
+                    <div className="absolute inset-0">
+                      
+                      {/* Runner Character */}
+                      {gameState.isPlaying && !gameState.isGameOver && (
+                        <motion.div
+                          className="absolute"
                           style={{
-                            filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))',
+                            left: RUNNER_X,
+                            top: runnerY,
+                            width: RUNNER_WIDTH,
+                            height: RUNNER_HEIGHT,
+                            zIndex: 10,
+                          }}
+                          animate={!isJumping ? { y: [0, -3, 0] } : {}}
+                          transition={{ repeat: Infinity, duration: 0.3 }}
+                        >
+                          <img 
+                            src="/images/character-jump.png"
+                            alt="Runner"
+                            className="w-full h-full object-contain"
+                            style={{
+                              filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))',
+                            }}
+                            draggable={false}
+                          />
+                        </motion.div>
+                      )}
+                        
+                      {/* Obstacles */}
+                      {obstacles.map(renderObstacle)}
+
+                      {/* Particles */}
+                      {particles.map(particle => (
+                        <div
+                          key={particle.id}
+                          className="absolute w-2 h-2 rounded-full"
+                          style={{
+                            left: particle.x,
+                            top: particle.y,
+                            backgroundColor: particle.color,
+                            opacity: particle.life / 40,
                           }}
                         />
-                      </motion.div>
-                    )}
-                      
-                    {/* Obstacles */}
-                    {obstacles.map(renderObstacle)}
+                      ))}
 
-                    {/* Particles */}
-                    {particles.map(particle => (
-                      <div
-                        key={particle.id}
-                        className="absolute w-2 h-2 rounded-full"
-                        style={{
-                          left: particle.x,
-                          top: particle.y,
-                          backgroundColor: particle.color,
-                          opacity: particle.life / 40,
-                        }}
-                      />
-                    ))}
-
-                    {/* Start Screen */}
-                    {!gameState.isPlaying && !gameState.isGameOver && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/60" style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}>
-                        <div className="text-center">
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="text-6xl mb-4"
-                          >
-                            🏃
-                          </motion.div>
-                          <h2 className="text-3xl font-bold mb-2">Ready to Run?</h2>
-                          <p className="text-gray-400 mb-6">Jump over obstacles and earn XP!</p>
-                          <Button
-                            onClick={(e) => startGame(e)}
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg pointer-events-auto"
-                          >
-                            <Play className="w-5 h-5 mr-2" />
-                            Start Game
-                          </Button>
+                      {/* Start Screen */}
+                      {!gameState.isPlaying && !gameState.isGameOver && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                          <div className="text-center">
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="text-6xl mb-4"
+                            >
+                              🏃
+                            </motion.div>
+                            <h2 className="text-3xl font-bold mb-2">Ready to Run?</h2>
+                            <p className="text-gray-400 mb-6">Jump over obstacles and earn XP!</p>
+                            <Button
+                              onClick={(e) => startGame(e)}
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
+                            >
+                              <Play className="w-5 h-5 mr-2" />
+                              Start Game
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Game Over Screen */}
-                    {gameState.isGameOver && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/80" style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}>
-                        <motion.div
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="text-center"
-                        >
-                          <div className="text-6xl mb-4">💥</div>
-                          <h2 className="text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
-                          <p className="text-2xl text-white mb-2">Score: {gameState.score}</p>
-                          {gameState.score > gameState.highScore && (
-                            <p className="text-yellow-400 mb-4">🎉 New High Score!</p>
-                          )}
-                          <Button
-                            onClick={(e) => startGame(e)}
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg pointer-events-auto"
+                      {/* Game Over Screen */}
+                      {gameState.isGameOver && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                          <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="text-center"
                           >
-                            <RotateCcw className="w-5 h-5 mr-2" />
-                            Play Again
-                          </Button>
-                        </motion.div>
+                            <div className="text-6xl mb-4">💥</div>
+                            <h2 className="text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
+                            <p className="text-2xl text-white mb-2">Score: {gameState.score}</p>
+                            {gameState.score > gameState.highScore && (
+                              <p className="text-yellow-400 mb-4">🎉 New High Score!</p>
+                            )}
+                            <Button
+                              onClick={(e) => startGame(e)}
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
+                            >
+                              <RotateCcw className="w-5 h-5 mr-2" />
+                              Play Again
+                            </Button>
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Score Overlay */}
+                    {gameState.isPlaying && (
+                      <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
+                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
+                          <div className="text-sm text-gray-400">Score</div>
+                          <div className="text-2xl font-bold text-white">{gameState.score}</div>
+                        </div>
+                        <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
+                          <div className="text-sm text-gray-400">Speed</div>
+                          <div className="text-2xl font-bold text-purple-400">
+                            {gameState.speed.toFixed(1)}x
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* Score Overlay */}
-                  {gameState.isPlaying && (
-                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
-                        <div className="text-sm text-gray-400">Score</div>
-                        <div className="text-2xl font-bold text-white">{gameState.score}</div>
-                      </div>
-                      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
-                        <div className="text-sm text-gray-400">Speed</div>
-                        <div className="text-2xl font-bold text-purple-400">
-                          {gameState.speed.toFixed(1)}x
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Controls Hint */}
             <div className="mt-4 flex justify-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg">
-                <span className="px-2 py-1 bg-gray-700 rounded text-sm">SPACE</span>
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg text-sm md:text-base">
+                <span className="px-2 py-1 bg-gray-700 rounded">SPACE</span>
                 <span className="text-gray-400">or</span>
-                <span className="px-2 py-1 bg-gray-700 rounded text-sm">CLICK</span>
+                <span className="px-2 py-1 bg-gray-700 rounded">CLICK</span>
                 <span className="text-gray-400">to Jump</span>
               </div>
             </div>
@@ -758,24 +752,24 @@ export default function MiniGamePageContent() {
           <div className="space-y-4">
             {/* Game Stats */}
             <Card className="bg-gray-900/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-400" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Trophy className="w-4 h-4 md:w-5 md:h-5 text-yellow-400" />
                   Your Stats
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-gray-400">High Score</span>
-                  <span className="text-2xl font-bold text-yellow-400">{gameState.highScore}</span>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center p-2.5 md:p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400 text-sm md:text-base">High Score</span>
+                  <span className="text-xl md:text-2xl font-bold text-yellow-400">{gameState.highScore}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-gray-400">Total XP Earned</span>
-                  <span className="text-2xl font-bold text-purple-400">{totalXp}</span>
+                <div className="flex justify-between items-center p-2.5 md:p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400 text-sm md:text-base">Total XP Earned</span>
+                  <span className="text-xl md:text-2xl font-bold text-purple-400">{totalXp}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-gray-400">Games Played</span>
-                  <span className="text-2xl font-bold text-blue-400">
+                <div className="flex justify-between items-center p-2.5 md:p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400 text-sm md:text-base">Games Played</span>
+                  <span className="text-xl md:text-2xl font-bold text-blue-400">
                     {Math.floor(totalXp / 125)}
                   </span>
                 </div>
@@ -784,14 +778,14 @@ export default function MiniGamePageContent() {
 
             {/* XP Info */}
             <Card className="bg-gray-900/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                   XP Rewards
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-xs md:text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Score 100+</span>
                     <span className="text-green-400">+50 XP</span>
@@ -814,21 +808,21 @@ export default function MiniGamePageContent() {
 
             {/* Quest Target */}
             <Card className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 border-purple-500/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-300">
-                  <Target className="w-5 h-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-purple-300 text-base md:text-lg">
+                  <Target className="w-4 h-4 md:w-5 md:h-5" />
                   Quest Target
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-300 mb-3">Score 500+ points in a single run!</p>
+                <p className="text-gray-300 mb-3 text-sm md:text-base">Score 500+ points in a single run!</p>
                 <div className="w-full bg-gray-800 rounded-full h-2">
                   <div 
                     className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all"
                     style={{ width: `${Math.min(100, (gameState.score / 500) * 100)}%` }}
                   />
                 </div>
-                <p className="text-right text-sm text-gray-400 mt-1">
+                <p className="text-right text-xs md:text-sm text-gray-400 mt-1">
                   {gameState.score} / 500
                 </p>
               </CardContent>
@@ -839,16 +833,16 @@ export default function MiniGamePageContent() {
 
       {/* XP Popup */}
       <Dialog open={showXpPopup} onOpenChange={setShowXpPopup}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
+        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-sm mx-4">
           <DialogHeader>
-            <DialogTitle className="text-center text-2xl">
+            <DialogTitle className="text-center text-xl md:text-2xl">
               🎉 Game Complete!
             </DialogTitle>
           </DialogHeader>
-          <div className="text-center py-6">
-            <div className="text-5xl font-bold text-purple-400 mb-2">+{xpEarned} XP</div>
-            <p className="text-gray-400">Earned from your run!</p>
-            <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
+          <div className="text-center py-4 md:py-6">
+            <div className="text-4xl md:text-5xl font-bold text-purple-400 mb-2">+{xpEarned} XP</div>
+            <p className="text-gray-400 text-sm md:text-base">Earned from your run!</p>
+            <div className="mt-4 md:mt-6 p-3 md:p-4 bg-gray-800/50 rounded-lg">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Final Score</span>
                 <span className="text-white font-bold">{gameState.score}</span>
@@ -860,7 +854,7 @@ export default function MiniGamePageContent() {
             </div>
             <Button
               onClick={() => setShowXpPopup(false)}
-              className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600"
+              className="mt-4 md:mt-6 bg-gradient-to-r from-purple-600 to-pink-600 w-full"
             >
               Awesome!
             </Button>
