@@ -401,9 +401,11 @@ const sendXpToServer = async (xp: number) => {
     };
   }, [jump]);
  
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [jump]);
+   // Keyboard controls
+useEffect(() => {
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [jump]);
 
   // Draw background
   useEffect(() => {
