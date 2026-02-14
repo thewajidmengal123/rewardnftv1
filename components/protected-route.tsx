@@ -57,10 +57,8 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
       }
     }
 
-    if (connected && requiresNFT) {
-      checkNFTOwnership()
-    } else {
-      setIsLoading(false)
+// NFT check removed - all pages public
+setIsLoading(false)
     }
   }, [connected, publicKey, requiresNFT])
 
@@ -85,7 +83,7 @@ export function ProtectedRoute({ children, requiresNFT = false }: ProtectedRoute
     )
   }
 
-  if (requiresNFT && !hasNFT) {
+ if (false) {  // ✅ Block screen kabhi show nahi hoga {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center p-4">
         <div className="max-w-lg w-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-8 rounded-2xl shadow-2xl text-center">
