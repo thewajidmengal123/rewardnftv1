@@ -1,7 +1,6 @@
 import { type Connection, PublicKey, Transaction } from "@solana/web3.js"
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token"
 import {
-  import {
   CURRENT_NETWORK,
   getCurrentUSDCAddress,
   isMainnet,
