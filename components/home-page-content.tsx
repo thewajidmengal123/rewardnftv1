@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { usePlatformStats } from "@/hooks/use-platform-stats"
+import { motion } from "framer-motion"
 import {
   FadeIn,
   SlideUp,
@@ -21,99 +22,139 @@ export function HomePageContent() {
   const { stats, loading: statsLoading } = usePlatformStats()
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* <Header /> */}
-
+    <div className="min-h-screen flex flex-col bg-[#020203]">
       {/* Hero Section */}
       <FadeIn>
-        <section className="relative pt-20 pb-32 px-6 flex-1 flex items-center">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-600/10 via-cyan-600/10 to-slate-600/10 z-0" />
-            {/* Enhanced animated gradient orbs */}
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 rounded-full blur-3xl animate-gradient-x bg-400%" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-cyan-500/20 via-teal-500/20 to-purple-500/20 rounded-full blur-3xl animate-gradient-x bg-400%" />
-            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-gradient-to-r from-pink-500/15 via-red-500/15 to-orange-500/15 rounded-full blur-2xl animate-gradient-x bg-400%" />
+        <section className="relative min-h-screen flex items-center px-6 lg:px-16 pt-24 pb-16 overflow-hidden">
+          {/* Background */}
+          <div className="absolute inset-0">
+            <div className="absolute top-1/3 left-1/4 w-[800px] h-[800px] bg-teal-500/10 rounded-full blur-[150px]" />
+            <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" />
           </div>
 
-          <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+          <div className="max-w-[1400px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative z-10">
+            
+            {/* Left Content - MASSIVE TEXT like reference */}
             <SlideInLeft delay={0.2}>
-              <div className="space-y-8">
-                <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-                  <span className="relative inline-block">
-                    <span className="bg-gradient-to-r from-yellow-300 via-orange-400 via-yellow-400 to-orange-500 bg-clip-text text-transparent animate-gradient-x bg-400% font-black">
-                      Mint Your
-                    </span>
-                    {/* Glow effect */}
-                    <span className="absolute inset-0 bg-gradient-to-r from-yellow-300 via-orange-400 via-yellow-400 to-orange-500 bg-clip-text text-transparent blur-sm opacity-40 animate-gradient-x bg-400%">
-                      Mint Your
-                    </span>
-                  </span>{" "}
-                  <span className="relative inline-block">
-                    <span className="bg-gradient-to-r from-red-400 via-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x bg-400% font-black">
-                      NFT
-                    </span>
-                    {/* Enhanced glow effect */}
-                    <span className="absolute inset-0 bg-gradient-to-r from-red-400 via-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent blur-sm opacity-50 animate-gradient-x bg-400%">
+              <div className="space-y-10">
+                
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium">
+                  <span className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></span>
+                  Built with &lt;3 on Solana
+                </div>
+
+                {/* Main Heading - EXTREMELY MASSIVE */}
+                <h1 className="font-black leading-[0.9] tracking-tight">
+                  <span className="block text-[80px] md:text-[120px] lg:text-[140px] xl:text-[160px] text-white mb-2">
+                    Mint Your
+                  </span>
+                  
+                  {/* Gradient Badge Style NFT Text */}
+                  <span className="inline-block relative">
+                    <span className="block text-[80px] md:text-[120px] lg:text-[140px] xl:text-[160px] bg-gradient-to-r from-purple-500 via-cyan-400 to-teal-400 bg-clip-text text-transparent px-4 py-2 rounded-2xl">
                       NFT
                     </span>
                   </span>
-                  <br />
-                  <span className="text-gray-400">Unlock the Future</span>
+                  
+                  <span className="block text-[60px] md:text-[90px] lg:text-[110px] xl:text-[130px] text-gray-400 mt-4">
+                    Unlock the
+                  </span>
+                  <span className="block text-[60px] md:text-[90px] lg:text-[110px] xl:text-[130px] text-gray-400">
+                    Future
+                  </span>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-lg animate-fade-in-up delay-700">
-                  Join the RewardNFT ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
+
+                {/* Subtext */}
+                <p className="text-2xl md:text-3xl text-gray-400 max-w-2xl leading-relaxed font-medium">
+                  Join the <span className="text-white font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
-                <div className="flex flex-wrap gap-4 pt-4 animate-fade-in-up delay-1000">
+
+                {/* Buttons - Bigger */}
+                <div className="flex flex-wrap gap-6 pt-6">
                   {!connected ? (
-                    <WalletConnectButton className="bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-500 hover:to-cyan-500 text-black font-bold text-lg px-8 hover:scale-105 transition-transform border-0" size="lg" />
+                    <WalletConnectButton 
+                      className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105" 
+                    />
                   ) : (
-                    <Button asChild size="lg" className="bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-500 hover:to-cyan-500 text-black font-bold text-lg px-8 hover:scale-105 transition-transform border-0">
+                    <Button 
+                      asChild 
+                      className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105"
+                    >
                       <Link href="/profile">View Profile</Link>
                     </Button>
                   )}
                   <Button
                     asChild
-                    size="lg"
                     variant="outline"
-                    className="border-teal-500/30 text-teal-400 hover:bg-teal-600/10 text-lg px-8 hover:scale-105 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/25"
+                    className="border-2 border-gray-700 text-white hover:bg-gray-800 hover:border-teal-500/50 text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105"
                   >
-                    <Link href="/mint">Mint NFT Unlock Airdrop </Link>
+                    <Link href="/mint">Mint NFT - $2.5</Link>
                   </Button>
                 </div>
 
-                {/* Stats - Updated with vibrant colors matching the image */}
-                <div className="flex gap-8 pt-4 animate-fade-in-up delay-1200">
+                {/* Stats - MASSIVE NUMBERS */}
+                <div className="flex gap-16 pt-10">
                   <div className="group">
-                    <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-teal-300 via-cyan-400 to-teal-500 bg-clip-text text-transparent bg-400% animate-gradient-x group-hover:scale-110 transition-transform">
+                    <div className="text-6xl md:text-7xl lg:text-8xl font-black text-teal-400 mb-2 group-hover:scale-110 transition-transform">
                       {statsLoading ? "..." : `${stats?.nftsMinted || 500}+`}
                     </div>
-                    <div className="text-sm text-gray-400 uppercase tracking-wide">NFTs Minted</div>
+                    <div className="text-lg text-gray-500 uppercase tracking-widest font-bold">NFTs Minted</div>
                   </div>
                   <div className="group">
-                    <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-500 bg-clip-text text-transparent bg-400% animate-gradient-x group-hover:scale-110 transition-transform">
+                    <div className="text-6xl md:text-7xl lg:text-8xl font-black text-orange-400 mb-2 group-hover:scale-110 transition-transform">
                       {statsLoading ? "..." : `${Math.floor((stats?.usdcEarned || 50000) / 1000)}K+`}
                     </div>
-                    <div className="text-sm text-gray-400 uppercase tracking-wide">USDC Earned</div>
-                  </div>
-                  <div className="group">
-                    <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-red-400 via-pink-500 to-red-600 bg-clip-text text-transparent bg-400% animate-gradient-x group-hover:scale-110 transition-transform">
-                      {statsLoading ? "..." : `${stats?.activeUsers || 1000}+`}
-                    </div>
-                    <div className="text-sm text-gray-400 uppercase tracking-wide">Active Users</div>
+                    <div className="text-lg text-gray-500 uppercase tracking-widest font-bold">USDC Earned</div>
                   </div>
                 </div>
               </div>
             </SlideInLeft>
 
+            {/* Right Content - Animated Floating Cards */}
             <SlideInRight delay={0.4}>
-              <div className="flex justify-end relative min-h-[500px] pr-8">
-                {/* Clean NFT cards without background box */}
-                <div className="relative group max-w-md w-full">
-                  <img
-                    src="/images/hero.png"
-                    alt="NFT Collection"
-                    className="w-full h-auto object-contain rounded-2xl group-hover:scale-105 transition-transform duration-500"
-                  />
+              <div className="flex justify-center lg:justify-end relative h-[700px]">
+                {/* Glow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-teal-500/20 to-cyan-500/20 rounded-full blur-[120px]" />
+                
+                <div className="relative w-full max-w-xl h-full">
+                  
+                  {/* Back Card */}
+                  <motion.div 
+                    className="absolute top-0 right-0 w-64 h-80 rounded-3xl overflow-hidden shadow-2xl"
+                    animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  </motion.div>
+
+                  {/* Middle Card */}
+                  <motion.div 
+                    className="absolute top-24 left-0 w-72 h-96 rounded-3xl overflow-hidden shadow-2xl z-10"
+                    animate={{ y: [0, -20, 0], rotate: [0, -5, 0] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                  >
+                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  </motion.div>
+
+                  {/* Front Card */}
+                  <motion.div 
+                    className="absolute bottom-0 right-12 w-80 h-[420px] rounded-3xl overflow-hidden shadow-2xl z-20 border-4 border-teal-500/30"
+                    animate={{ y: [0, -35, 0], rotate: [0, 5, 0], scale: [1, 1.03, 1] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                  >
+                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <div className="bg-black/60 backdrop-blur-md rounded-xl px-4 py-3 text-center">
+                        <p className="text-white font-bold text-lg">Reward NFT</p>
+                        <p className="text-teal-400 text-sm">Genesis Collection</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
                 </div>
               </div>
             </SlideInRight>
@@ -121,66 +162,41 @@ export function HomePageContent() {
         </section>
       </FadeIn>
 
-      {/* Features Section */}
-      <section className="py-20 px-6 bg-black/40 backdrop-blur-sm relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-900/5 via-transparent to-cyan-900/5" />
-        <div className="max-w-7xl mx-auto relative z-10">
+      {/* How It Works */}
+      <section className="py-32 px-6 bg-black/20">
+        <div className="max-w-7xl mx-auto">
           <SlideUp delay={0.2}>
-            <h2 className="text-4xl font-bold text-white text-center mb-16">How It Works</h2>
+            <h2 className="text-7xl md:text-8xl lg:text-9xl font-black text-white text-center mb-24">
+              How It <span className="text-teal-400">Works</span>
+            </h2>
           </SlideUp>
 
           <StaggerContainer staggerDelay={0.15}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <StaggerItem>
-                <HoverCard className="bg-black/40 backdrop-blur-xl border border-gray-800/50 hover:border-teal-500/30 rounded-2xl p-6 h-full transition-all duration-300">
-                  <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mb-4 border border-teal-500/30">
-                      <span className="text-teal-400 text-2xl font-bold">1</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+              {[1, 2, 3].map((num, idx) => (
+                <StaggerItem key={idx}>
+                  <HoverCard className="bg-gray-900/20 backdrop-blur border border-gray-800 hover:border-teal-500/50 rounded-3xl p-10 h-full transition-all duration-300 group">
+                    <div className="flex flex-col items-center text-center h-full">
+                      <div className="w-24 h-24 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mb-8 border-2 border-teal-500/30 group-hover:scale-110 transition-transform">
+                        <span className="text-teal-400 text-4xl font-black">{num}</span>
+                      </div>
+                      <h3 className="text-3xl font-black text-white mb-6">
+                        {num === 1 ? "Mint Your NFT" : num === 2 ? "Refer Friends" : "Complete Quests"}
+                      </h3>
+                      <p className="text-xl text-gray-400 flex-1 leading-relaxed mb-8">
+                        {num === 1 ? "Mint your exclusive Reward NFT using USDC on the Solana blockchain." : 
+                         num === 2 ? "Share your unique referral link and earn USDC for each friend who mints an NFT." : 
+                         "Earn additional XP by completing daily, weekly, and special quests."}
+                      </p>
+                      <Button asChild className="bg-teal-500 hover:bg-teal-600 text-black font-black text-lg px-10 py-5 h-auto rounded-xl">
+                        <Link href={num === 1 ? "/mint" : num === 2 ? "/referrals" : "/quests"}>
+                          {num === 1 ? "Mint Now" : num === 2 ? "Get Referral Link" : "View Quests"}
+                        </Link>
+                      </Button>
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Mint Your NFT</h3>
-                    <p className="text-gray-300 flex-1">
-                      Mint your exclusive Reward NFT using USDC on the Solana blockchain.
-                    </p>
-                    <Button asChild className="mt-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold border-0">
-                      <Link href="/mint">Mint Now</Link>
-                    </Button>
-                  </div>
-                </HoverCard>
-              </StaggerItem>
-
-              <StaggerItem>
-                <HoverCard className="bg-black/40 backdrop-blur-xl border border-gray-800/50 hover:border-cyan-500/30 rounded-2xl p-6 h-full transition-all duration-300">
-                  <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-full flex items-center justify-center mb-4 border border-cyan-500/30">
-                      <span className="text-cyan-400 text-2xl font-bold">2</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Refer Friends</h3>
-                    <p className="text-gray-300 flex-1">
-                      Share your unique referral link and earn USDC for each friend who mints an NFT.
-                    </p>
-                    <Button asChild className="mt-4 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-black font-bold border-0">
-                      <Link href="/referrals">Get Referral Link</Link>
-                    </Button>
-                  </div>
-                </HoverCard>
-              </StaggerItem>
-
-              <StaggerItem>
-                <HoverCard className="bg-black/40 backdrop-blur-xl border border-gray-800/50 hover:border-teal-500/30 rounded-2xl p-6 h-full transition-all duration-300">
-                  <div className="flex flex-col items-center text-center h-full">
-                    <div className="w-16 h-16 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mb-4 border border-teal-500/30">
-                      <span className="text-teal-400 text-2xl font-bold">3</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Complete Quests</h3>
-                    <p className="text-gray-300 flex-1">
-                      Earn additional XP by completing daily, weekly, and special quests.
-                    </p>
-                    <Button asChild className="mt-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold border-0">
-                      <Link href="/quests">View Quests</Link>
-                    </Button>
-                  </div>
-                </HoverCard>
-              </StaggerItem>
+                  </HoverCard>
+                </StaggerItem>
+              ))}
             </div>
           </StaggerContainer>
         </div>
@@ -188,33 +204,22 @@ export function HomePageContent() {
 
       {/* Stats Section */}
       <FadeIn delay={0.3}>
-        <section className="py-20 px-6">
+        <section className="py-24 px-6">
           <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 text-center hover:scale-105 transition-transform">
-                <p className="text-4xl font-bold bg-gradient-to-r from-teal-300 via-cyan-400 to-teal-500 bg-clip-text text-transparent bg-400% animate-gradient-x">
-                  {statsLoading ? "..." : `${stats?.nftsMinted || 500}+`}
-                </p>
-                <p className="text-white/70 mt-2">NFTs Minted</p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 text-center hover:scale-105 transition-transform">
-                <p className="text-4xl font-bold bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-500 bg-clip-text text-transparent bg-400% animate-gradient-x">
-                  {statsLoading ? "..." : `${Math.floor((stats?.usdcEarned || 50000) / 1000)}K+`}
-                </p>
-                <p className="text-white/70 mt-2">USDC Earned</p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 text-center hover:scale-105 transition-transform">
-                <p className="text-4xl font-bold bg-gradient-to-r from-red-400 via-pink-500 to-red-600 bg-clip-text text-transparent bg-400% animate-gradient-x">
-                  {statsLoading ? "..." : `${stats?.activeUsers || 1000}+`}
-                </p>
-                <p className="text-white/70 mt-2">Active Users</p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 text-center hover:scale-105 transition-transform">
-                <p className="text-4xl font-bold text-white">
-                  {statsLoading ? "..." : `${stats?.totalReferrals || 250}+`}
-                </p>
-                <p className="text-white/70 mt-2">Referrals Made</p>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {[
+                { value: `${stats?.nftsMinted || 500}+`, label: "NFTs Minted", color: "text-teal-400" },
+                { value: `${Math.floor((stats?.usdcEarned || 50000) / 1000)}K+`, label: "USDC Earned", color: "text-orange-400" },
+                { value: `${stats?.activeUsers || 1000}+`, label: "Active Users", color: "text-pink-400" },
+                { value: `${stats?.totalReferrals || 250}+`, label: "Referrals", color: "text-white" },
+              ].map((stat, idx) => (
+                <div key={idx} className="bg-gray-900/20 backdrop-blur border border-gray-800 rounded-3xl p-10 text-center hover:scale-105 transition-transform group">
+                  <p className={`text-6xl md:text-7xl font-black ${stat.color} mb-3 group-hover:scale-110 transition-transform`}>
+                    {statsLoading ? "..." : stat.value}
+                  </p>
+                  <p className="text-gray-500 text-lg uppercase tracking-widest font-bold">{stat.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -222,19 +227,31 @@ export function HomePageContent() {
 
       {/* CTA Section */}
       <SlideUp delay={0.2}>
-        <section className="py-20 px-6 bg-gradient-to-r from-[#FF5555]/20 to-[#00FFE0]/20">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-4xl font-bold text-white mb-6">Ready to Start Earning?</h2>
-            <p className="text-xl text-white/80 mb-8">
+        <section className="py-32 px-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-teal-600/20 via-cyan-600/20 to-purple-600/20" />
+          <div className="max-w-4xl mx-auto text-center relative z-10">
+            <h2 className="text-7xl md:text-8xl lg:text-9xl font-black text-white mb-8">
+              Ready to <span className="text-teal-400">Earn?</span>
+            </h2>
+            <p className="text-2xl text-gray-400 mb-12 max-w-2xl mx-auto">
               Join our community today and start earning USDC rewards through NFT minting, referrals, and quests.
             </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Button asChild size="lg" className="bg-white hover:bg-white/90 text-black text-lg px-8 hover:scale-105 transition-transform">
-                <Link href={connected ? "/profile" : "/mint"}>{connected ? "View My Profile" : "Get Started"}</Link>
+            <div className="flex flex-wrap gap-6 justify-center">
+              <Button 
+                asChild 
+                className="bg-white hover:bg-gray-100 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl hover:scale-105 transition-transform"
+              >
+                <Link href={connected ? "/profile" : "/mint"}>
+                  {connected ? "View Profile" : "Get Started"}
+                </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 text-lg px-8 hover:scale-105 transition-transform">
+              <Button 
+                asChild 
+                variant="outline" 
+                className="border-2 border-gray-700 text-white hover:bg-white/5 text-xl px-12 py-6 h-auto rounded-2xl hover:scale-105 transition-transform hover:border-teal-500/50"
+              >
                 <Link href="https://rewardnft.gitbook.io/rewardnft" target="_blank" rel="noopener noreferrer">
-                  Learn More
+                  Documentation
                 </Link>
               </Button>
             </div>
