@@ -46,27 +46,27 @@ export function HomePageContent() {
 
                 {/* Main Heading - EXTREMELY MASSIVE */}
                 <h1 className="font-black leading-[0.9] tracking-tight">
-                  <span className="block text-[80px] md:text-[120px] lg:text-[140px] xl:text-[160px] text-white mb-2">
+                  <span className="block text-[50px] md:text-[70px] lg:text-[90px] xl:text-[110px] text-white mb-2">
                     Mint Your
                   </span>
                   
                   {/* Gradient Badge Style NFT Text */}
                   <span className="inline-block relative">
-                    <span className="block text-[80px] md:text-[120px] lg:text-[140px] xl:text-[160px] bg-gradient-to-r from-purple-500 via-cyan-400 to-teal-400 bg-clip-text text-transparent px-4 py-2 rounded-2xl">
+                    <span className="block text-[50px] md:text-[70px] lg:text-[90px] xl:text-[110px] bg-gradient-to-r from-purple-500 via-cyan-400 to-teal-400 bg-clip-text text-transparent px-4 py-2 rounded-2xl">
                       NFT
                     </span>
                   </span>
                   
-                  <span className="block text-[60px] md:text-[90px] lg:text-[110px] xl:text-[130px] text-gray-400 mt-4">
+                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-gray-400 mt-4">
                     Unlock the
                   </span>
-                  <span className="block text-[60px] md:text-[90px] lg:text-[110px] xl:text-[130px] text-gray-400">
+                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-gray-400">
                     Future
                   </span>
                 </h1>
 
                 {/* Subtext */}
-                <p className="text-2xl md:text-3xl text-gray-400 max-w-2xl leading-relaxed font-medium">
+                <p className="text-xl md:text-2xl text-gray-400 max-w-2xl leading-relaxed font-medium">
                   Join the <span className="text-white font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
 
@@ -250,7 +250,7 @@ export function HomePageContent() {
                 variant="outline" 
                 className="border-2 border-gray-700 text-white hover:bg-white/5 text-xl px-12 py-6 h-auto rounded-2xl hover:scale-105 transition-transform hover:border-teal-500/50"
               >
-                <Link href="https://rewardnft.gitbook.io/rewardnft" target="_blank" rel="noopener noreferrer">
+                <Link href="https://rewardnft.gitbook.io/rewardnft " target="_blank" rel="noopener noreferrer">
                   Documentation
                 </Link>
               </Button>
