@@ -127,7 +127,7 @@ export function HomePageContent() {
                         >
                           ✨
                         </motion.span>
-                        Mint NFT - $2.5
+                        Mint NFT Unlock Airdrop
                         <motion.span
                           animate={{ rotate: [0, -15, 15, 0] }}
                           transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3, delay: 0.25 }}
