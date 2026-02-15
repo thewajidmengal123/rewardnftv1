@@ -58,17 +58,18 @@ export function HomePageContent() {
                     </span>
                   </span>
                   
-                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-gray-400 mt-4">
+                  {/* Unlock the Future - Theme Color (Teal/Cyan) */}
+                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-teal-400 mt-4">
                     Unlock the
                   </span>
-                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-gray-400">
+                  <span className="block text-[40px] md:text-[55px] lg:text-[70px] xl:text-[85px] text-teal-400">
                     Future
                   </span>
                 </h1>
 
-                {/* Subtext */}
-                <p className="text-xl md:text-2xl text-gray-400 max-w-2xl leading-relaxed font-medium">
-                  Join the <span className="text-white font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
+                {/* Subtext - Theme Color */}
+                <p className="text-xl md:text-2xl text-teal-200/80 max-w-2xl leading-relaxed font-medium">
+                  Join the <span className="text-teal-400 font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
 
                 {/* Buttons - Animated & Colorful */}
