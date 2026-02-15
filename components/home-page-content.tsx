@@ -7,6 +7,7 @@ import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { usePlatformStats } from "@/hooks/use-platform-stats"
 import { motion } from "framer-motion"
+import Image from "next/image"
 import {
   FadeIn,
   SlideUp,
@@ -70,27 +71,77 @@ export function HomePageContent() {
                   Join the <span className="text-white font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
 
-                {/* Buttons - Bigger */}
+                {/* Buttons - Animated & Colorful */}
                 <div className="flex flex-wrap gap-6 pt-6">
                   {!connected ? (
-                    <WalletConnectButton 
-                      className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105" 
-                    />
-                  ) : (
-                    <Button 
-                      asChild 
-                      className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105"
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <Link href="/profile">View Profile</Link>
-                    </Button>
+                      <WalletConnectButton 
+                        className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all shadow-[0_0_30px_rgba(45,212,191,0.3)] hover:shadow-[0_0_50px_rgba(45,212,191,0.5)]" 
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button 
+                        asChild 
+                        className="bg-teal-400 hover:bg-teal-500 text-black font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all shadow-[0_0_30px_rgba(45,212,191,0.3)] hover:shadow-[0_0_50px_rgba(45,212,191,0.5)]"
+                      >
+                        <Link href="/profile">View Profile</Link>
+                      </Button>
+                    </motion.div>
                   )}
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="border-2 border-gray-700 text-white hover:bg-gray-800 hover:border-teal-500/50 text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105"
+                  
+                  {/* Animated Mint NFT Button */}
+                  <motion.div
+                    whileHover={{ scale: 1.08, rotate: 1 }}
+                    whileTap={{ scale: 0.95 }}
+                    animate={{ 
+                      boxShadow: [
+                        "0 0 20px rgba(168, 85, 247, 0.4)",
+                        "0 0 40px rgba(168, 85, 247, 0.6)",
+                        "0 0 20px rgba(168, 85, 247, 0.4)"
+                      ]
+                    }}
+                    transition={{ 
+                      boxShadow: {
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }
+                    }}
                   >
-                    <Link href="/mint">Mint NFT - 5</Link>
-                  </Button>
+                    <Button
+                      asChild
+                      className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 hover:from-purple-500 hover:via-pink-400 hover:to-orange-400 text-white font-black text-xl px-12 py-6 h-auto rounded-2xl transition-all border-0"
+                    >
+                      <Link href="/mint" className="relative z-10 flex items-center gap-3">
+                        <motion.span
+                          animate={{ rotate: [0, 15, -15, 0] }}
+                          transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
+                        >
+                          ✨
+                        </motion.span>
+                        Mint NFT - $2.5
+                        <motion.span
+                          animate={{ rotate: [0, -15, 15, 0] }}
+                          transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3, delay: 0.25 }}
+                        >
+                          ✨
+                        </motion.span>
+                      </Link>
+                    </Button>
+                    {/* Shimmer Effect */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                      animate={{ x: ["-200%", "200%"] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  </motion.div>
                 </div>
 
                 {/* Stats - MASSIVE NUMBERS */}
@@ -111,7 +162,7 @@ export function HomePageContent() {
               </div>
             </SlideInLeft>
 
-            {/* Right Content - Animated Floating Cards */}
+            {/* Right Content - Animated Floating Cards with Correct Image */}
             <SlideInRight delay={0.4}>
               <div className="flex justify-center lg:justify-end relative h-[700px]">
                 {/* Glow */}
@@ -125,7 +176,14 @@ export function HomePageContent() {
                     animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
                     transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    <img src="/NFT-character.jpeg" alt="NFT" className="w-full h-full object-cover" />
+                    <Image 
+                      src="/images/NFT-character.jpeg" 
+                      alt="NFT Character" 
+                      fill
+                      className="object-cover"
+                      priority
+                      unoptimized
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   </motion.div>
 
@@ -135,7 +193,14 @@ export function HomePageContent() {
                     animate={{ y: [0, -20, 0], rotate: [0, -5, 0] }}
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
                   >
-                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <Image 
+                      src="/images/NFT-character.jpeg" 
+                      alt="NFT Character" 
+                      fill
+                      className="object-cover"
+                      priority
+                      unoptimized
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   </motion.div>
 
@@ -145,7 +210,14 @@ export function HomePageContent() {
                     animate={{ y: [0, -35, 0], rotate: [0, 5, 0], scale: [1, 1.03, 1] }}
                     transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                   >
-                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <Image 
+                      src="/images/NFT-character.jpeg" 
+                      alt="NFT Character" 
+                      fill
+                      className="object-cover"
+                      priority
+                      unoptimized
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     <div className="absolute bottom-6 left-6 right-6">
                       <div className="bg-black/60 backdrop-blur-md rounded-xl px-4 py-3 text-center">
