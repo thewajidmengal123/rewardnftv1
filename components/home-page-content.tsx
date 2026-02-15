@@ -67,8 +67,8 @@ export function HomePageContent() {
                   </span>
                 </h1>
 
-                {/* Subtext - Theme Color */}
-                <p className="text-xl md:text-2xl text-teal-200/80 max-w-2xl leading-relaxed font-medium">
+                {/* Subtext - White with Teal RewardNFT */}
+                <p className="text-xl md:text-2xl text-white max-w-2xl leading-relaxed font-medium">
                   Join the <span className="text-teal-400 font-bold">RewardNFT</span> ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
                 </p>
 
