@@ -89,7 +89,7 @@ export function HomePageContent() {
                     variant="outline"
                     className="border-2 border-gray-700 text-white hover:bg-gray-800 hover:border-teal-500/50 text-xl px-12 py-6 h-auto rounded-2xl transition-all hover:scale-105"
                   >
-                    <Link href="/mint">Mint NFT - $2.5</Link>
+                    <Link href="/mint">Mint NFT - 5</Link>
                   </Button>
                 </div>
 
@@ -125,7 +125,7 @@ export function HomePageContent() {
                     animate={{ y: [0, -30, 0], rotate: [0, 8, 0] }}
                     transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    <img src="/images/hero.png" alt="NFT" className="w-full h-full object-cover" />
+                    <img src="/NFT-character.jpeg" alt="NFT" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   </motion.div>
 
