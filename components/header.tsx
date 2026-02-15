@@ -38,31 +38,37 @@ export function Header() {
               href="/mint"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
-              Features
+              Mint
             </Link>
             <Link
               href="/referrals"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
-              Economy
+              Referrals
             </Link>
             <Link
               href="/leaderboard"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
-              Roadmap
+              Leaderboard
             </Link>
             <Link
               href="/quests"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
-              FAQ
+              Quests
             </Link>
             <Link
               href="/airdrops"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
-              Docs
+              Airdrops
+            </Link>
+            <Link
+              href="/mini-game"
+              className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
+            >
+              Mini-Game
             </Link>
             <AdminOnly>
               <Link
