@@ -2,9 +2,28 @@
 
 import { NewMintInterface } from "@/components/new-mint-interface"
 import { usePlatformStats } from "@/hooks/use-platform-stats"
+import { useEffect, useRef, useState } from "react"
 
 export function MintPageContent() {
   const { stats, loading: statsLoading } = usePlatformStats()
+  const nftRef = useRef<HTMLDivElement>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [isHovering, setIsHovering] = useState(false)
+
+  // Mouse follow effect for 3D tilt
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!nftRef.current) return
+      const rect = nftRef.current.getBoundingClientRect()
+      const x = (e.clientX - rect.left - rect.width / 2) / 25
+      const y = (e.clientY - rect.top - rect.height / 2) / 25
+      setMousePosition({ x, y })
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
       {/* Animated background orbs */}
@@ -36,8 +55,11 @@ export function MintPageContent() {
 
             {/* Header */}
             <div className="text-center space-y-6 mb-16">
-              <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">Mint Your NFT</span>
+              <h1 className="text-6xl font-bold leading-tight">
+                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">Mint Your</span>{" "}
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent">
+                  NFT
+                </span>
                 <br />
                 <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent">
                   Unlock the Future
@@ -46,13 +68,13 @@ export function MintPageContent() {
               <div className="text-2xl font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent mb-4">
                 Exclusive Rewards Await
               </div>
-              <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-lg text-gray-400 max-w-3xl mx-auto leading-relaxed">
                 Join the RewardNFT ecosystem and experience exclusive rewards, referrals, quests, and our exciting mini-game.
               </p>
             </div>
 
             {/* Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 max-w-4xl mx-auto">
               <div className="text-center bg-white/5 backdrop-blur-xl border border-white/10 hover:border-cyan-500/30 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_40px_rgba(34,211,238,0.1)]">
                 <div className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">
                   {statsLoading ? "..." : `${stats?.nftsMinted || 0}+`}
@@ -73,8 +95,36 @@ export function MintPageContent() {
               </div>
             </div>
 
-            {/* SIRF NewMintInterface - NO CUSTOM CARD */}
-            <NewMintInterface />
+            {/* 3D Animation Wrapper around NewMintInterface */}
+            <div 
+              ref={nftRef}
+              className="relative group"
+              onMouseEnter={() => setIsHovering(true)}
+              onMouseLeave={() => setIsHovering(false)}
+              style={{ perspective: '1000px' }}
+            >
+              {/* Dynamic Glow Effect */}
+              <div 
+                className="absolute -inset-4 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-all duration-500"
+                style={{
+                  transform: `translate(${mousePosition.x * 2}px, ${mousePosition.y * 2}px)`
+                }}
+              />
+              
+              {/* 3D Tilt Container */}
+              <div 
+                className="relative transition-transform duration-200 ease-out"
+                style={{
+                  transform: isHovering 
+                    ? `rotateY(${mousePosition.x}deg) rotateX(${-mousePosition.y}deg)`
+                    : 'rotateY(0deg) rotateX(0deg)',
+                  transformStyle: 'preserve-3d'
+                }}
+              >
+                {/* ORIGINAL NewMintInterface - NO CHANGES */}
+                <NewMintInterface />
+              </div>
+            </div>
 
           </div>
         </div>
