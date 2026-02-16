@@ -2,28 +2,9 @@
 
 import { NewMintInterface } from "@/components/new-mint-interface"
 import { usePlatformStats } from "@/hooks/use-platform-stats"
-import { useEffect, useRef, useState } from "react"
 
 export function MintPageContent() {
   const { stats, loading: statsLoading } = usePlatformStats()
-  const nftRef = useRef<HTMLDivElement>(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [isHovering, setIsHovering] = useState(false)
-
-  // Mouse follow effect for 3D tilt
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!nftRef.current) return
-      const rect = nftRef.current.getBoundingClientRect()
-      const x = (e.clientX - rect.left - rect.width / 2) / 25
-      const y = (e.clientY - rect.top - rect.height / 2) / 25
-      setMousePosition({ x, y })
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
-
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
       {/* Animated background orbs */}
@@ -95,33 +76,13 @@ export function MintPageContent() {
               </div>
             </div>
 
-            {/* 3D Animation Wrapper around NewMintInterface */}
-            <div 
-              ref={nftRef}
-              className="relative group"
-              onMouseEnter={() => setIsHovering(true)}
-              onMouseLeave={() => setIsHovering(false)}
-              style={{ perspective: '1000px' }}
-            >
-              {/* Dynamic Glow Effect */}
-              <div 
-                className="absolute -inset-4 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-3xl blur-2xl opacity-20 group-hover:opacity-40 transition-all duration-500"
-                style={{
-                  transform: `translate(${mousePosition.x * 2}px, ${mousePosition.y * 2}px)`
-                }}
-              />
+            {/* NFT Section with Simple CSS Animation - NO JavaScript */}
+            <div className="relative group">
+              {/* Animated Glow Background */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000 animate-pulse" />
               
-              {/* 3D Tilt Container */}
-              <div 
-                className="relative transition-transform duration-200 ease-out"
-                style={{
-                  transform: isHovering 
-                    ? `rotateY(${mousePosition.x}deg) rotateX(${-mousePosition.y}deg)`
-                    : 'rotateY(0deg) rotateX(0deg)',
-                  transformStyle: 'preserve-3d'
-                }}
-              >
-                {/* ORIGINAL NewMintInterface - NO CHANGES */}
+              {/* Simple Float Animation Container */}
+              <div className="relative animate-float-slow">
                 <NewMintInterface />
               </div>
             </div>
@@ -129,6 +90,21 @@ export function MintPageContent() {
           </div>
         </div>
       </div>
+
+      {/* Simple CSS Animation - No JavaScript */}
+      <style jsx>{`
+        @keyframes float-slow {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        .animate-float-slow {
+          animation: float-slow 6s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   )
 }
