@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -14,21 +13,9 @@ import {
   ExternalLink, 
   Plus, 
   Trash2,
-  Target,
-  Gamepad2,
-  Twitter,
-  Linkedin,
-  MessageCircle,
-  Flame,
   Crown,
-  Gem,
-  Sparkles,
-  ArrowRight,
-  X,
-  Link as LinkIcon,
-  Upload,
-  AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useQuestSystem } from "@/hooks/use-quest-system"
@@ -43,6 +30,23 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
+// ==========================================
+// FIREBASE IMPORTS
+// ==========================================
+import { 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  serverTimestamp,
+  where,
+  updateDoc
+} from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // ==========================================
 // ADMIN CONFIGURATION
@@ -61,7 +65,7 @@ interface Quest {
   id: string
   title: string
   description: string
-  icon: string
+  icon?: string
   reward: { xp: number }
   requirements: { 
     type: string
@@ -72,55 +76,22 @@ interface Quest {
   actionLink?: string
   imageUrl?: string
   difficulty?: "easy" | "medium" | "hard"
-  createdAt?: string
+  createdAt?: any
   createdBy?: string
   isActive?: boolean
+  isCustom?: boolean
 }
 
 // ==========================================
-// SAFE LOCALSTORAGE HELPER
+// MAIN COMPONENT
 // ==========================================
-const safeLocalStorage = {
-  getItem: (key: string): string | null => {
-    if (typeof window === 'undefined') return null
-    try {
-      return window.localStorage.getItem(key)
-    } catch (e) {
-      console.warn('localStorage error:', e)
-      return null
-    }
-  },
-  setItem: (key: string, value: string): void => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(key, value)
-    } catch (e) {
-      console.warn('localStorage error:', e)
-    }
-  },
-  removeItem: (key: string): void => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.removeItem(key)
-    } catch (e) {
-      console.warn('localStorage error:', e)
-    }
-  }
-}
-
-// ==========================================
-// CREATE QUEST MODAL COMPONENT
-// ==========================================
-function CreateQuestModal({ 
-  isOpen, 
-  onClose, 
-  onCreate 
-}: { 
-  isOpen: boolean
-  onClose: () => void
-  onCreate: (questData: any) => void
-}) {
-  const [formData, setFormData] = useState({
+export function QuestPageContent() {
+  const { signTransaction, publicKey } = useWallet()
+  const [processingQuest, setProcessingQuest] = useState<string | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [customQuests, setCustomQuests] = useState<Quest[]>([])
+  const [isLoadingQuests, setIsLoadingQuests] = useState(true)
+  const [newQuest, setNewQuest] = useState({
     title: "",
     description: "",
     icon: "⭐",
@@ -130,469 +101,6 @@ function CreateQuestModal({
     difficulty: "easy" as "easy" | "medium" | "hard",
     category: "one_time"
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  if (!isOpen) return null
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formData.title || !formData.link) {
-      toast({ 
-        title: "Error", 
-        description: "Title and Link are required", 
-        variant: "destructive" 
-      })
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      const questData = {
-        id: `custom-${Date.now()}`,
-        title: formData.title,
-        description: formData.description,
-        icon: formData.icon,
-        reward: { xp: parseInt(formData.xp) || 100 },
-        requirements: { type: "custom_quest", count: 1 },
-        actionLink: formData.link,
-        category: formData.category,
-        difficulty: formData.difficulty,
-        imageUrl: formData.imageUrl,
-        isNew: true,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        createdBy: ADMIN_WALLET_ADDRESS
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 500))
-      onCreate(questData)
-
-      setFormData({
-        title: "",
-        description: "",
-        icon: "⭐",
-        xp: "100",
-        link: "",
-        imageUrl: "",
-        difficulty: "easy",
-        category: "one_time"
-      })
-      onClose()
-    } catch (error) {
-      console.error("Create quest error:", error)
-      toast({ 
-        title: "Error", 
-        description: "Failed to create quest", 
-        variant: "destructive" 
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-              <Plus className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <DialogTitle className="text-2xl font-bold text-white">
-                Create New Quest
-              </DialogTitle>
-              <p className="text-slate-400 text-sm">Admin Only</p>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div>
-            <Label className="text-slate-300">Quest Title *</Label>
-            <Input
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              placeholder="e.g., Follow us on Twitter"
-              className="bg-slate-800 border-slate-600 text-white mt-1"
-              required
-            />
-          </div>
-
-          <div>
-            <Label className="text-slate-300">Description</Label>
-            <Input
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              placeholder="Short description..."
-              className="bg-slate-800 border-slate-600 text-white mt-1"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-slate-300">Icon (Emoji)</Label>
-              <Input
-                value={formData.icon}
-                onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                placeholder="⭐"
-                className="bg-slate-800 border-slate-600 text-white mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-slate-300">XP Reward *</Label>
-              <Input
-                type="number"
-                value={formData.xp}
-                onChange={(e) => setFormData({...formData, xp: e.target.value})}
-                placeholder="100"
-                className="bg-slate-800 border-slate-600 text-white mt-1"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-slate-300">Action Link (URL) *</Label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <Input
-                type="url"
-                value={formData.link}
-                onChange={(e) => setFormData({...formData, link: e.target.value})}
-                placeholder="https://twitter.com/yourhandle"
-                className="bg-slate-800 border-slate-600 text-white mt-1 pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-slate-300">Quest Image URL (Optional)</Label>
-            <div className="relative">
-              <Upload className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <Input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
-                placeholder="https://example.com/image.png"
-                className="bg-slate-800 border-slate-600 text-white mt-1 pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-slate-300">Difficulty</Label>
-              <select
-                value={formData.difficulty}
-                onChange={(e) => setFormData({...formData, difficulty: e.target.value as any})}
-                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-white"
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-            <div>
-              <Label className="text-slate-300">Category</Label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-white"
-              >
-                <option value="one_time">One-Time</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Create Quest
-                </span>
-              )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ==========================================
-// ENHANCED QUEST CARD COMPONENT
-// ==========================================
-function EnhancedQuestCard({ 
-  quest, 
-  progress, 
-  onStart, 
-  onAction, 
-  onClaim, 
-  onDelete,
-  isAdmin,
-  processingQuest 
-}: { 
-  quest: Quest
-  progress: any
-  onStart: (id: string) => void
-  onAction: (id: string, type: string) => void
-  onClaim: (id: string) => void
-  onDelete?: (id: string) => void
-  isAdmin: boolean
-  processingQuest: string | null
-}) {
-  const progressPercentage = progress ? (progress.progress / progress.maxProgress) * 100 : 0
-  const isCompleted = progress?.status === "completed"
-  const isClaimed = progress?.status === "claimed"
-  const canClaim = isCompleted && !isClaimed
-  const hasStarted = !!progress
-
-  const getQuestIcon = (questType: string, icon?: string) => {
-    if (icon && icon.length <= 2) return icon
-
-    switch (questType) {
-      case "connect_discord": return "🔗"
-      case "login_streak": return "🔥"
-      case "share_twitter": return "🐦"
-      case "refer_friends": return "👥"
-      case "play_minigame": return "🎮"
-      case "join_community_call": return "📞"
-      case "follow_linkedin": return "💼"
-      case "engage_tweet": return "❤️"
-      case "follow_x": return "🐦"
-      case "join_telegram": return "📱"
-      case "custom_quest": return "⭐"
-      default: return "⭐"
-    }
-  }
-
-  const getActionText = (questType: string) => {
-    switch (questType) {
-      case "connect_discord": return "Connect Discord"
-      case "login_streak": return "Pay & Login"
-      case "share_twitter": return "Share on Twitter"
-      case "refer_friends": return "Check Referrals"
-      case "play_minigame": return "Play Game"
-      case "join_community_call": return "Join Community"
-      case "follow_linkedin": return "Follow LinkedIn"
-      case "engage_tweet": return "Engage Tweet"
-      case "follow_x": return "Follow X"
-      case "join_telegram": return "Join Telegram"
-      case "custom_quest": return "Complete Quest"
-      default: return "Complete"
-    }
-  }
-
-  const getDifficultyColor = (diff?: string) => {
-    switch (diff) {
-      case "easy": return "from-emerald-400 to-emerald-600"
-      case "medium": return "from-amber-400 to-orange-600"
-      case "hard": return "from-rose-400 to-red-600"
-      default: return "from-blue-400 to-indigo-600"
-    }
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -5 }}
-      className="group relative"
-    >
-      <div className={`absolute -inset-0.5 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} rounded-2xl opacity-0 group-hover:opacity-30 transition-opacity duration-500 blur-xl`} />
-
-      <div className={`relative bg-slate-900/80 backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-300 ${
-        isClaimed ? 'border-green-500/50 shadow-lg shadow-green-500/20' : 'border-slate-800 hover:border-slate-600'
-      }`}>
-        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} opacity-50`} />
-
-        {isAdmin && onDelete && (
-          <button
-            onClick={() => onDelete(quest.id)}
-            className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors opacity-0 group-hover:opacity-100"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-
-        {quest.isNew && (
-          <div className="absolute top-4 right-4">
-            <span className="px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full shadow-lg shadow-pink-500/25 animate-pulse">
-              NEW
-            </span>
-          </div>
-        )}
-
-        <div className="p-6">
-          <div className="flex items-start gap-4 mb-4">
-            <div className={`p-3 rounded-xl bg-gradient-to-br ${getDifficultyColor(quest.difficulty)} shadow-lg`}>
-              <span className="text-2xl">{getQuestIcon(quest.requirements.type, quest.icon)}</span>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-bold text-white">{quest.title}</h3>
-                {quest.isNew && !isAdmin && (
-                  <Badge className="bg-red-500 text-white text-xs">NEW</Badge>
-                )}
-              </div>
-              <p className="text-slate-400 text-sm">{quest.description}</p>
-            </div>
-          </div>
-
-          {quest.imageUrl && (
-            <div className="mb-4 rounded-xl overflow-hidden">
-              <img 
-                src={quest.imageUrl} 
-                alt={quest.title}
-                className="w-full h-32 object-cover"
-              />
-            </div>
-          )}
-
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Progress</span>
-              <span className="text-sm font-bold text-white">
-                {progress?.progress || 0} <span className="text-slate-500">/ {quest.requirements.count}</span>
-              </span>
-            </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercentage}%` }}
-                transition={{ duration: 1, delay: 0.5 }}
-                className={`h-full bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} rounded-full`}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              {quest.difficulty && (
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                  quest.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
-                  quest.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 
-                  'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                }`}>
-                  {quest.difficulty.charAt(0).toUpperCase() + quest.difficulty.slice(1)}
-                </div>
-              )}
-              <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold">
-                <Zap className="w-3 h-3" />
-                {quest.reward.xp} XP
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              {!hasStarted && (
-                <Button
-                  onClick={() => onStart(quest.id)}
-                  size="sm"
-                  className="bg-teal-500 hover:bg-teal-600 text-black font-semibold"
-                >
-                  Start
-                </Button>
-              )}
-
-              {hasStarted && !isCompleted && !isClaimed && (
-                <Button
-                  onClick={() => onAction(quest.id, quest.requirements.type)}
-                  size="sm"
-                  disabled={processingQuest === quest.id}
-                  className="bg-blue-500 hover:bg-blue-600 text-white"
-                >
-                  {processingQuest === quest.id ? "Processing..." : (
-                    <span className="flex items-center gap-1">
-                      {getActionText(quest.requirements.type)}
-                      {quest.requirements.type === "login_streak" && (
-                        <span className="text-xs">(0.01 SOL)</span>
-                      )}
-                    </span>
-                  )}
-                </Button>
-              )}
-
-              {canClaim && (
-                <Button
-                  onClick={() => onClaim(progress.id)}
-                  size="sm"
-                  className="bg-green-500 hover:bg-green-600 text-black font-semibold"
-                >
-                  Claim
-                </Button>
-              )}
-
-              {isClaimed && (
-                <Button size="sm" variant="outline" disabled className="border-green-500/50 text-green-400">
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Completed
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-      </div>
-    </motion.div>
-  )
-}
-
-// ==========================================
-// STATS CARD COMPONENT
-// ==========================================
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
-  return (
-    <motion.div
-      whileHover={{ y: -5 }}
-      className="relative bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 overflow-hidden group cursor-pointer"
-    >
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${color} opacity-10 rounded-full blur-3xl group-hover:opacity-20 transition-opacity`} />
-      <div className="relative">
-        <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${color} mb-4`}>
-          {icon}
-        </div>
-        <p className="text-slate-400 text-sm mb-1">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
-      </div>
-    </motion.div>
-  )
-}
-
-// ==========================================
-// MAIN QUEST PAGE COMPONENT
-// ==========================================
-export function QuestPageContent() {
-  const { signTransaction, publicKey } = useWallet()
-  const [processingQuest, setProcessingQuest] = useState<string | null>(null)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [customQuests, setCustomQuests] = useState<Quest[]>([])
-  const [mounted, setMounted] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const {
     dailyQuests,
@@ -600,7 +108,7 @@ export function QuestPageContent() {
     oneTimeQuests,
     userXPData,
     loading,
-    error: questError,
+    error,
     startQuest,
     updateQuestProgress,
     claimQuestReward,
@@ -610,136 +118,139 @@ export function QuestPageContent() {
   const adminMode = isAdmin(publicKey?.toString())
 
   // ==========================================
-  // SYNC CUSTOM QUESTS - Real-time sync
+  // FIREBASE: REAL-TIME SYNC from 'quests' collection
   // ==========================================
-  const syncCustomQuests = useCallback(async () => {
-    try {
-      // Try to fetch from API first (if you have a backend endpoint)
-      const response = await fetch('/api/quests/custom', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      }).catch(() => null)
+  useEffect(() => {
+    // Existing 'quests' collection se custom quests fetch karna
+    const questsRef = collection(db, "quests")
+    const q = query(
+      questsRef, 
+      where("isCustom", "==", true),
+      where("isActive", "!=", false),
+      orderBy("createdAt", "desc")
+    )
 
-      if (response && response.ok) {
-        const data = await response.json()
-        if (data.success && data.quests) {
-          setCustomQuests(data.quests)
-          safeLocalStorage.setItem('customQuests', JSON.stringify(data.quests))
-          return
-        }
-      }
+    // Real-time listener
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const quests: Quest[] = []
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        quests.push({
+          id: doc.id,
+          title: data.title,
+          description: data.description,
+          icon: data.icon || "⭐",
+          reward: data.reward || { xp: 100 },
+          requirements: data.requirements || { type: "custom_quest", count: 1 },
+          category: data.category || "one_time",
+          difficulty: data.difficulty || "easy",
+          actionLink: data.actionLink,
+          imageUrl: data.imageUrl,
+          isNew: data.isNew ?? true,
+          isActive: data.isActive ?? true,
+          isCustom: true,
+          createdAt: data.createdAt,
+          createdBy: data.createdBy
+        } as Quest)
+      })
+      setCustomQuests(quests)
+      setIsLoadingQuests(false)
+    }, (error) => {
+      console.error("Error fetching custom quests:", error)
+      setIsLoadingQuests(false)
+    })
 
-      // Fallback to localStorage
-      const saved = safeLocalStorage.getItem('customQuests')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        // Filter only active quests
-        const activeQuests = parsed.filter((q: Quest) => q.isActive !== false)
-        setCustomQuests(activeQuests)
-      }
-    } catch (e) {
-      console.error("Error syncing quests:", e)
-    }
+    return () => unsubscribe()
   }, [])
 
-  // Initial load and periodic sync
-  useEffect(() => {
-    setMounted(true)
-    syncCustomQuests()
-
-    // Sync every 5 seconds for real-time updates
-    const interval = setInterval(syncCustomQuests, 5000)
-    return () => clearInterval(interval)
-  }, [syncCustomQuests])
-
-  // Listen for storage changes (cross-tab sync)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'customQuests') {
-        syncCustomQuests()
-      }
+  // ==========================================
+  // ADMIN: CREATE QUEST (Firebase)
+  // ==========================================
+  const handleCreateQuest = async () => {
+    if (!newQuest.title || !newQuest.link) {
+      toast({
+        title: "Error",
+        description: "Title and Link are required",
+        variant: "destructive"
+      })
+      return
     }
 
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [syncCustomQuests])
-
-  // Save to localStorage whenever customQuests change
-  useEffect(() => {
-    if (customQuests.length > 0) {
-      safeLocalStorage.setItem('customQuests', JSON.stringify(customQuests))
-    }
-  }, [customQuests])
-
-  // ==========================================
-  // CREATE QUEST - With API sync
-  // ==========================================
-  const handleCreateQuest = useCallback(async (questData: Quest) => {
     try {
-      // Add to local state immediately
-      setCustomQuests(prev => [questData, ...prev])
-
-      // Try to save to API
-      const response = await fetch('/api/quests/custom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(questData)
-      }).catch(() => null)
-
-      if (response && response.ok) {
-        toast({ 
-          title: "Quest Created!", 
-          description: "New quest is now live for all users" 
-        })
-      } else {
-        // If API fails, still show success (localStorage will sync)
-        toast({ 
-          title: "Quest Created!", 
-          description: "Quest saved locally. All users will see it on refresh." 
-        })
+      const questData = {
+        title: newQuest.title,
+        description: newQuest.description,
+        icon: newQuest.icon,
+        reward: { xp: parseInt(newQuest.xp) || 100 },
+        requirements: { 
+          type: "custom_quest", 
+          count: 1,
+          description: newQuest.description
+        },
+        actionLink: newQuest.link,
+        category: newQuest.category,
+        difficulty: newQuest.difficulty,
+        imageUrl: newQuest.imageUrl,
+        isNew: true,
+        isActive: true,
+        isCustom: true,  // Important: Mark as custom quest
+        createdAt: serverTimestamp(),
+        createdBy: publicKey?.toString(),
+        // Required fields for existing quest system
+        maxProgress: 1,
+        progress: 0
       }
 
-      // Broadcast to other tabs
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'customQuests',
-        newValue: JSON.stringify([questData, ...customQuests])
-      }))
+      // Add to existing 'quests' collection
+      await addDoc(collection(db, "quests"), questData)
 
-    } catch (e) {
-      console.error("Error creating quest:", e)
-      toast({ 
-        title: "Error", 
-        description: "Failed to create quest", 
-        variant: "destructive" 
+      // Reset form
+      setNewQuest({
+        title: "",
+        description: "",
+        icon: "⭐",
+        xp: "100",
+        link: "",
+        imageUrl: "",
+        difficulty: "easy",
+        category: "one_time"
+      })
+
+      setCreateModalOpen(false)
+
+      toast({
+        title: "✅ Quest Created!",
+        description: "New quest is now live for ALL users worldwide!"
+      })
+    } catch (error) {
+      console.error("Error creating quest:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create quest. Check console.",
+        variant: "destructive"
       })
     }
-  }, [customQuests])
+  }
 
   // ==========================================
-  // DELETE QUEST - With API sync
+  // ADMIN: DELETE QUEST (Firebase)
   // ==========================================
-  const handleDeleteQuest = useCallback(async (questId: string) => {
-    if (typeof window !== 'undefined' && window.confirm("Are you sure you want to delete this quest?")) {
+  const handleDeleteQuest = async (questId: string) => {
+    if (typeof window !== 'undefined' && confirm("Are you sure you want to delete this quest?")) {
       try {
-        // Update local state
-        setCustomQuests(prev => prev.filter(q => q.id !== questId))
+        // Soft delete - isActive false karna
+        await updateDoc(doc(db, "quests", questId), {
+          isActive: false,
+          deletedAt: serverTimestamp(),
+          deletedBy: publicKey?.toString()
+        })
 
-        // Try to delete from API
-        await fetch(`/api/quests/custom?id=${questId}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => null)
-
-        toast({ title: "Quest Deleted" })
-
-        // Broadcast to other tabs
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'customQuests',
-          newValue: JSON.stringify(customQuests.filter(q => q.id !== questId))
-        }))
-
-      } catch (e) {
-        console.error("Error deleting quest:", e)
+        toast({ 
+          title: "✅ Quest Deleted", 
+          description: "Quest removed for all users" 
+        })
+      } catch (error) {
+        console.error("Error deleting quest:", error)
         toast({ 
           title: "Error", 
           description: "Failed to delete quest", 
@@ -747,61 +258,57 @@ export function QuestPageContent() {
         })
       }
     }
-  }, [customQuests])
+  }
 
+  // ==========================================
+  // MERGE CUSTOM QUESTS WITH EXISTING QUESTS
+  // ==========================================
   const getMergedOneTimeQuests = useCallback(() => {
     return [...customQuests, ...oneTimeQuests]
   }, [customQuests, oneTimeQuests])
 
-  const handleStartQuest = useCallback(async (questId: string) => {
-    try {
-      const success = await startQuest(questId)
-      if (success) {
-        toast({ title: "Quest Started", description: "You've started this quest!" })
-      } else {
-        toast({ title: "Error", description: questError || "Failed to start quest", variant: "destructive" })
-      }
-    } catch (e) {
-      console.error("Start quest error:", e)
-      toast({ title: "Error", description: "Failed to start quest", variant: "destructive" })
+  // ==========================================
+  // EXISTING HANDLERS (UNCHANGED)
+  // ==========================================
+  const handleStartQuest = async (questId: string) => {
+    const success = await startQuest(questId)
+    if (success) {
+      toast({ title: "Quest Started", description: "You've started this quest!" })
+    } else {
+      toast({ title: "Error", description: error || "Failed to start quest", variant: "destructive" })
     }
-  }, [startQuest, questError])
+  }
 
-  const handleClaimReward = useCallback(async (progressId: string) => {
-    try {
-      const success = await claimQuestReward(progressId)
-      if (success) {
-        toast({ title: "Reward Claimed!", description: "XP has been added to your account" })
-      } else {
-        toast({ title: "Error", description: questError || "Failed to claim reward", variant: "destructive" })
-      }
-    } catch (e) {
-      console.error("Claim reward error:", e)
-      toast({ title: "Error", description: "Failed to claim reward", variant: "destructive" })
+  const handleClaimReward = async (progressId: string) => {
+    const success = await claimQuestReward(progressId)
+    if (success) {
+      toast({ title: "Reward Claimed!", description: "XP has been added to your account" })
+    } else {
+      toast({ title: "Error", description: error || "Failed to claim reward", variant: "destructive" })
     }
-  }, [claimQuestReward, questError])
+  }
 
-  const handleQuestAction = useCallback(async (questId: string, questType: string) => {
-    if (!publicKey || !signTransaction) {
-      toast({ title: "Error", description: "Please connect your wallet", variant: "destructive" })
-      return
-    }
+  const handleQuestAction = async (questId: string, questType: string) => {
+    if (!publicKey || !signTransaction) return
 
     setProcessingQuest(questId)
 
     try {
+      // Handle custom quests
       if (questType === "custom_quest") {
         const quest = customQuests.find(q => q.id === questId)
         if (quest?.actionLink) {
           window.open(quest.actionLink, "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { customCompleted: true, timestamp: Date.now() })
-              if (success) {
-                toast({ title: "Quest Completed!", description: `You earned ${quest.reward.xp} XP` })
-              }
-            } catch (e) {
-              console.error("Custom quest completion error:", e)
+            const success = await updateQuestProgress(questId, 1, { 
+              customCompleted: true, 
+              timestamp: Date.now() 
+            })
+            if (success) {
+              toast({ 
+                title: "✅ Quest Completed!", 
+                description: `You earned ${quest.reward.xp} XP` 
+              })
             }
           }, 3000)
         }
@@ -809,55 +316,71 @@ export function QuestPageContent() {
         return
       }
 
-      // All existing quest types...
+      // All existing quest types (UNCHANGED)
       switch (questType) {
         case "connect_discord":
           window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { discordConnected: true, timestamp: Date.now() })
-              if (success) toast({ title: "Discord Connected!", description: "Quest completed! You earned 100 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              discordConnected: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "Discord Connected!", description: "Quest completed! You earned 100 XP" })
           }, 3000)
           break
 
         case "follow_linkedin":
           window.open("https://www.linkedin.com/company/rewardnft", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { linkedinFollowed: true, timestamp: Date.now() })
-              if (success) toast({ title: "LinkedIn Followed!", description: "Quest completed! You earned 100 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              linkedinFollowed: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "LinkedIn Followed!", description: "Quest completed! You earned 100 XP" })
+          }, 3000)
+          break
+
+        case "BD Follow":
+          window.open("https://x.com/thewajidmengal", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, {
+              tweetEngaged: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "Follow Now!", description: "Quest completed! You earned 150 XP" })
           }, 3000)
           break
 
         case "engage_tweet":
           window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { tweetEngaged: true, timestamp: Date.now() })
-              if (success) toast({ title: "Tweet Engaged!", description: "Quest completed! You earned 150 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              tweetEngaged: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "Tweet Engaged!", description: "Quest completed! You earned 150 XP" })
           }, 3000)
           break
 
         case "follow_x":
           window.open("https://x.com/thewajidmengal", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { xFollowed: true, timestamp: Date.now() })
-              if (success) toast({ title: "X Followed!", description: "Quest completed! You earned 100 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              xFollowed: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "X Followed!", description: "Quest completed! You earned 100 XP" })
           }, 3000)
           break
 
         case "join_telegram":
           window.open("https://t.me/rewardsNFT", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { telegramJoined: true, timestamp: Date.now() })
-              if (success) toast({ title: "Telegram Joined!", description: "Quest completed! You earned 100 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              telegramJoined: true,
+              timestamp: Date.now()
+            })
+            if (success) toast({ title: "Telegram Joined!", description: "Quest completed! You earned 100 XP" })
           }, 3000)
           break
 
@@ -902,12 +425,14 @@ export function QuestPageContent() {
 
         case "share_twitter":
           const tweetText = encodeURIComponent("Just completed a quest on RewardNFT! 🚀 Earning XP and climbing the leaderboard! #RewardNFT #NFT #Solana #Web3 @RewardNFT_")
-          window.open(`https://x.com/intent/tweet?text=${tweetText}`, "_blank")
+          const tweetUrl = `https://x.com/intent/tweet?text=${tweetText}`
+          window.open(tweetUrl, "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { twitterShareUrl: `https://x.com/intent/tweet?text=${tweetText}`, sharedAt: Date.now() })
-              if (success) toast({ title: "Twitter Share Complete!", description: "Quest completed! You earned 75 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              twitterShareUrl: tweetUrl,
+              sharedAt: Date.now()
+            })
+            if (success) toast({ title: "Twitter Share Complete!", description: "Quest completed! You earned 75 XP" })
           }, 2000)
           break
 
@@ -925,7 +450,9 @@ export function QuestPageContent() {
 
               let currentProgress = 0
               if (currentProgressResult.success) {
-                const questProgress = currentProgressResult.data.find((progress: any) => progress.questId === questId)
+                const questProgress = currentProgressResult.data.find((progress: any) =>
+                  progress.questId === questId
+                )
                 currentProgress = questProgress?.progress || 0
               }
 
@@ -957,17 +484,18 @@ export function QuestPageContent() {
           break
 
         case "play_minigame":
-          safeLocalStorage.setItem('pendingQuestId', questId)
+          localStorage.setItem('pendingQuestId', questId)
           window.location.href = "/mini-game"
           break
 
         case "join_community_call":
           window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
           setTimeout(async () => {
-            try {
-              const success = await updateQuestProgress(questId, 1, { attendanceVerified: true, joinedAt: Date.now() })
-              if (success) toast({ title: "Community Call Joined!", description: "Quest completed! You earned 200 XP" })
-            } catch (e) { console.error(e) }
+            const success = await updateQuestProgress(questId, 1, {
+              attendanceVerified: true,
+              joinedAt: Date.now()
+            })
+            if (success) toast({ title: "Community Call Joined!", description: "Quest completed! You earned 200 XP" })
           }, 3000)
           break
 
@@ -976,25 +504,196 @@ export function QuestPageContent() {
       }
     } catch (error) {
       console.error("Quest action error:", error)
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to complete quest", variant: "destructive" })
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to complete quest action", variant: "destructive" })
     } finally {
       setProcessingQuest(null)
     }
-  }, [publicKey, signTransaction, customQuests, updateQuestProgress])
-
-  // Manual refresh handler
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await syncCustomQuests()
-    setTimeout(() => setIsRefreshing(false), 500)
   }
 
-  if (!mounted || loading) {
+  // ==========================================
+  // QUEST CARD COMPONENT
+  // ==========================================
+  const QuestCard = ({ quest }: { quest: any }) => {
+    const progress = getQuestProgress(quest.id)
+    const progressPercentage = progress ? (progress.progress / progress.maxProgress) * 100 : 0
+    const isCompleted = progress?.status === "completed"
+    const isClaimed = progress?.status === "claimed"
+    const canClaim = isCompleted && !isClaimed
+    const isCustomQuest = quest.isCustom === true
+
+    const getQuestIcon = (questType: string, icon?: string) => {
+      if (icon && icon.length <= 2) return icon
+
+      switch (questType) {
+        case "connect_discord": return "🔗"
+        case "login_streak": return "🔥"
+        case "share_twitter": return "🐦"
+        case "refer_friends": return "👥"
+        case "play_minigame": return "🎮"
+        case "join_community_call": return "📞"
+        case "follow_linkedin": return "💼"
+        case "engage_tweet": return "❤️"
+        case "follow_x": return "🐦"
+        case "join_telegram": return "📱"
+        case "custom_quest": return quest.icon || "⭐"
+        default: return "⭐"
+      }
+    }
+
+    const getActionText = (questType: string) => {
+      switch (questType) {
+        case "connect_discord": return "🔗 Connect Discord"
+        case "login_streak": return "💰 Pay & Login"
+        case "share_twitter": return "🐦 Share on Twitter"
+        case "refer_friends": return "👥 Check Referrals"
+        case "play_minigame": return "🎮 Play Game"
+        case "join_community_call": return "💬 Join Community"
+        case "follow_linkedin": return "💼 Follow LinkedIn"
+        case "engage_tweet": return "❤️ Engage Tweet"
+        case "follow_x": return "🐦 Follow X"
+        case "join_telegram": return "📱 Join Telegram"
+        case "custom_quest": return "Complete"
+        default: return "Complete"
+      }
+    }
+
+    const getQuestDescription = (questType: string, requirements: any) => {
+      switch (questType) {
+        case "connect_discord": return "Click to open Discord and connect"
+        case "login_streak": return "Pay 0.01 SOL to treasury to complete daily login"
+        case "share_twitter": return "Share on Twitter with #RewardNFT hashtag"
+        case "refer_friends": return `Get ${requirements.count} friends to mint NFTs`
+        case "play_minigame": return `Score ${requirements.count}+ points in mini-game`
+        case "join_community_call": return "Join our Discord community"
+        case "follow_linkedin": return "Follow RewardNFT on LinkedIn for updates"
+        case "engage_tweet": return "Like and retweet our latest announcement"
+        case "follow_x": return "Follow @RewardNFT_ on X (Twitter)"
+        case "join_telegram": return "Join our Telegram community"
+        case "custom_quest": return quest.description || "Complete this quest to earn rewards"
+        default: return "Complete this quest to earn rewards"
+      }
+    }
+
+    return (
+      <div className={`bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border transition-all duration-300 hover:bg-gray-800/80 relative ${
+        isCompleted ? 'border-green-500/50 bg-green-900/20' : 'border-gray-700/50'
+      }`}>
+        {/* Admin Delete Button */}
+        {adminMode && isCustomQuest && (
+          <button
+            onClick={() => handleDeleteQuest(quest.id)}
+            className="absolute top-4 right-4 p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors z-10"
+            title="Delete Quest"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* NEW Badge */}
+        {quest.isNew && (
+          <div className="absolute top-4 right-4">
+            <Badge className="bg-red-500 text-white text-xs animate-pulse">NEW</Badge>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">{getQuestIcon(quest.requirements.type, quest.icon)}</div>
+            <div>
+              <h3 className="text-white font-semibold text-lg">{quest.title}</h3>
+              <p className="text-gray-400 text-sm">{quest.description}</p>
+              <p className="text-gray-500 text-xs italic mt-1">{getQuestDescription(quest.requirements.type, quest.requirements)}</p>
+            </div>
+          </div>
+          {isClaimed && <CheckCircle className="w-6 h-6 text-green-400" />}
+        </div>
+
+        {/* Quest Image for custom quests */}
+        {quest.imageUrl && (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <img src={quest.imageUrl} alt={quest.title} className="w-full h-32 object-cover" />
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Progress</span>
+            <span className="text-white">
+              {progress?.progress || 0} / {quest.requirements.count}
+            </span>
+          </div>
+
+          <Progress value={progressPercentage} className="h-2" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {quest.difficulty && (
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  quest.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                  quest.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {quest.difficulty.charAt(0).toUpperCase() + quest.difficulty.slice(1)}
+                </span>
+              )}
+              <Star className="w-4 h-4 text-yellow-400" />
+              <span className="text-yellow-400 font-medium">Reward: {quest.reward.xp} XP</span>
+            </div>
+
+            <div className="flex gap-2">
+              {!progress && (
+                <Button
+                  onClick={() => handleStartQuest(quest.id)}
+                  size="sm"
+                  className="bg-teal-500 hover:bg-teal-600 text-black"
+                >
+                  Start
+                </Button>
+              )}
+
+              {progress && !isCompleted && !isClaimed && (
+                <Button
+                  onClick={() => handleQuestAction(quest.id, quest.requirements.type)}
+                  size="sm"
+                  disabled={processingQuest === quest.id}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  {processingQuest === questId ? "Processing..." : getActionText(quest.requirements.type)}
+                  {quest.requirements.type === "login_streak" && (
+                    <span className="ml-1 text-xs">(0.01 SOL)</span>
+                  )}
+                </Button>
+              )}
+
+              {canClaim && (
+                <Button
+                  onClick={() => handleClaimReward(progress.id)}
+                  size="sm"
+                  className="bg-green-500 hover:bg-green-600 text-black"
+                >
+                  Claim
+                </Button>
+              )}
+
+              {isClaimed && (
+                <Button size="sm" variant="outline" disabled>
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Completed
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading || isLoadingQuests) {
     return (
       <ProtectedRoute requiresNFT={true}>
-        <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
           <div className="text-white text-xl flex items-center gap-3">
-            <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+            <Loader2 className="w-6 h-6 animate-spin" />
             Loading quests...
           </div>
         </div>
@@ -1004,257 +703,251 @@ export function QuestPageContent() {
 
   return (
     <ProtectedRoute requiresNFT={true}>
-      <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
-        {/* Animated Background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[128px] animate-pulse" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[128px] animate-pulse delay-1000" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[150px]" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
-          {/* Admin Badge */}
-          {adminMode && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="fixed top-4 right-4 z-50"
-            >
-              <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg shadow-purple-500/25 flex items-center gap-2">
-                <Crown className="w-4 h-4 text-white" />
-                <span className="text-sm font-bold text-white">Admin Mode</span>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400"
-            >
-              <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
-              <button 
-                onClick={() => setError(null)}
-                className="ml-auto text-sm hover:text-red-300"
-              >
-                Dismiss
-              </button>
-            </motion.div>
-          )}
-
-          {/* Header Section */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 mb-6">
-              <Sparkles className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm text-slate-300">Complete quests to earn rewards</span>
-            </div>
-
-            <h1 className="text-5xl md:text-7xl font-bold mb-6">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
-                Complete
-              </span>
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 ml-4">
-                Quests
-              </span>
-            </h1>
-
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              Complete tasks, earn XP, and climb the leaderboard to unlock exclusive rewards and NFTs
-            </p>
-
-            {/* Admin Controls */}
-            {adminMode && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-8 flex justify-center gap-4"
-              >
-                <Button
-                  onClick={() => setCreateModalOpen(true)}
-                  className="px-8 py-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all text-lg"
-                >
-                  <Plus className="w-6 h-6 mr-2" />
-                  Create New Quest
-                </Button>
-
-                <Button
-                  onClick={handleRefresh}
-                  variant="outline"
-                  className="px-6 py-6 border-slate-600 text-slate-300 hover:bg-slate-800"
-                >
-                  <RefreshCw className={`w-5 h-5 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Sync Quests
-                </Button>
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
-            <StatCard 
-              icon={<Trophy className="w-6 h-6 text-white" />}
-              label="Total XP Earned"
-              value={userXPData?.totalXP?.toString() || "0"}
-              color="from-yellow-400 to-orange-600"
-            />
-            <StatCard 
-              icon={<Target className="w-6 h-6 text-white" />}
-              label="Quests Completed"
-              value={`${customQuests.length + oneTimeQuests.length}`}
-              color="from-blue-400 to-indigo-600"
-            />
-            <StatCard 
-              icon={<Crown className="w-6 h-6 text-white" />}
-              label="Current Rank"
-              value={`#${userXPData?.rank || 142}`}
-              color="from-purple-400 to-pink-600"
-            />
-            <StatCard 
-              icon={<Gem className="w-6 h-6 text-white" />}
-              label="Level"
-              value={userXPData?.level?.toString() || "1"}
-              color="from-emerald-400 to-teal-600"
-            />
-          </div>
-
-          {/* One-Time Quests */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mb-12"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-                <Star className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-white">
-                {adminMode ? "All Quests (Admin View)" : "One-Time Quests"}
-              </h2>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AnimatePresence mode="popLayout">
-                {getMergedOneTimeQuests().map((quest, index) => (
-                  <EnhancedQuestCard
-                    key={quest.id}
-                    quest={quest}
-                    progress={getQuestProgress(quest.id)}
-                    onStart={handleStartQuest}
-                    onAction={handleQuestAction}
-                    onClaim={handleClaimReward}
-                    onDelete={adminMode ? handleDeleteQuest : undefined}
-                    isAdmin={adminMode}
-                    processingQuest={processingQuest}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-
-          {/* Daily Quests */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mb-12"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-white">Daily Quests</h2>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {dailyQuests.map((quest, index) => (
-                <EnhancedQuestCard
-                  key={quest.id}
-                  quest={quest}
-                  progress={getQuestProgress(quest.id)}
-                  onStart={handleStartQuest}
-                  onAction={handleQuestAction}
-                  onClaim={handleClaimReward}
-                  onDelete={adminMode ? handleDeleteQuest : undefined}
-                  isAdmin={adminMode}
-                  processingQuest={processingQuest}
-                />
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Weekly Quests */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500">
-                <Trophy className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-white">Weekly Quests</h2>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {weeklyQuests.map((quest, index) => (
-                <EnhancedQuestCard
-                  key={quest.id}
-                  quest={quest}
-                  progress={getQuestProgress(quest.id)}
-                  onStart={handleStartQuest}
-                  onAction={handleQuestAction}
-                  onClaim={handleClaimReward}
-                  onDelete={adminMode ? handleDeleteQuest : undefined}
-                  isAdmin={adminMode}
-                  processingQuest={processingQuest}
-                />
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Bottom CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-            className="mt-16 text-center"
-          >
-            <div className="inline-flex flex-col items-center gap-4 p-8 rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-900/40 border border-slate-800 backdrop-blur-xl">
-              <div className="p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/25">
-                <Trophy className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white">Ready for more challenges?</h3>
-              <p className="text-slate-400 max-w-md">
-                Complete all quests to unlock exclusive NFT rewards and climb to the top of the leaderboard!
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
+        <main className="py-12 px-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <h1 className="text-5xl font-bold text-white mb-4">
+                Complete <span className="bg-gradient-to-r from-green-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">Quests</span>
+              </h1>
+              <p className="text-xl text-gray-400">
+                Complete tasks, earn XP, and climb the leaderboard to unlock exclusive rewards.
               </p>
-              <Button
-                className="px-8 py-6 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow text-lg"
-              >
-                View Leaderboard
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
+
+              {/* Admin Badge & Create Button */}
+              {adminMode && (
+                <div className="mt-6 flex justify-center items-center gap-4">
+                  <div className="px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-purple-400" />
+                    <span className="text-purple-400 text-sm font-semibold">Admin Mode</span>
+                  </div>
+                  <Button
+                    onClick={() => setCreateModalOpen(true)}
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-6 py-3 rounded-full shadow-lg shadow-purple-500/25"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Quest
+                  </Button>
+                </div>
+              )}
             </div>
-          </motion.div>
-        </div>
+
+            {/* User XP Progress */}
+            {userXPData && (
+              <div className="bg-gray-800/60 backdrop-blur-sm rounded-2xl p-6 mb-12 border border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-teal-400 to-blue-500 rounded-full flex items-center justify-center">
+                      <Trophy className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">Level {userXPData.level}</div>
+                      <div className="text-gray-400">
+                        {userXPData.currentLevelXP}/{userXPData.nextLevelXP} XP
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-teal-400">
+                      {userXPData.totalXP}/500
+                    </div>
+                    <div className="text-gray-400">Total XP</div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-yellow-400">
+                      #{userXPData.rank || 532}
+                    </div>
+                    <div className="text-gray-400">Rank</div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <Progress 
+                    value={(userXPData.currentLevelXP / userXPData.nextLevelXP) * 100} 
+                    className="h-3"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* One-Time Quests */}
+            <div className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <Trophy className="w-6 h-6 text-purple-400" />
+                <h2 className="text-3xl font-bold text-white">
+                  {adminMode ? "All Quests (Admin View)" : "One-Time Quests"}
+                </h2>
+                {customQuests.length > 0 && (
+                  <span className="text-sm text-gray-400">
+                    ({customQuests.length} custom)
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {getMergedOneTimeQuests().map((quest) => (
+                  <QuestCard key={quest.id} quest={quest} />
+                ))}
+              </div>
+            </div>
+
+            {/* Daily Quests */}
+            <div className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <Zap className="w-6 h-6 text-blue-400" />
+                <h2 className="text-3xl font-bold text-white">Daily Quests</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {dailyQuests.map((quest) => (
+                  <QuestCard key={quest.id} quest={quest} />
+                ))}
+              </div>
+            </div>
+
+            {/* Weekly Quests */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <Star className="w-6 h-6 text-yellow-400" />
+                <h2 className="text-3xl font-bold text-white">Weekly Quests</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {weeklyQuests.map((quest) => (
+                  <QuestCard key={quest.id} quest={quest} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
 
         {/* Create Quest Modal */}
-        <CreateQuestModal
-          isOpen={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          onCreate={handleCreateQuest}
-        />
+        <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+          <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-white flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/20">
+                  <Plus className="w-5 h-5 text-purple-400" />
+                </div>
+                Create New Quest
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label className="text-gray-300">Quest Title *</Label>
+                <Input
+                  value={newQuest.title}
+                  onChange={(e) => setNewQuest({...newQuest, title: e.target.value})}
+                  placeholder="e.g., Follow on Twitter"
+                  className="bg-gray-800 border-gray-600 text-white mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-300">Description</Label>
+                <Input
+                  value={newQuest.description}
+                  onChange={(e) => setNewQuest({...newQuest, description: e.target.value})}
+                  placeholder="Short description..."
+                  className="bg-gray-800 border-gray-600 text-white mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-300">Icon (Emoji)</Label>
+                  <Input
+                    value={newQuest.icon}
+                    onChange={(e) => setNewQuest({...newQuest, icon: e.target.value})}
+                    placeholder="⭐"
+                    className="bg-gray-800 border-gray-600 text-white mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">XP Reward *</Label>
+                  <Input
+                    type="number"
+                    value={newQuest.xp}
+                    onChange={(e) => setNewQuest({...newQuest, xp: e.target.value})}
+                    placeholder="100"
+                    className="bg-gray-800 border-gray-600 text-white mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300">Action Link (URL) *</Label>
+                <Input
+                  type="url"
+                  value={newQuest.link}
+                  onChange={(e) => setNewQuest({...newQuest, link: e.target.value})}
+                  placeholder="https://..."
+                  className="bg-gray-800 border-gray-600 text-white mt-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">Users will be redirected here</p>
+              </div>
+
+              <div>
+                <Label className="text-gray-300">Quest Image URL (Optional)</Label>
+                <Input
+                  type="url"
+                  value={newQuest.imageUrl}
+                  onChange={(e) => setNewQuest({...newQuest, imageUrl: e.target.value})}
+                  placeholder="https://example.com/image.png"
+                  className="bg-gray-800 border-gray-600 text-white mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-300">Difficulty</Label>
+                  <select
+                    value={newQuest.difficulty}
+                    onChange={(e) => setNewQuest({...newQuest, difficulty: e.target.value as any})}
+                    className="w-full mt-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-gray-300">Category</Label>
+                  <select
+                    value={newQuest.category}
+                    onChange={(e) => setNewQuest({...newQuest, category: e.target.value})}
+                    className="w-full mt-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
+                  >
+                    <option value="one_time">One-Time</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateModalOpen(false)}
+                  className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateQuest}
+                  disabled={!newQuest.title || !newQuest.link}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold"
+                >
+                  Create Quest
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   )
