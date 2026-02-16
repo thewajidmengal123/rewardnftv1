@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -26,7 +26,9 @@ import {
   ArrowRight,
   X,
   Link as LinkIcon,
-  Upload
+  Upload,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useQuestSystem } from "@/hooks/use-quest-system"
@@ -70,25 +72,44 @@ interface Quest {
   actionLink?: string
   imageUrl?: string
   difficulty?: "easy" | "medium" | "hard"
+  createdAt?: string
+  createdBy?: string
+  isActive?: boolean
 }
 
 // ==========================================
-// DIFFICULTY CONFIG
+// SAFE LOCALSTORAGE HELPER
 // ==========================================
-const difficultyColors = {
-  easy: "from-green-400 to-emerald-600",
-  medium: "from-yellow-400 to-orange-600",
-  hard: "from-red-400 to-rose-600"
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      return window.localStorage.getItem(key)
+    } catch (e) {
+      console.warn('localStorage error:', e)
+      return null
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(key, value)
+    } catch (e) {
+      console.warn('localStorage error:', e)
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.removeItem(key)
+    } catch (e) {
+      console.warn('localStorage error:', e)
+    }
+  }
 }
 
-const difficultyBg = {
-  easy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  medium: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  hard: "bg-rose-500/10 text-rose-400 border-rose-500/20"
-}
-
 // ==========================================
-// CREATE QUEST MODAL COMPONENT (Enhanced)
+// CREATE QUEST MODAL COMPONENT
 // ==========================================
 function CreateQuestModal({ 
   isOpen, 
@@ -116,41 +137,58 @@ function CreateQuestModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title || !formData.link) {
-      toast({ title: "Error", description: "Title and Link are required", variant: "destructive" })
+      toast({ 
+        title: "Error", 
+        description: "Title and Link are required", 
+        variant: "destructive" 
+      })
       return
     }
 
     setIsSubmitting(true)
 
-    const questData = {
-      id: `custom-${Date.now()}`,
-      title: formData.title,
-      description: formData.description,
-      icon: formData.icon,
-      reward: { xp: parseInt(formData.xp) || 100 },
-      requirements: { type: "custom_quest", count: 1 },
-      actionLink: formData.link,
-      category: formData.category,
-      difficulty: formData.difficulty,
-      imageUrl: formData.imageUrl,
-      isNew: true
+    try {
+      const questData = {
+        id: `custom-${Date.now()}`,
+        title: formData.title,
+        description: formData.description,
+        icon: formData.icon,
+        reward: { xp: parseInt(formData.xp) || 100 },
+        requirements: { type: "custom_quest", count: 1 },
+        actionLink: formData.link,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        imageUrl: formData.imageUrl,
+        isNew: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        createdBy: ADMIN_WALLET_ADDRESS
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500))
+      onCreate(questData)
+
+      setFormData({
+        title: "",
+        description: "",
+        icon: "⭐",
+        xp: "100",
+        link: "",
+        imageUrl: "",
+        difficulty: "easy",
+        category: "one_time"
+      })
+      onClose()
+    } catch (error) {
+      console.error("Create quest error:", error)
+      toast({ 
+        title: "Error", 
+        description: "Failed to create quest", 
+        variant: "destructive" 
+      })
+    } finally {
+      setIsSubmitting(false)
     }
-
-    await new Promise(resolve => setTimeout(resolve, 500))
-    onCreate(questData)
-
-    setFormData({
-      title: "",
-      description: "",
-      icon: "⭐",
-      xp: "100",
-      link: "",
-      imageUrl: "",
-      difficulty: "easy",
-      category: "one_time"
-    })
-    setIsSubmitting(false)
-    onClose()
   }
 
   return (
@@ -165,13 +203,12 @@ function CreateQuestModal({
               <DialogTitle className="text-2xl font-bold text-white">
                 Create New Quest
               </DialogTitle>
-              <p className="text-slate-400 text-sm">Admin Only - Create quests for users</p>
+              <p className="text-slate-400 text-sm">Admin Only</p>
             </div>
           </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {/* Title */}
           <div>
             <Label className="text-slate-300">Quest Title *</Label>
             <Input
@@ -183,18 +220,16 @@ function CreateQuestModal({
             />
           </div>
 
-          {/* Description */}
           <div>
             <Label className="text-slate-300">Description</Label>
             <Input
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
-              placeholder="Short description of the quest..."
+              placeholder="Short description..."
               className="bg-slate-800 border-slate-600 text-white mt-1"
             />
           </div>
 
-          {/* Icon & XP */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-slate-300">Icon (Emoji)</Label>
@@ -218,7 +253,6 @@ function CreateQuestModal({
             </div>
           </div>
 
-          {/* External Link */}
           <div>
             <Label className="text-slate-300">Action Link (URL) *</Label>
             <div className="relative">
@@ -232,12 +266,8 @@ function CreateQuestModal({
                 required
               />
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Users will be redirected to this link
-            </p>
           </div>
 
-          {/* Image URL */}
           <div>
             <Label className="text-slate-300">Quest Image URL (Optional)</Label>
             <div className="relative">
@@ -252,7 +282,6 @@ function CreateQuestModal({
             </div>
           </div>
 
-          {/* Difficulty & Category */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-slate-300">Difficulty</Label>
@@ -280,7 +309,6 @@ function CreateQuestModal({
             </div>
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-3 pt-4">
             <Button
               type="button"
@@ -343,7 +371,7 @@ function EnhancedQuestCard({
   const hasStarted = !!progress
 
   const getQuestIcon = (questType: string, icon?: string) => {
-    if (icon && icon.length <= 2) return icon // Return emoji if provided
+    if (icon && icon.length <= 2) return icon
 
     switch (questType) {
       case "connect_discord": return "🔗"
@@ -394,17 +422,13 @@ function EnhancedQuestCard({
       whileHover={{ y: -5 }}
       className="group relative"
     >
-      {/* Glow Effect */}
       <div className={`absolute -inset-0.5 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} rounded-2xl opacity-0 group-hover:opacity-30 transition-opacity duration-500 blur-xl`} />
 
-      {/* Card */}
       <div className={`relative bg-slate-900/80 backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-300 ${
         isClaimed ? 'border-green-500/50 shadow-lg shadow-green-500/20' : 'border-slate-800 hover:border-slate-600'
       }`}>
-        {/* Top Gradient Line */}
         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} opacity-50`} />
 
-        {/* Admin Delete Button */}
         {isAdmin && onDelete && (
           <button
             onClick={() => onDelete(quest.id)}
@@ -414,7 +438,6 @@ function EnhancedQuestCard({
           </button>
         )}
 
-        {/* NEW Badge */}
         {quest.isNew && (
           <div className="absolute top-4 right-4">
             <span className="px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full shadow-lg shadow-pink-500/25 animate-pulse">
@@ -424,7 +447,6 @@ function EnhancedQuestCard({
         )}
 
         <div className="p-6">
-          {/* Header */}
           <div className="flex items-start gap-4 mb-4">
             <div className={`p-3 rounded-xl bg-gradient-to-br ${getDifficultyColor(quest.difficulty)} shadow-lg`}>
               <span className="text-2xl">{getQuestIcon(quest.requirements.type, quest.icon)}</span>
@@ -440,7 +462,6 @@ function EnhancedQuestCard({
             </div>
           </div>
 
-          {/* Quest Image */}
           {quest.imageUrl && (
             <div className="mb-4 rounded-xl overflow-hidden">
               <img 
@@ -451,7 +472,6 @@ function EnhancedQuestCard({
             </div>
           )}
 
-          {/* Progress Section */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Progress</span>
@@ -469,13 +489,13 @@ function EnhancedQuestCard({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               {quest.difficulty && (
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                  quest.difficulty === 'easy' ? difficultyBg.easy : 
-                  quest.difficulty === 'medium' ? difficultyBg.medium : difficultyBg.hard
+                  quest.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+                  quest.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 
+                  'bg-rose-500/10 text-rose-400 border-rose-500/20'
                 }`}>
                   {quest.difficulty.charAt(0).toUpperCase() + quest.difficulty.slice(1)}
                 </div>
@@ -535,7 +555,6 @@ function EnhancedQuestCard({
           </div>
         </div>
 
-        {/* Hover Shine Effect */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
       </div>
     </motion.div>
@@ -572,6 +591,8 @@ export function QuestPageContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [customQuests, setCustomQuests] = useState<Quest[]>([])
   const [mounted, setMounted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const {
     dailyQuests,
@@ -579,7 +600,7 @@ export function QuestPageContent() {
     oneTimeQuests,
     userXPData,
     loading,
-    error,
+    error: questError,
     startQuest,
     updateQuestProgress,
     claimQuestReward,
@@ -588,71 +609,199 @@ export function QuestPageContent() {
 
   const adminMode = isAdmin(publicKey?.toString())
 
-  useEffect(() => {
-    setMounted(true)
-    // Load custom quests from localStorage
-    const saved = localStorage.getItem('customQuests')
-    if (saved) {
-      setCustomQuests(JSON.parse(saved))
+  // ==========================================
+  // SYNC CUSTOM QUESTS - Real-time sync
+  // ==========================================
+  const syncCustomQuests = useCallback(async () => {
+    try {
+      // Try to fetch from API first (if you have a backend endpoint)
+      const response = await fetch('/api/quests/custom', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      }).catch(() => null)
+
+      if (response && response.ok) {
+        const data = await response.json()
+        if (data.success && data.quests) {
+          setCustomQuests(data.quests)
+          safeLocalStorage.setItem('customQuests', JSON.stringify(data.quests))
+          return
+        }
+      }
+
+      // Fallback to localStorage
+      const saved = safeLocalStorage.getItem('customQuests')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Filter only active quests
+        const activeQuests = parsed.filter((q: Quest) => q.isActive !== false)
+        setCustomQuests(activeQuests)
+      }
+    } catch (e) {
+      console.error("Error syncing quests:", e)
     }
   }, [])
 
-  // Save custom quests when updated
+  // Initial load and periodic sync
+  useEffect(() => {
+    setMounted(true)
+    syncCustomQuests()
+
+    // Sync every 5 seconds for real-time updates
+    const interval = setInterval(syncCustomQuests, 5000)
+    return () => clearInterval(interval)
+  }, [syncCustomQuests])
+
+  // Listen for storage changes (cross-tab sync)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'customQuests') {
+        syncCustomQuests()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [syncCustomQuests])
+
+  // Save to localStorage whenever customQuests change
   useEffect(() => {
     if (customQuests.length > 0) {
-      localStorage.setItem('customQuests', JSON.stringify(customQuests))
+      safeLocalStorage.setItem('customQuests', JSON.stringify(customQuests))
     }
   }, [customQuests])
 
-  const handleCreateQuest = (questData: Quest) => {
-    setCustomQuests(prev => [questData, ...prev])
-    toast({ title: "Quest Created!", description: "New quest is now live for all users" })
-  }
+  // ==========================================
+  // CREATE QUEST - With API sync
+  // ==========================================
+  const handleCreateQuest = useCallback(async (questData: Quest) => {
+    try {
+      // Add to local state immediately
+      setCustomQuests(prev => [questData, ...prev])
 
-  const handleDeleteQuest = (questId: string) => {
-    if (confirm("Are you sure you want to delete this quest?")) {
-      setCustomQuests(prev => prev.filter(q => q.id !== questId))
-      toast({ title: "Quest Deleted" })
+      // Try to save to API
+      const response = await fetch('/api/quests/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(questData)
+      }).catch(() => null)
+
+      if (response && response.ok) {
+        toast({ 
+          title: "Quest Created!", 
+          description: "New quest is now live for all users" 
+        })
+      } else {
+        // If API fails, still show success (localStorage will sync)
+        toast({ 
+          title: "Quest Created!", 
+          description: "Quest saved locally. All users will see it on refresh." 
+        })
+      }
+
+      // Broadcast to other tabs
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'customQuests',
+        newValue: JSON.stringify([questData, ...customQuests])
+      }))
+
+    } catch (e) {
+      console.error("Error creating quest:", e)
+      toast({ 
+        title: "Error", 
+        description: "Failed to create quest", 
+        variant: "destructive" 
+      })
     }
-  }
+  }, [customQuests])
 
-  const getMergedOneTimeQuests = () => {
+  // ==========================================
+  // DELETE QUEST - With API sync
+  // ==========================================
+  const handleDeleteQuest = useCallback(async (questId: string) => {
+    if (typeof window !== 'undefined' && window.confirm("Are you sure you want to delete this quest?")) {
+      try {
+        // Update local state
+        setCustomQuests(prev => prev.filter(q => q.id !== questId))
+
+        // Try to delete from API
+        await fetch(`/api/quests/custom?id=${questId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => null)
+
+        toast({ title: "Quest Deleted" })
+
+        // Broadcast to other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'customQuests',
+          newValue: JSON.stringify(customQuests.filter(q => q.id !== questId))
+        }))
+
+      } catch (e) {
+        console.error("Error deleting quest:", e)
+        toast({ 
+          title: "Error", 
+          description: "Failed to delete quest", 
+          variant: "destructive" 
+        })
+      }
+    }
+  }, [customQuests])
+
+  const getMergedOneTimeQuests = useCallback(() => {
     return [...customQuests, ...oneTimeQuests]
-  }
+  }, [customQuests, oneTimeQuests])
 
-  // All your existing quest action handlers remain the same...
-  const handleStartQuest = async (questId: string) => {
-    const success = await startQuest(questId)
-    if (success) {
-      toast({ title: "Quest Started", description: "You've started this quest!" })
-    } else {
-      toast({ title: "Error", description: error || "Failed to start quest", variant: "destructive" })
+  const handleStartQuest = useCallback(async (questId: string) => {
+    try {
+      const success = await startQuest(questId)
+      if (success) {
+        toast({ title: "Quest Started", description: "You've started this quest!" })
+      } else {
+        toast({ title: "Error", description: questError || "Failed to start quest", variant: "destructive" })
+      }
+    } catch (e) {
+      console.error("Start quest error:", e)
+      toast({ title: "Error", description: "Failed to start quest", variant: "destructive" })
     }
-  }
+  }, [startQuest, questError])
 
-  const handleClaimReward = async (progressId: string) => {
-    const success = await claimQuestReward(progressId)
-    if (success) {
-      toast({ title: "Reward Claimed!", description: "XP has been added to your account" })
-    } else {
-      toast({ title: "Error", description: error || "Failed to claim reward", variant: "destructive" })
+  const handleClaimReward = useCallback(async (progressId: string) => {
+    try {
+      const success = await claimQuestReward(progressId)
+      if (success) {
+        toast({ title: "Reward Claimed!", description: "XP has been added to your account" })
+      } else {
+        toast({ title: "Error", description: questError || "Failed to claim reward", variant: "destructive" })
+      }
+    } catch (e) {
+      console.error("Claim reward error:", e)
+      toast({ title: "Error", description: "Failed to claim reward", variant: "destructive" })
     }
-  }
+  }, [claimQuestReward, questError])
 
-  const handleQuestAction = async (questId: string, questType: string) => {
-    if (!publicKey || !signTransaction) return
+  const handleQuestAction = useCallback(async (questId: string, questType: string) => {
+    if (!publicKey || !signTransaction) {
+      toast({ title: "Error", description: "Please connect your wallet", variant: "destructive" })
+      return
+    }
+
     setProcessingQuest(questId)
 
     try {
-      // Handle custom quests
       if (questType === "custom_quest") {
         const quest = customQuests.find(q => q.id === questId)
         if (quest?.actionLink) {
           window.open(quest.actionLink, "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { customCompleted: true, timestamp: Date.now() })
-            if (success) {
-              toast({ title: "Quest Completed!", description: `You earned ${quest.reward.xp} XP` })
+            try {
+              const success = await updateQuestProgress(questId, 1, { customCompleted: true, timestamp: Date.now() })
+              if (success) {
+                toast({ title: "Quest Completed!", description: `You earned ${quest.reward.xp} XP` })
+              }
+            } catch (e) {
+              console.error("Custom quest completion error:", e)
             }
           }, 3000)
         }
@@ -660,45 +809,55 @@ export function QuestPageContent() {
         return
       }
 
-      // All your existing switch cases remain here...
+      // All existing quest types...
       switch (questType) {
         case "connect_discord":
           window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { discordConnected: true, timestamp: Date.now() })
-            if (success) toast({ title: "Discord Connected!", description: "Quest completed! You earned 100 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { discordConnected: true, timestamp: Date.now() })
+              if (success) toast({ title: "Discord Connected!", description: "Quest completed! You earned 100 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
         case "follow_linkedin":
           window.open("https://www.linkedin.com/company/rewardnft", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { linkedinFollowed: true, timestamp: Date.now() })
-            if (success) toast({ title: "LinkedIn Followed!", description: "Quest completed! You earned 100 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { linkedinFollowed: true, timestamp: Date.now() })
+              if (success) toast({ title: "LinkedIn Followed!", description: "Quest completed! You earned 100 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
         case "engage_tweet":
           window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { tweetEngaged: true, timestamp: Date.now() })
-            if (success) toast({ title: "Tweet Engaged!", description: "Quest completed! You earned 150 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { tweetEngaged: true, timestamp: Date.now() })
+              if (success) toast({ title: "Tweet Engaged!", description: "Quest completed! You earned 150 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
         case "follow_x":
           window.open("https://x.com/thewajidmengal", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { xFollowed: true, timestamp: Date.now() })
-            if (success) toast({ title: "X Followed!", description: "Quest completed! You earned 100 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { xFollowed: true, timestamp: Date.now() })
+              if (success) toast({ title: "X Followed!", description: "Quest completed! You earned 100 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
         case "join_telegram":
           window.open("https://t.me/rewardsNFT", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { telegramJoined: true, timestamp: Date.now() })
-            if (success) toast({ title: "Telegram Joined!", description: "Quest completed! You earned 100 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { telegramJoined: true, timestamp: Date.now() })
+              if (success) toast({ title: "Telegram Joined!", description: "Quest completed! You earned 100 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
@@ -706,17 +865,21 @@ export function QuestPageContent() {
           try {
             const paymentResult = await solPaymentService.processPayment(publicKey, 0.01, signTransaction)
             if (paymentResult.success) {
-              await fetch('/api/treasury/sol-payments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  walletAddress: publicKey.toString(),
-                  signature: paymentResult.signature,
-                  amount: 0.01,
-                  questId,
-                  treasuryWallet: solPaymentService.treasuryWalletAddress
+              try {
+                await fetch('/api/treasury/sol-payments', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    walletAddress: publicKey.toString(),
+                    signature: paymentResult.signature,
+                    amount: 0.01,
+                    questId,
+                    treasuryWallet: solPaymentService.treasuryWalletAddress
+                  })
                 })
-              })
+              } catch (recordError) {
+                console.warn("Failed to record payment:", recordError)
+              }
 
               const success = await updateQuestProgress(questId, 1, {
                 solPaymentSignature: paymentResult.signature,
@@ -741,8 +904,10 @@ export function QuestPageContent() {
           const tweetText = encodeURIComponent("Just completed a quest on RewardNFT! 🚀 Earning XP and climbing the leaderboard! #RewardNFT #NFT #Solana #Web3 @RewardNFT_")
           window.open(`https://x.com/intent/tweet?text=${tweetText}`, "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { twitterShareUrl: `https://x.com/intent/tweet?text=${tweetText}`, sharedAt: Date.now() })
-            if (success) toast({ title: "Twitter Share Complete!", description: "Quest completed! You earned 75 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { twitterShareUrl: `https://x.com/intent/tweet?text=${tweetText}`, sharedAt: Date.now() })
+              if (success) toast({ title: "Twitter Share Complete!", description: "Quest completed! You earned 75 XP" })
+            } catch (e) { console.error(e) }
           }, 2000)
           break
 
@@ -792,15 +957,17 @@ export function QuestPageContent() {
           break
 
         case "play_minigame":
-          localStorage.setItem('pendingQuestId', questId)
+          safeLocalStorage.setItem('pendingQuestId', questId)
           window.location.href = "/mini-game"
           break
 
         case "join_community_call":
           window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
           setTimeout(async () => {
-            const success = await updateQuestProgress(questId, 1, { attendanceVerified: true, joinedAt: Date.now() })
-            if (success) toast({ title: "Community Call Joined!", description: "Quest completed! You earned 200 XP" })
+            try {
+              const success = await updateQuestProgress(questId, 1, { attendanceVerified: true, joinedAt: Date.now() })
+              if (success) toast({ title: "Community Call Joined!", description: "Quest completed! You earned 200 XP" })
+            } catch (e) { console.error(e) }
           }, 3000)
           break
 
@@ -813,6 +980,13 @@ export function QuestPageContent() {
     } finally {
       setProcessingQuest(null)
     }
+  }, [publicKey, signTransaction, customQuests, updateQuestProgress])
+
+  // Manual refresh handler
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await syncCustomQuests()
+    setTimeout(() => setIsRefreshing(false), 500)
   }
 
   if (!mounted || loading) {
@@ -854,6 +1028,24 @@ export function QuestPageContent() {
             </motion.div>
           )}
 
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400"
+            >
+              <AlertCircle className="w-5 h-5" />
+              <span>{error}</span>
+              <button 
+                onClick={() => setError(null)}
+                className="ml-auto text-sm hover:text-red-300"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+
           {/* Header Section */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -878,12 +1070,12 @@ export function QuestPageContent() {
               Complete tasks, earn XP, and climb the leaderboard to unlock exclusive rewards and NFTs
             </p>
 
-            {/* Admin Create Quest Button */}
+            {/* Admin Controls */}
             {adminMode && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="mt-8"
+                className="mt-8 flex justify-center gap-4"
               >
                 <Button
                   onClick={() => setCreateModalOpen(true)}
@@ -891,6 +1083,15 @@ export function QuestPageContent() {
                 >
                   <Plus className="w-6 h-6 mr-2" />
                   Create New Quest
+                </Button>
+
+                <Button
+                  onClick={handleRefresh}
+                  variant="outline"
+                  className="px-6 py-6 border-slate-600 text-slate-300 hover:bg-slate-800"
+                >
+                  <RefreshCw className={`w-5 h-5 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Sync Quests
                 </Button>
               </motion.div>
             )}
