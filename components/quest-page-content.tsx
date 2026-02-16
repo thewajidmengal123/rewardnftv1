@@ -2,164 +2,79 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 import { 
+  CheckCircle, 
+  Clock, 
+  Star, 
   Trophy, 
-  Target, 
-  Flame, 
-  Twitter, 
-  Linkedin, 
-  MessageCircle, 
-  Gamepad2, 
-  Star,
-  Zap,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  Sparkles,
+  Zap, 
+  ExternalLink, 
+  Plus, 
+  Trash2,
+  Target,
+  Gamepad2,
+  Twitter,
+  Linkedin,
+  MessageCircle,
+  Flame,
   Crown,
   Gem,
-  Plus,
+  Sparkles,
+  ArrowRight,
   X,
   Link as LinkIcon,
-  Upload,
-  Trash2,
-  ExternalLink
+  Upload
 } from "lucide-react"
-import { useWallet } from "@solana/wallet-adapter-react"
+import { ProtectedRoute } from "@/components/protected-route"
+import { useQuestSystem } from "@/hooks/use-quest-system"
+import { useWallet } from "@/contexts/wallet-context"
+import { solPaymentService } from "@/services/sol-payment-service"
+import { toast } from "@/components/ui/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
-// ============================================
+// ==========================================
 // ADMIN CONFIGURATION
-// ============================================
+// ==========================================
 const ADMIN_WALLET_ADDRESS = "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ"
 
-// ============================================
+const isAdmin = (walletAddress: string | null | undefined): boolean => {
+  if (!walletAddress) return false
+  return walletAddress === ADMIN_WALLET_ADDRESS
+}
+
+// ==========================================
 // TYPES
-// ============================================
+// ==========================================
 interface Quest {
   id: string
   title: string
   description: string
-  reward: number
-  progress: number
-  maxProgress: number
   icon: string
-  type: "social" | "game" | "daily" | "special"
-  difficulty: "easy" | "medium" | "hard"
+  reward: { xp: number }
+  requirements: { 
+    type: string
+    count: number
+  }
+  category: string
   isNew?: boolean
-  isCompleted?: boolean
-  externalLink?: string
+  actionLink?: string
   imageUrl?: string
-  createdAt?: string
-  createdBy?: string
+  difficulty?: "easy" | "medium" | "hard"
 }
 
-interface CreateQuestData {
-  title: string
-  description: string
-  reward: number
-  externalLink: string
-  imageUrl: string
-  type: "social" | "game" | "daily" | "special"
-  difficulty: "easy" | "medium" | "hard"
-}
-
-// ============================================
-// DEFAULT QUESTS (Initial Data)
-// ============================================
-const defaultQuests: Quest[] = [
-  {
-    id: "1",
-    title: "Engage Post",
-    description: "Keep engaging with community posts",
-    reward: 100,
-    progress: 0,
-    maxProgress: 1,
-    icon: "star",
-    type: "social",
-    difficulty: "easy",
-    isNew: true
-  },
-  {
-    id: "2",
-    title: "Play Mini-Game Challenge",
-    description: "Score 1500+ points in the click challenge mini-game",
-    reward: 200,
-    progress: 0,
-    maxProgress: 1500,
-    icon: "gamepad",
-    type: "game",
-    difficulty: "medium"
-  },
-  {
-    id: "3",
-    title: "Complete Login Streak",
-    description: "Login to the platform for 5 consecutive days",
-    reward: 300,
-    progress: 0,
-    maxProgress: 5,
-    icon: "flame",
-    type: "daily",
-    difficulty: "medium"
-  },
-  {
-    id: "4",
-    title: "Engage Tweet",
-    description: "Like and retweet our latest announcement",
-    reward: 150,
-    progress: 0,
-    maxProgress: 1,
-    icon: "twitter",
-    type: "social",
-    difficulty: "easy"
-  },
-  {
-    id: "5",
-    title: "Follow LinkedIn",
-    description: "Follow RewardNFT on LinkedIn to stay updated",
-    reward: 100,
-    progress: 0,
-    maxProgress: 1,
-    icon: "linkedin",
-    type: "social",
-    difficulty: "easy"
-  },
-  {
-    id: "6",
-    title: "Join Telegram",
-    description: "Join our Telegram community for exclusive updates",
-    reward: 100,
-    progress: 0,
-    maxProgress: 1,
-    icon: "message",
-    type: "social",
-    difficulty: "easy"
-  }
-]
-
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-const generateId = () => Math.random().toString(36).substr(2, 9)
-
-const getIconComponent = (iconName: string) => {
-  const icons: { [key: string]: React.ReactNode } = {
-    star: <Star className="w-5 h-5" />,
-    gamepad: <Gamepad2 className="w-5 h-5" />,
-    flame: <Flame className="w-5 h-5" />,
-    twitter: <Twitter className="w-5 h-5" />,
-    linkedin: <Linkedin className="w-5 h-5" />,
-    message: <MessageCircle className="w-5 h-5" />,
-    trophy: <Trophy className="w-5 h-5" />,
-    target: <Target className="w-5 h-5" />,
-    zap: <Zap className="w-5 h-5" />,
-    link: <LinkIcon className="w-5 h-5" />
-  }
-  return icons[iconName] || <Target className="w-5 h-5" />
-}
-
-// ============================================
+// ==========================================
 // DIFFICULTY CONFIG
-// ============================================
+// ==========================================
 const difficultyColors = {
   easy: "from-green-400 to-emerald-600",
   medium: "from-yellow-400 to-orange-600",
@@ -172,9 +87,9 @@ const difficultyBg = {
   hard: "bg-rose-500/10 text-rose-400 border-rose-500/20"
 }
 
-// ============================================
-// CREATE QUEST MODAL COMPONENT
-// ============================================
+// ==========================================
+// CREATE QUEST MODAL COMPONENT (Enhanced)
+// ==========================================
 function CreateQuestModal({ 
   isOpen, 
   onClose, 
@@ -182,16 +97,17 @@ function CreateQuestModal({
 }: { 
   isOpen: boolean
   onClose: () => void
-  onCreate: (quest: CreateQuestData) => void
+  onCreate: (questData: any) => void
 }) {
-  const [formData, setFormData] = useState<CreateQuestData>({
+  const [formData, setFormData] = useState({
     title: "",
     description: "",
-    reward: 100,
-    externalLink: "",
+    icon: "⭐",
+    xp: "100",
+    link: "",
     imageUrl: "",
-    type: "social",
-    difficulty: "easy"
+    difficulty: "easy" as "easy" | "medium" | "hard",
+    category: "one_time"
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -199,233 +115,275 @@ function CreateQuestModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.title || !formData.link) {
+      toast({ title: "Error", description: "Title and Link are required", variant: "destructive" })
+      return
+    }
+
     setIsSubmitting(true)
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
+    const questData = {
+      id: `custom-${Date.now()}`,
+      title: formData.title,
+      description: formData.description,
+      icon: formData.icon,
+      reward: { xp: parseInt(formData.xp) || 100 },
+      requirements: { type: "custom_quest", count: 1 },
+      actionLink: formData.link,
+      category: formData.category,
+      difficulty: formData.difficulty,
+      imageUrl: formData.imageUrl,
+      isNew: true
+    }
 
-    onCreate(formData)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    onCreate(questData)
+
     setFormData({
       title: "",
       description: "",
-      reward: 100,
-      externalLink: "",
+      icon: "⭐",
+      xp: "100",
+      link: "",
       imageUrl: "",
-      type: "social",
-      difficulty: "easy"
+      difficulty: "easy",
+      category: "one_time"
     })
     setIsSubmitting(false)
     onClose()
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
-              <Plus className="w-6 h-6 text-white" />
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+              <Plus className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Create New Quest</h2>
-              <p className="text-slate-400 text-sm">Admin Only - Create a new quest for users</p>
+              <DialogTitle className="text-2xl font-bold text-white">
+                Create New Quest
+              </DialogTitle>
+              <p className="text-slate-400 text-sm">Admin Only - Create quests for users</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {/* Title */}
+          <div>
+            <Label className="text-slate-300">Quest Title *</Label>
+            <Input
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              placeholder="e.g., Follow us on Twitter"
+              className="bg-slate-800 border-slate-600 text-white mt-1"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <Label className="text-slate-300">Description</Label>
+            <Input
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              placeholder="Short description of the quest..."
+              className="bg-slate-800 border-slate-600 text-white mt-1"
+            />
+          </div>
+
+          {/* Icon & XP */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-slate-300">Icon (Emoji)</Label>
+              <Input
+                value={formData.icon}
+                onChange={(e) => setFormData({...formData, icon: e.target.value})}
+                placeholder="⭐"
+                className="bg-slate-800 border-slate-600 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-300">XP Reward *</Label>
+              <Input
+                type="number"
+                value={formData.xp}
+                onChange={(e) => setFormData({...formData, xp: e.target.value})}
+                placeholder="100"
+                className="bg-slate-800 border-slate-600 text-white mt-1"
+                required
+              />
             </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Quest Title *
-              </label>
-              <input
-                type="text"
+          {/* External Link */}
+          <div>
+            <Label className="text-slate-300">Action Link (URL) *</Label>
+            <div className="relative">
+              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                type="url"
+                value={formData.link}
+                onChange={(e) => setFormData({...formData, link: e.target.value})}
+                placeholder="https://twitter.com/yourhandle"
+                className="bg-slate-800 border-slate-600 text-white mt-1 pl-10"
                 required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g., Follow us on Twitter"
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
               />
             </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Users will be redirected to this link
+            </p>
+          </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Quest Description *
-              </label>
-              <textarea
-                required
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe what users need to do..."
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+          {/* Image URL */}
+          <div>
+            <Label className="text-slate-300">Quest Image URL (Optional)</Label>
+            <div className="relative">
+              <Upload className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                type="url"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
+                placeholder="https://example.com/image.png"
+                className="bg-slate-800 border-slate-600 text-white mt-1 pl-10"
               />
             </div>
+          </div>
 
-            {/* XP Reward */}
+          {/* Difficulty & Category */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                XP Reward *
-              </label>
-              <input
-                type="number"
-                required
-                min={1}
-                value={formData.reward}
-                onChange={(e) => setFormData({ ...formData, reward: parseInt(e.target.value) || 0 })}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-              />
+              <Label className="text-slate-300">Difficulty</Label>
+              <select
+                value={formData.difficulty}
+                onChange={(e) => setFormData({...formData, difficulty: e.target.value as any})}
+                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-white"
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
             </div>
-
-            {/* External Link */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                External Link URL *
-              </label>
-              <div className="relative">
-                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="url"
-                  required
-                  value={formData.externalLink}
-                  onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
-                  placeholder="https://twitter.com/yourhandle"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Users will be redirected to this link when they start the quest
-              </p>
+              <Label className="text-slate-300">Category</Label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-white"
+              >
+                <option value="one_time">One-Time</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
             </div>
+          </div>
 
-            {/* Image URL */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Quest Image URL (Optional)
-              </label>
-              <div className="relative">
-                <Upload className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="url"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.png"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Type & Difficulty */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Quest Type
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-purple-500 transition-colors"
-                >
-                  <option value="social">Social</option>
-                  <option value="game">Gaming</option>
-                  <option value="daily">Daily</option>
-                  <option value="special">Special</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Difficulty
-                </label>
-                <select
-                  value={formData.difficulty}
-                  onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-purple-500 transition-colors"
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
+          {/* Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold"
             >
               {isSubmitting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Creating...
-                </>
+                </span>
               ) : (
-                <>
-                  <Plus className="w-5 h-5" />
+                <span className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
                   Create Quest
-                </>
+                </span>
               )}
-            </button>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-// ============================================
-// QUEST CARD COMPONENT
-// ============================================
-function QuestCard({ 
+// ==========================================
+// ENHANCED QUEST CARD COMPONENT
+// ==========================================
+function EnhancedQuestCard({ 
   quest, 
-  index, 
-  onComplete,
+  progress, 
+  onStart, 
+  onAction, 
+  onClaim, 
   onDelete,
-  isAdmin 
+  isAdmin,
+  processingQuest 
 }: { 
   quest: Quest
-  index: number
-  onComplete?: (questId: string, reward: number) => void
-  onDelete?: (questId: string) => void
+  progress: any
+  onStart: (id: string) => void
+  onAction: (id: string, type: string) => void
+  onClaim: (id: string) => void
+  onDelete?: (id: string) => void
   isAdmin: boolean
+  processingQuest: string | null
 }) {
-  const [isHovered, setIsHovered] = useState(false)
-  const [hasVisitedLink, setHasVisitedLink] = useState(false)
-  const progressPercent = Math.min((quest.progress / quest.maxProgress) * 100, 100)
+  const progressPercentage = progress ? (progress.progress / progress.maxProgress) * 100 : 0
+  const isCompleted = progress?.status === "completed"
+  const isClaimed = progress?.status === "claimed"
+  const canClaim = isCompleted && !isClaimed
+  const hasStarted = !!progress
 
-  const handleStart = () => {
-    if (quest.externalLink) {
-      window.open(quest.externalLink, '_blank')
-      setHasVisitedLink(true)
+  const getQuestIcon = (questType: string, icon?: string) => {
+    if (icon && icon.length <= 2) return icon // Return emoji if provided
+
+    switch (questType) {
+      case "connect_discord": return "🔗"
+      case "login_streak": return "🔥"
+      case "share_twitter": return "🐦"
+      case "refer_friends": return "👥"
+      case "play_minigame": return "🎮"
+      case "join_community_call": return "📞"
+      case "follow_linkedin": return "💼"
+      case "engage_tweet": return "❤️"
+      case "follow_x": return "🐦"
+      case "join_telegram": return "📱"
+      case "custom_quest": return "⭐"
+      default: return "⭐"
     }
   }
 
-  const handleComplete = () => {
-    if (onComplete && !quest.isCompleted) {
-      onComplete(quest.id, quest.reward)
+  const getActionText = (questType: string) => {
+    switch (questType) {
+      case "connect_discord": return "Connect Discord"
+      case "login_streak": return "Pay & Login"
+      case "share_twitter": return "Share on Twitter"
+      case "refer_friends": return "Check Referrals"
+      case "play_minigame": return "Play Game"
+      case "join_community_call": return "Join Community"
+      case "follow_linkedin": return "Follow LinkedIn"
+      case "engage_tweet": return "Engage Tweet"
+      case "follow_x": return "Follow X"
+      case "join_telegram": return "Join Telegram"
+      case "custom_quest": return "Complete Quest"
+      default: return "Complete"
+    }
+  }
+
+  const getDifficultyColor = (diff?: string) => {
+    switch (diff) {
+      case "easy": return "from-emerald-400 to-emerald-600"
+      case "medium": return "from-amber-400 to-orange-600"
+      case "hard": return "from-rose-400 to-red-600"
+      default: return "from-blue-400 to-indigo-600"
     }
   }
 
@@ -433,18 +391,18 @@ function QuestCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      whileHover={{ y: -5 }}
       className="group relative"
     >
       {/* Glow Effect */}
-      <div className={`absolute -inset-0.5 bg-gradient-to-r ${difficultyColors[quest.difficulty]} rounded-2xl opacity-0 group-hover:opacity-30 transition-opacity duration-500 blur-xl`} />
+      <div className={`absolute -inset-0.5 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} rounded-2xl opacity-0 group-hover:opacity-30 transition-opacity duration-500 blur-xl`} />
 
       {/* Card */}
-      <div className="relative bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-600 transition-all duration-300">
+      <div className={`relative bg-slate-900/80 backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-300 ${
+        isClaimed ? 'border-green-500/50 shadow-lg shadow-green-500/20' : 'border-slate-800 hover:border-slate-600'
+      }`}>
         {/* Top Gradient Line */}
-        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${difficultyColors[quest.difficulty]} opacity-50`} />
+        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} opacity-50`} />
 
         {/* Admin Delete Button */}
         {isAdmin && onDelete && (
@@ -468,18 +426,17 @@ function QuestCard({
         <div className="p-6">
           {/* Header */}
           <div className="flex items-start gap-4 mb-4">
-            <div className={`p-3 rounded-xl bg-gradient-to-br ${difficultyColors[quest.difficulty]} shadow-lg`}>
-              <div className="text-white">
-                {getIconComponent(quest.icon)}
-              </div>
+            <div className={`p-3 rounded-xl bg-gradient-to-br ${getDifficultyColor(quest.difficulty)} shadow-lg`}>
+              <span className="text-2xl">{getQuestIcon(quest.requirements.type, quest.icon)}</span>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-white mb-1 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-400 transition-all">
-                {quest.title}
-              </h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                {quest.description}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-bold text-white">{quest.title}</h3>
+                {quest.isNew && !isAdmin && (
+                  <Badge className="bg-red-500 text-white text-xs">NEW</Badge>
+                )}
+              </div>
+              <p className="text-slate-400 text-sm">{quest.description}</p>
             </div>
           </div>
 
@@ -499,69 +456,81 @@ function QuestCard({
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Progress</span>
               <span className="text-sm font-bold text-white">
-                {quest.progress} <span className="text-slate-500">/ {quest.maxProgress}</span>
+                {progress?.progress || 0} <span className="text-slate-500">/ {quest.requirements.count}</span>
               </span>
             </div>
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
+                animate={{ width: `${progressPercentage}%` }}
                 transition={{ duration: 1, delay: 0.5 }}
-                className={`h-full bg-gradient-to-r ${difficultyColors[quest.difficulty]} rounded-full`}
+                className={`h-full bg-gradient-to-r ${getDifficultyColor(quest.difficulty)} rounded-full`}
               />
             </div>
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${difficultyBg[quest.difficulty]}`}>
-                {quest.difficulty.charAt(0).toUpperCase() + quest.difficulty.slice(1)}
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {quest.difficulty && (
+                <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                  quest.difficulty === 'easy' ? difficultyBg.easy : 
+                  quest.difficulty === 'medium' ? difficultyBg.medium : difficultyBg.hard
+                }`}>
+                  {quest.difficulty.charAt(0).toUpperCase() + quest.difficulty.slice(1)}
+                </div>
+              )}
               <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold">
                 <Zap className="w-3 h-3" />
-                {quest.reward} XP
+                {quest.reward.xp} XP
               </div>
             </div>
 
             <div className="flex gap-2">
-              {/* External Link Button */}
-              {quest.externalLink && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleStart}
-                  className="px-4 py-2 rounded-xl font-semibold text-sm bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all flex items-center gap-2"
+              {!hasStarted && (
+                <Button
+                  onClick={() => onStart(quest.id)}
+                  size="sm"
+                  className="bg-teal-500 hover:bg-teal-600 text-black font-semibold"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  Visit
-                </motion.button>
+                  Start
+                </Button>
               )}
 
-              {/* Complete Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleComplete}
-                disabled={quest.isCompleted || (!quest.externalLink && !hasVisitedLink)}
-                className={`px-6 py-2 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
-                  quest.isCompleted
-                    ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/25 cursor-default"
-                    : "bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                }`}
-              >
-                {quest.isCompleted ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Done
-                  </>
-                ) : (
-                  <>
-                    Complete
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </motion.button>
+              {hasStarted && !isCompleted && !isClaimed && (
+                <Button
+                  onClick={() => onAction(quest.id, quest.requirements.type)}
+                  size="sm"
+                  disabled={processingQuest === quest.id}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  {processingQuest === quest.id ? "Processing..." : (
+                    <span className="flex items-center gap-1">
+                      {getActionText(quest.requirements.type)}
+                      {quest.requirements.type === "login_streak" && (
+                        <span className="text-xs">(0.01 SOL)</span>
+                      )}
+                    </span>
+                  )}
+                </Button>
+              )}
+
+              {canClaim && (
+                <Button
+                  onClick={() => onClaim(progress.id)}
+                  size="sm"
+                  className="bg-green-500 hover:bg-green-600 text-black font-semibold"
+                >
+                  Claim
+                </Button>
+              )}
+
+              {isClaimed && (
+                <Button size="sm" variant="outline" disabled className="border-green-500/50 text-green-400">
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Completed
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -573,9 +542,9 @@ function QuestCard({
   )
 }
 
-// ============================================
+// ==========================================
 // STATS CARD COMPONENT
-// ============================================
+// ==========================================
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   return (
     <motion.div
@@ -594,320 +563,498 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   )
 }
 
-// ============================================
+// ==========================================
 // MAIN QUEST PAGE COMPONENT
-// ============================================
-export default function QuestsPage() {
-  const { publicKey } = useWallet()
-  const [quests, setQuests] = useState<Quest[]>([])
-  const [activeTab, setActiveTab] = useState<"all" | "social" | "game" | "daily" | "special">("all")
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [userXP, setUserXP] = useState(12450)
-  const [completedQuests, setCompletedQuests] = useState(24)
+// ==========================================
+export function QuestPageContent() {
+  const { signTransaction, publicKey } = useWallet()
+  const [processingQuest, setProcessingQuest] = useState<string | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [customQuests, setCustomQuests] = useState<Quest[]>([])
   const [mounted, setMounted] = useState(false)
 
-  // Check if connected wallet is admin
-  const isAdmin = publicKey?.toString() === ADMIN_WALLET_ADDRESS
+  const {
+    dailyQuests,
+    weeklyQuests,
+    oneTimeQuests,
+    userXPData,
+    loading,
+    error,
+    startQuest,
+    updateQuestProgress,
+    claimQuestReward,
+    getQuestProgress,
+  } = useQuestSystem()
+
+  const adminMode = isAdmin(publicKey?.toString())
 
   useEffect(() => {
     setMounted(true)
-    // Load quests from localStorage or use defaults
-    const savedQuests = localStorage.getItem('rewardnft_quests')
-    if (savedQuests) {
-      setQuests(JSON.parse(savedQuests))
-    } else {
-      setQuests(defaultQuests)
-      localStorage.setItem('rewardnft_quests', JSON.stringify(defaultQuests))
+    // Load custom quests from localStorage
+    const saved = localStorage.getItem('customQuests')
+    if (saved) {
+      setCustomQuests(JSON.parse(saved))
     }
-
-    // Load user stats
-    const savedXP = localStorage.getItem('rewardnft_user_xp')
-    if (savedXP) setUserXP(parseInt(savedXP))
-
-    const savedCompleted = localStorage.getItem('rewardnft_completed_quests')
-    if (savedCompleted) setCompletedQuests(parseInt(savedCompleted))
   }, [])
 
-  // Save quests whenever they change
+  // Save custom quests when updated
   useEffect(() => {
-    if (quests.length > 0) {
-      localStorage.setItem('rewardnft_quests', JSON.stringify(quests))
+    if (customQuests.length > 0) {
+      localStorage.setItem('customQuests', JSON.stringify(customQuests))
     }
-  }, [quests])
+  }, [customQuests])
 
-  // Handle quest creation (ADMIN ONLY)
-  const handleCreateQuest = (questData: CreateQuestData) => {
-    const newQuest: Quest = {
-      id: generateId(),
-      title: questData.title,
-      description: questData.description,
-      reward: questData.reward,
-      progress: 0,
-      maxProgress: 1,
-      icon: questData.type === "social" ? "twitter" : questData.type === "game" ? "gamepad" : "target",
-      type: questData.type,
-      difficulty: questData.difficulty,
-      isNew: true,
-      externalLink: questData.externalLink,
-      imageUrl: questData.imageUrl,
-      createdAt: new Date().toISOString(),
-      createdBy: ADMIN_WALLET_ADDRESS
-    }
-
-    setQuests(prev => [newQuest, ...prev])
-
-    // Show success notification (you can integrate with your toast system)
-    alert("Quest created successfully!")
+  const handleCreateQuest = (questData: Quest) => {
+    setCustomQuests(prev => [questData, ...prev])
+    toast({ title: "Quest Created!", description: "New quest is now live for all users" })
   }
 
-  // Handle quest deletion (ADMIN ONLY)
   const handleDeleteQuest = (questId: string) => {
     if (confirm("Are you sure you want to delete this quest?")) {
-      setQuests(prev => prev.filter(q => q.id !== questId))
+      setCustomQuests(prev => prev.filter(q => q.id !== questId))
+      toast({ title: "Quest Deleted" })
     }
   }
 
-  // Handle quest completion
-  const handleCompleteQuest = (questId: string, reward: number) => {
-    // Update quest status
-    setQuests(prev => prev.map(q => 
-      q.id === questId ? { ...q, isCompleted: true, progress: q.maxProgress } : q
-    ))
+  const getMergedOneTimeQuests = () => {
+    return [...customQuests, ...oneTimeQuests]
+  }
 
-    // Update user XP
-    const newXP = userXP + reward
-    setUserXP(newXP)
-    localStorage.setItem('rewardnft_user_xp', newXP.toString())
-
-    // Update completed count
-    const newCompleted = completedQuests + 1
-    setCompletedQuests(newCompleted)
-    localStorage.setItem('rewardnft_completed_quests', newCompleted.toString())
-
-    // Update leaderboard (using existing system)
-    // This integrates with your existing XP/leaderboard logic
-    const leaderboardData = JSON.parse(localStorage.getItem('rewardnft_leaderboard') || '[]')
-    const userEntry = leaderboardData.find((entry: any) => entry.wallet === publicKey?.toString())
-
-    if (userEntry) {
-      userEntry.xp = newXP
-      userEntry.completedQuests = newCompleted
+  // All your existing quest action handlers remain the same...
+  const handleStartQuest = async (questId: string) => {
+    const success = await startQuest(questId)
+    if (success) {
+      toast({ title: "Quest Started", description: "You've started this quest!" })
     } else {
-      leaderboardData.push({
-        wallet: publicKey?.toString(),
-        xp: newXP,
-        completedQuests: newCompleted,
-        rank: leaderboardData.length + 1
-      })
+      toast({ title: "Error", description: error || "Failed to start quest", variant: "destructive" })
     }
-
-    localStorage.setItem('rewardnft_leaderboard', JSON.stringify(leaderboardData))
-
-    alert(`Quest completed! You earned ${reward} XP!`)
   }
 
-  // Filter quests
-  const filteredQuests = activeTab === "all" 
-    ? quests 
-    : quests.filter(q => q.type === activeTab)
+  const handleClaimReward = async (progressId: string) => {
+    const success = await claimQuestReward(progressId)
+    if (success) {
+      toast({ title: "Reward Claimed!", description: "XP has been added to your account" })
+    } else {
+      toast({ title: "Error", description: error || "Failed to claim reward", variant: "destructive" })
+    }
+  }
 
-  if (!mounted) return null
+  const handleQuestAction = async (questId: string, questType: string) => {
+    if (!publicKey || !signTransaction) return
+    setProcessingQuest(questId)
+
+    try {
+      // Handle custom quests
+      if (questType === "custom_quest") {
+        const quest = customQuests.find(q => q.id === questId)
+        if (quest?.actionLink) {
+          window.open(quest.actionLink, "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { customCompleted: true, timestamp: Date.now() })
+            if (success) {
+              toast({ title: "Quest Completed!", description: `You earned ${quest.reward.xp} XP` })
+            }
+          }, 3000)
+        }
+        setProcessingQuest(null)
+        return
+      }
+
+      // All your existing switch cases remain here...
+      switch (questType) {
+        case "connect_discord":
+          window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { discordConnected: true, timestamp: Date.now() })
+            if (success) toast({ title: "Discord Connected!", description: "Quest completed! You earned 100 XP" })
+          }, 3000)
+          break
+
+        case "follow_linkedin":
+          window.open("https://www.linkedin.com/company/rewardnft", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { linkedinFollowed: true, timestamp: Date.now() })
+            if (success) toast({ title: "LinkedIn Followed!", description: "Quest completed! You earned 100 XP" })
+          }, 3000)
+          break
+
+        case "engage_tweet":
+          window.open("https://x.com/RewardNFT_/status/1947059548101218766", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { tweetEngaged: true, timestamp: Date.now() })
+            if (success) toast({ title: "Tweet Engaged!", description: "Quest completed! You earned 150 XP" })
+          }, 3000)
+          break
+
+        case "follow_x":
+          window.open("https://x.com/thewajidmengal", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { xFollowed: true, timestamp: Date.now() })
+            if (success) toast({ title: "X Followed!", description: "Quest completed! You earned 100 XP" })
+          }, 3000)
+          break
+
+        case "join_telegram":
+          window.open("https://t.me/rewardsNFT", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { telegramJoined: true, timestamp: Date.now() })
+            if (success) toast({ title: "Telegram Joined!", description: "Quest completed! You earned 100 XP" })
+          }, 3000)
+          break
+
+        case "login_streak":
+          try {
+            const paymentResult = await solPaymentService.processPayment(publicKey, 0.01, signTransaction)
+            if (paymentResult.success) {
+              await fetch('/api/treasury/sol-payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  walletAddress: publicKey.toString(),
+                  signature: paymentResult.signature,
+                  amount: 0.01,
+                  questId,
+                  treasuryWallet: solPaymentService.treasuryWalletAddress
+                })
+              })
+
+              const success = await updateQuestProgress(questId, 1, {
+                solPaymentSignature: paymentResult.signature,
+                amount: 0.01,
+                verified: true,
+                treasuryWallet: solPaymentService.treasuryWalletAddress
+              })
+
+              if (success) {
+                toast({ title: "Daily Login Complete!", description: `0.01 SOL paid to treasury! You earned 100 XP` })
+              }
+            } else {
+              throw new Error(paymentResult.error || "Payment failed")
+            }
+          } catch (error) {
+            console.error("Payment error:", error)
+            toast({ title: "Payment Failed", description: "Failed to process SOL payment", variant: "destructive" })
+          }
+          break
+
+        case "share_twitter":
+          const tweetText = encodeURIComponent("Just completed a quest on RewardNFT! 🚀 Earning XP and climbing the leaderboard! #RewardNFT #NFT #Solana #Web3 @RewardNFT_")
+          window.open(`https://x.com/intent/tweet?text=${tweetText}`, "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { twitterShareUrl: `https://x.com/intent/tweet?text=${tweetText}`, sharedAt: Date.now() })
+            if (success) toast({ title: "Twitter Share Complete!", description: "Quest completed! You earned 75 XP" })
+          }, 2000)
+          break
+
+        case "refer_friends":
+          try {
+            const userResponse = await fetch(`/api/users?wallet=${publicKey.toString()}`)
+            const userData = await userResponse.json()
+
+            if (userData.success) {
+              const referralCount = userData.data?.totalReferrals || 0
+              const targetReferrals = 3
+
+              const currentProgressResponse = await fetch(`/api/quests?wallet=${publicKey.toString()}&action=get-user-progress`)
+              const currentProgressResult = await currentProgressResponse.json()
+
+              let currentProgress = 0
+              if (currentProgressResult.success) {
+                const questProgress = currentProgressResult.data.find((progress: any) => progress.questId === questId)
+                currentProgress = questProgress?.progress || 0
+              }
+
+              const targetProgress = Math.min(referralCount, targetReferrals)
+              const progressIncrement = Math.max(0, targetProgress - currentProgress)
+              const isCompleted = referralCount >= targetReferrals
+
+              const success = await updateQuestProgress(questId, progressIncrement, {
+                referralCount: referralCount,
+                targetReferrals: targetReferrals,
+                verified: true,
+                lastUpdated: Date.now(),
+                currentProgress: currentProgress,
+                targetProgress: targetProgress
+              })
+
+              if (success) {
+                if (isCompleted) {
+                  toast({ title: "🎉 Referral Quest Complete!", description: `You have ${referralCount} referrals! Quest completed! You earned 500 XP!` })
+                } else {
+                  toast({ title: "📊 Referral Progress Updated", description: `You have ${referralCount}/${targetReferrals} referrals. Refer ${targetReferrals - referralCount} more friends to complete.` })
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Referral check error:", error)
+            toast({ title: "Error", description: "Failed to check referral count", variant: "destructive" })
+          }
+          break
+
+        case "play_minigame":
+          localStorage.setItem('pendingQuestId', questId)
+          window.location.href = "/mini-game"
+          break
+
+        case "join_community_call":
+          window.open("https://discord.gg/fZ7SDHeAtr", "_blank")
+          setTimeout(async () => {
+            const success = await updateQuestProgress(questId, 1, { attendanceVerified: true, joinedAt: Date.now() })
+            if (success) toast({ title: "Community Call Joined!", description: "Quest completed! You earned 200 XP" })
+          }, 3000)
+          break
+
+        default:
+          await updateQuestProgress(questId, 1)
+      }
+    } catch (error) {
+      console.error("Quest action error:", error)
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to complete quest", variant: "destructive" })
+    } finally {
+      setProcessingQuest(null)
+    }
+  }
+
+  if (!mounted || loading) {
+    return (
+      <ProtectedRoute requiresNFT={true}>
+        <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+          <div className="text-white text-xl flex items-center gap-3">
+            <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+            Loading quests...
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[128px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[128px] animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[150px]" />
-      </div>
+    <ProtectedRoute requiresNFT={true}>
+      <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
+        {/* Animated Background */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[128px] animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[128px] animate-pulse delay-1000" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[150px]" />
+        </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-        {/* Admin Badge */}
-        {isAdmin && (
+          {/* Admin Badge */}
+          {adminMode && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="fixed top-4 right-4 z-50"
+            >
+              <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg shadow-purple-500/25 flex items-center gap-2">
+                <Crown className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white">Admin Mode</span>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Header Section */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="fixed top-4 right-4 z-50"
+            className="text-center mb-12"
           >
-            <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg shadow-purple-500/25 flex items-center gap-2">
-              <Crown className="w-4 h-4 text-white" />
-              <span className="text-sm font-bold text-white">Admin Mode</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 mb-6">
+              <Sparkles className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm text-slate-300">Complete quests to earn rewards</span>
             </div>
-          </motion.div>
-        )}
 
-        {/* Header Section */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 mb-6">
-            <Sparkles className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm text-slate-300">Complete quests to earn rewards</span>
+            <h1 className="text-5xl md:text-7xl font-bold mb-6">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+                Complete
+              </span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 ml-4">
+                Quests
+              </span>
+            </h1>
+
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+              Complete tasks, earn XP, and climb the leaderboard to unlock exclusive rewards and NFTs
+            </p>
+
+            {/* Admin Create Quest Button */}
+            {adminMode && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-8"
+              >
+                <Button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="px-8 py-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all text-lg"
+                >
+                  <Plus className="w-6 h-6 mr-2" />
+                  Create New Quest
+                </Button>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
+            <StatCard 
+              icon={<Trophy className="w-6 h-6 text-white" />}
+              label="Total XP Earned"
+              value={userXPData?.totalXP?.toString() || "0"}
+              color="from-yellow-400 to-orange-600"
+            />
+            <StatCard 
+              icon={<Target className="w-6 h-6 text-white" />}
+              label="Quests Completed"
+              value={`${customQuests.length + oneTimeQuests.length}`}
+              color="from-blue-400 to-indigo-600"
+            />
+            <StatCard 
+              icon={<Crown className="w-6 h-6 text-white" />}
+              label="Current Rank"
+              value={`#${userXPData?.rank || 142}`}
+              color="from-purple-400 to-pink-600"
+            />
+            <StatCard 
+              icon={<Gem className="w-6 h-6 text-white" />}
+              label="Level"
+              value={userXPData?.level?.toString() || "1"}
+              color="from-emerald-400 to-teal-600"
+            />
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold mb-6">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
-              Complete
-            </span>
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 ml-4">
-              Quests
-            </span>
-          </h1>
-
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-            Complete tasks, earn XP, and climb the leaderboard to unlock exclusive rewards and NFTs
-          </p>
-        </motion.div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
-          <StatCard 
-            icon={<Trophy className="w-6 h-6 text-white" />}
-            label="Total XP Earned"
-            value={userXP.toLocaleString()}
-            color="from-yellow-400 to-orange-600"
-          />
-          <StatCard 
-            icon={<Target className="w-6 h-6 text-white" />}
-            label="Quests Completed"
-            value={`${completedQuests}/${quests.length}`}
-            color="from-blue-400 to-indigo-600"
-          />
-          <StatCard 
-            icon={<Crown className="w-6 h-6 text-white" />}
-            label="Current Rank"
-            value="#142"
-            color="from-purple-400 to-pink-600"
-          />
-          <StatCard 
-            icon={<Gem className="w-6 h-6 text-white" />}
-            label="NFTs Earned"
-            value="3"
-            color="from-emerald-400 to-teal-600"
-          />
-        </div>
-
-        {/* Admin Create Quest Button */}
-        {isAdmin && (
+          {/* One-Time Quests */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex justify-center mb-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mb-12"
           >
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all flex items-center gap-3 hover:scale-105"
-            >
-              <Plus className="w-6 h-6" />
-              Create New Quest
-            </button>
-          </motion.div>
-        )}
-
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
-          {[
-            { id: "all", label: "All Quests", icon: <Target className="w-4 h-4" /> },
-            { id: "social", label: "Social", icon: <Twitter className="w-4 h-4" /> },
-            { id: "game", label: "Gaming", icon: <Gamepad2 className="w-4 h-4" /> },
-            { id: "daily", label: "Daily", icon: <Clock className="w-4 h-4" /> },
-            { id: "special", label: "Special", icon: <Star className="w-4 h-4" /> }
-          ].map((tab) => (
-            <motion.button
-              key={tab.id}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-                activeTab === tab.id
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25"
-                  : "bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </motion.button>
-          ))}
-        </div>
-
-        {/* Quests Grid */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-              <Star className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">
-              {isAdmin ? "All Quests (Admin View)" : "Available Quests"}
-            </h2>
-            <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
-          </div>
-
-          {filteredQuests.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="inline-flex p-4 rounded-full bg-slate-800 mb-4">
-                <Target className="w-8 h-8 text-slate-500" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+                <Star className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">No quests found</h3>
-              <p className="text-slate-400">Check back later for new quests!</p>
+              <h2 className="text-2xl font-bold text-white">
+                {adminMode ? "All Quests (Admin View)" : "One-Time Quests"}
+              </h2>
+              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <AnimatePresence mode="popLayout">
-                {filteredQuests.map((quest, index) => (
-                  <QuestCard 
-                    key={quest.id} 
-                    quest={quest} 
-                    index={index}
-                    onComplete={handleCompleteQuest}
-                    onDelete={isAdmin ? handleDeleteQuest : undefined}
-                    isAdmin={isAdmin}
+                {getMergedOneTimeQuests().map((quest, index) => (
+                  <EnhancedQuestCard
+                    key={quest.id}
+                    quest={quest}
+                    progress={getQuestProgress(quest.id)}
+                    onStart={handleStartQuest}
+                    onAction={handleQuestAction}
+                    onClaim={handleClaimReward}
+                    onDelete={adminMode ? handleDeleteQuest : undefined}
+                    isAdmin={adminMode}
+                    processingQuest={processingQuest}
                   />
                 ))}
               </AnimatePresence>
             </div>
-          )}
-        </motion.div>
+          </motion.div>
 
-        {/* Bottom CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-16 text-center"
-        >
-          <div className="inline-flex flex-col items-center gap-4 p-8 rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-900/40 border border-slate-800 backdrop-blur-xl">
-            <div className="p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/25">
-              <Trophy className="w-8 h-8 text-white" />
+          {/* Daily Quests */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="mb-12"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Daily Quests</h2>
+              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
             </div>
-            <h3 className="text-2xl font-bold text-white">Ready for more challenges?</h3>
-            <p className="text-slate-400 max-w-md">
-              Complete all quests to unlock exclusive NFT rewards and climb to the top of the leaderboard!
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
-            >
-              View Leaderboard
-            </motion.button>
-          </div>
-        </motion.div>
-      </div>
 
-      {/* Create Quest Modal */}
-      <CreateQuestModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreate={handleCreateQuest}
-      />
-    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {dailyQuests.map((quest, index) => (
+                <EnhancedQuestCard
+                  key={quest.id}
+                  quest={quest}
+                  progress={getQuestProgress(quest.id)}
+                  onStart={handleStartQuest}
+                  onAction={handleQuestAction}
+                  onClaim={handleClaimReward}
+                  onDelete={adminMode ? handleDeleteQuest : undefined}
+                  isAdmin={adminMode}
+                  processingQuest={processingQuest}
+                />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Weekly Quests */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500">
+                <Trophy className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Weekly Quests</h2>
+              <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent ml-4" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {weeklyQuests.map((quest, index) => (
+                <EnhancedQuestCard
+                  key={quest.id}
+                  quest={quest}
+                  progress={getQuestProgress(quest.id)}
+                  onStart={handleStartQuest}
+                  onAction={handleQuestAction}
+                  onClaim={handleClaimReward}
+                  onDelete={adminMode ? handleDeleteQuest : undefined}
+                  isAdmin={adminMode}
+                  processingQuest={processingQuest}
+                />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Bottom CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="mt-16 text-center"
+          >
+            <div className="inline-flex flex-col items-center gap-4 p-8 rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-900/40 border border-slate-800 backdrop-blur-xl">
+              <div className="p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/25">
+                <Trophy className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-white">Ready for more challenges?</h3>
+              <p className="text-slate-400 max-w-md">
+                Complete all quests to unlock exclusive NFT rewards and climb to the top of the leaderboard!
+              </p>
+              <Button
+                className="px-8 py-6 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow text-lg"
+              >
+                View Leaderboard
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Create Quest Modal */}
+        <CreateQuestModal
+          isOpen={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreate={handleCreateQuest}
+        />
+      </div>
+    </ProtectedRoute>
   )
 }
