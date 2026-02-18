@@ -50,7 +50,9 @@ interface Particle {
   color: string;
 }
 
-// Game Constants
+// ============================================
+// GAME SPEED INCREASED
+// ============================================
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 500;
 const GROUND_Y = 380;
@@ -59,9 +61,9 @@ const RUNNER_HEIGHT = 90;
 const RUNNER_X = 150;
 const GRAVITY = 0.8;
 const JUMP_FORCE = -15;
-const BASE_SPEED = 5;
-const MAX_SPEED = 15;
-const SPEED_INCREMENT = 0.002;
+const BASE_SPEED = 8; // Increased from 5
+const MAX_SPEED = 25; // Increased from 15
+const SPEED_INCREMENT = 0.005; // Increased from 0.002
 
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet()
@@ -83,8 +85,6 @@ export default function MiniGamePageContent() {
   const [xpEarned, setXpEarned] = useState(0);
   const [totalXp, setTotalXp] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
-  
-  // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const obstacleIdRef = useRef(0);
@@ -97,6 +97,8 @@ export default function MiniGamePageContent() {
   // Direct refs for immediate jump
   const isGroundedRef = useRef(true);
   const isPlayingRef = useRef(false);
+  const runnerYRef = useRef(GROUND_Y - RUNNER_HEIGHT);
+  const runnerVyRef = useRef(0);
 
   // Load saved data
   useEffect(() => {
@@ -110,10 +112,32 @@ export default function MiniGamePageContent() {
     isPlayingRef.current = gameState.isPlaying;
   }, [gameState.isPlaying]);
 
+  useEffect(() => {
+    runnerYRef.current = runnerY;
+  }, [runnerY]);
+
+  useEffect(() => {
+    runnerVyRef.current = runnerVy;
+  }, [runnerVy]);
+
   // ============================================
-  // FULLSCREEN FUNCTIONS
+  // FULLSCREEN - Desktop only (iOS not supported)
   // ============================================
   const toggleFullscreen = useCallback(async () => {
+    // Check if iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      // iOS doesn't support fullscreen API, rotate to landscape instead
+      if (screen.orientation && (screen.orientation as any).lock) {
+        try {
+          await (screen.orientation as any).lock('landscape');
+        } catch (e) {
+          console.log('Orientation lock failed');
+        }
+      }
+      return;
+    }
+
     const doc: any = document;
     const wrapper = gameWrapperRef.current;
     if (!wrapper) return;
@@ -169,13 +193,14 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // JUMP FUNCTION - Immediate Response
+  // CRITICAL: IMMEDIATE JUMP FUNCTION
   // ============================================
   const executeJump = useCallback(() => {
     if (!isPlayingRef.current || gameState.isGameOver) return;
     if (!isGroundedRef.current) return;
     
-    // IMMEDIATE velocity change
+    // IMMEDIATE velocity change using ref
+    runnerVyRef.current = JUMP_FORCE;
     setRunnerVy(JUMP_FORCE);
     isGroundedRef.current = false;
     setIsJumping(true);
@@ -197,72 +222,84 @@ export default function MiniGamePageContent() {
   }, [gameState.isGameOver]);
 
   // ============================================
-  // CRITICAL: Unified Input Handling (Pointer Events)
+  // CRITICAL: Direct DOM Event Listeners
   // ============================================
   useEffect(() => {
-    const gameContainer = gameContainerRef.current;
-    if (!gameContainer) return;
-
-    // Pointer events handle both mouse and touch [^24^]
-    const handlePointerDown = (e: PointerEvent) => {
-      // Only jump if clicking on game area, not on buttons
-      if ((e.target as HTMLElement).closest('button')) return;
-      
-      if (isPlayingRef.current && !gameState.isGameOver) {
-        e.preventDefault();
-        executeJump();
+    // Wait for DOM to be ready
+    const setupEvents = () => {
+      const gameContainer = gameContainerRef.current;
+      if (!gameContainer) {
+        setTimeout(setupEvents, 100);
+        return;
       }
-    };
 
-    // Use pointer events for unified handling
-    if (window.PointerEvent) {
-      gameContainer.addEventListener('pointerdown', handlePointerDown, { passive: false });
-    } else {
-      // Fallback for older browsers
+      // Mouse click handler
+      const handleMouseDown = (e: MouseEvent) => {
+        // Ignore if clicking on button
+        if ((e.target as HTMLElement).closest('button')) return;
+        
+        if (isPlayingRef.current && !gameState.isGameOver) {
+          e.preventDefault();
+          e.stopPropagation();
+          executeJump();
+        }
+      };
+
+      // Touch handler
       const handleTouchStart = (e: TouchEvent) => {
         if (isPlayingRef.current && !gameState.isGameOver) {
           e.preventDefault();
           executeJump();
         }
       };
-      
-      const handleMouseDown = (e: MouseEvent) => {
+
+      // Pointer handler (unified)
+      const handlePointerDown = (e: PointerEvent) => {
         if ((e.target as HTMLElement).closest('button')) return;
+        
         if (isPlayingRef.current && !gameState.isGameOver) {
+          e.preventDefault();
           executeJump();
         }
       };
 
-      gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+      // Add all event listeners
       gameContainer.addEventListener('mousedown', handleMouseDown);
+      gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
       
-      return () => {
-        gameContainer.removeEventListener('touchstart', handleTouchStart);
-        gameContainer.removeEventListener('mousedown', handleMouseDown);
+      if (window.PointerEvent) {
+        gameContainer.addEventListener('pointerdown', handlePointerDown, { passive: false });
+      }
+
+      // Keyboard handler on window
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.code === 'Space' || e.code === 'ArrowUp') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          executeJump();
+        }
+        if (e.code === 'KeyF') {
+          e.preventDefault();
+          toggleFullscreen();
+        }
       };
-    }
 
+      window.addEventListener('keydown', handleKeyDown, { passive: false });
+
+      // Cleanup
+      return () => {
+        gameContainer.removeEventListener('mousedown', handleMouseDown);
+        gameContainer.removeEventListener('touchstart', handleTouchStart);
+        gameContainer.removeEventListener('pointerdown', handlePointerDown);
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    };
+
+    const cleanup = setupEvents();
     return () => {
-      gameContainer.removeEventListener('pointerdown', handlePointerDown);
+      if (cleanup) cleanup();
     };
-  }, [executeJump, gameState.isGameOver]);
-
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault();
-        executeJump();
-      }
-      if (e.code === 'KeyF') {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, { passive: false });
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [executeJump, toggleFullscreen]);
+  }, [executeJump, toggleFullscreen, gameState.isGameOver]);
 
   // Ground detection
   useEffect(() => {
@@ -309,7 +346,9 @@ export default function MiniGamePageContent() {
     });
     
     setRunnerY(GROUND_Y - RUNNER_HEIGHT);
+    runnerYRef.current = GROUND_Y - RUNNER_HEIGHT;
     setRunnerVy(0);
+    runnerVyRef.current = 0;
     setIsJumping(false);
     setObstacles([]);
     setParticles([]);
@@ -398,7 +437,7 @@ export default function MiniGamePageContent() {
   const checkCollision = useCallback(() => {
     const runnerHitbox = {
       x: RUNNER_X + 15,
-      y: runnerY + 10,
+      y: runnerYRef.current + 10,
       width: RUNNER_WIDTH - 30,
       height: RUNNER_HEIGHT - 20,
     };
@@ -423,25 +462,30 @@ export default function MiniGamePageContent() {
       }
     }
     return false;
-  }, [obstacles, runnerY, gameOver]);
+  }, [obstacles, gameOver]);
 
   // Game loop
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
     const gameLoop = () => {
-      setRunnerY(prev => {
-        let newY = prev + runnerVy;
-        let newVy = runnerVy + GRAVITY;
-        
-        if (newY >= GROUND_Y - RUNNER_HEIGHT) {
-          newY = GROUND_Y - RUNNER_HEIGHT;
-          newVy = 0;
+      // Update physics using ref for immediate response
+      runnerVyRef.current += GRAVITY;
+      runnerYRef.current += runnerVyRef.current;
+      
+      const groundY = GROUND_Y - RUNNER_HEIGHT;
+      if (runnerYRef.current >= groundY) {
+        runnerYRef.current = groundY;
+        runnerVyRef.current = 0;
+        if (!isGroundedRef.current) {
+          isGroundedRef.current = true;
+          setIsJumping(false);
         }
-        
-        setRunnerVy(newVy);
-        return newY;
-      });
+      }
+
+      // Sync state for rendering
+      setRunnerY(runnerYRef.current);
+      setRunnerVy(runnerVyRef.current);
 
       setObstacles(prev => {
         const newObstacles = prev
@@ -483,7 +527,7 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
+  }, [gameState.isPlaying, gameState.speed, checkCollision, spawnObstacle]);
 
   // Draw background
   useEffect(() => {
@@ -625,6 +669,9 @@ export default function MiniGamePageContent() {
     startGame();
   };
 
+  // Check if iOS for fullscreen button
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
   return (
     <div className={`min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden ${isFullscreen ? 'fullscreen-mode' : ''}`}>
       {/* Background */}
@@ -653,9 +700,7 @@ export default function MiniGamePageContent() {
               <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">SPACE</span>
               <span>or</span>
               <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">CLICK</span>
-              <span>or</span>
-              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">F</span>
-              <span>for Fullscreen</span>
+              <span>to jump</span>
             </div>
           </motion.div>
         )}
@@ -671,12 +716,12 @@ export default function MiniGamePageContent() {
                   <div 
                     ref={gameContainerRef}
                     id="game-container"
-                    className="relative w-full select-none touch-none"
+                    className="relative w-full select-none"
                     style={{ 
                       aspectRatio: isFullscreen ? 'auto' : '2/1', 
                       maxHeight: isFullscreen ? '100vh' : '500px',
                       cursor: gameState.isPlaying ? 'pointer' : 'default',
-                      touchAction: 'none' // Critical for touch [^24^]
+                      touchAction: 'none'
                     }}
                   >
                     <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="absolute inset-0 w-full h-full" />
@@ -793,18 +838,20 @@ export default function MiniGamePageContent() {
                       </motion.div>
                     )}
 
-                    {/* Fullscreen Toggle Button */}
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={toggleFullscreen}
-                      className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all group"
-                      title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
-                    >
-                      {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
-                    </motion.button>
+                    {/* Fullscreen Button - Hidden on iOS */}
+                    {!isIOS && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={toggleFullscreen}
+                        className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all"
+                        title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
+                      >
+                        {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
+                      </motion.button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
