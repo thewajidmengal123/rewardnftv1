@@ -18,8 +18,7 @@ import {
   Award,
   Flame,
   Maximize2,
-  Minimize2,
-  MonitorPlay
+  Minimize2
 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 
@@ -85,8 +84,8 @@ export default function MiniGamePageContent() {
   const [totalXp, setTotalXp] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
   
+  // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFullscreenSupported, setIsFullscreenSupported] = useState(true);
 
   const obstacleIdRef = useRef(0);
   const particleIdRef = useRef(0);
@@ -95,11 +94,8 @@ export default function MiniGamePageContent() {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameWrapperRef = useRef<HTMLDivElement>(null);
   
-  // Direct refs for immediate jump - NO DELAY
+  // Direct refs for immediate jump
   const isGroundedRef = useRef(true);
-  const jumpRequestedRef = useRef(false);
-  const runnerYRef = useRef(GROUND_Y - RUNNER_HEIGHT);
-  const runnerVyRef = useRef(0);
   const isPlayingRef = useRef(false);
 
   // Load saved data
@@ -108,139 +104,14 @@ export default function MiniGamePageContent() {
     if (saved) setGameState(prev => ({ ...prev, highScore: parseInt(saved) }));
     const savedXp = localStorage.getItem('runnerTotalXp');
     if (savedXp) setTotalXp(parseInt(savedXp));
-    
-    const doc: any = document;
-    const fullscreenEnabled = document.fullscreenEnabled || 
-                             doc.webkitFullscreenEnabled || 
-                             doc.mozFullScreenEnabled || 
-                             doc.msFullscreenEnabled;
-    setIsFullscreenSupported(!!fullscreenEnabled);
   }, []);
 
-  // Sync refs with state
   useEffect(() => {
     isPlayingRef.current = gameState.isPlaying;
   }, [gameState.isPlaying]);
 
-  useEffect(() => {
-    runnerYRef.current = runnerY;
-  }, [runnerY]);
-
-  useEffect(() => {
-    runnerVyRef.current = runnerVy;
-  }, [runnerVy]);
-
   // ============================================
-  // CRITICAL: Immediate Jump Function - NO DELAY
-  // ============================================
-  const executeJump = useCallback(() => {
-    if (!isPlayingRef.current || gameState.isGameOver) return false;
-    if (!isGroundedRef.current) return false;
-    
-    // IMMEDIATE velocity change
-    runnerVyRef.current = JUMP_FORCE;
-    setRunnerVy(JUMP_FORCE);
-    isGroundedRef.current = false;
-    setIsJumping(true);
-    
-    // Create particles immediately
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < 8; i++) {
-      newParticles.push({
-        id: particleIdRef.current++,
-        x: RUNNER_X + RUNNER_WIDTH / 2,
-        y: GROUND_Y,
-        vx: (Math.random() - 0.5) * 8,
-        vy: -Math.random() * 5 - 2,
-        life: 30,
-        color: ['#a855f7', '#3b82f6', '#ec4899', '#22d3ee'][Math.floor(Math.random() * 4)],
-      });
-    }
-    setParticles(prev => [...prev, ...newParticles]);
-    
-    return true;
-  }, [gameState.isGameOver]);
-
-  // Jump request from inputs
-  const requestJump = useCallback(() => {
-    if (isGroundedRef.current) {
-      executeJump();
-    } else {
-      // Queue jump for when landing
-      jumpRequestedRef.current = true;
-    }
-  }, [executeJump]);
-
-  // Check for queued jump when landing
-  useEffect(() => {
-    const groundY = GROUND_Y - RUNNER_HEIGHT;
-    const isOnGround = runnerYRef.current >= groundY - 2;
-    
-    if (isOnGround && !isGroundedRef.current) {
-      isGroundedRef.current = true;
-      setIsJumping(false);
-      
-      // Execute queued jump immediately
-      if (jumpRequestedRef.current && isPlayingRef.current) {
-        jumpRequestedRef.current = false;
-        setTimeout(() => executeJump(), 10);
-      }
-    } else if (!isOnGround && isGroundedRef.current) {
-      isGroundedRef.current = false;
-    }
-  }, [runnerY, executeJump]);
-
-  // ============================================
-  // CRITICAL: Direct Event Listeners - NO REACT DELAY
-  // ============================================
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault();
-        e.stopPropagation();
-        requestJump();
-      }
-      if (e.code === 'KeyF') {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-
-    // Use capture phase for immediate response
-    window.addEventListener('keydown', handleKeyDown, { passive: false, capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [requestJump]);
-
-  // Direct touch handler
-  useEffect(() => {
-    const gameContainer = gameContainerRef.current;
-    if (!gameContainer) return;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (!isPlayingRef.current) return;
-      e.preventDefault();
-      requestJump();
-    };
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (!isPlayingRef.current) return;
-      // Only jump if not clicking a button
-      if ((e.target as HTMLElement).tagName !== 'BUTTON') {
-        requestJump();
-      }
-    };
-
-    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-    gameContainer.addEventListener('mousedown', handleMouseDown);
-
-    return () => {
-      gameContainer.removeEventListener('touchstart', handleTouchStart);
-      gameContainer.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, [requestJump]);
-
-  // ============================================
-  // Fullscreen Functions
+  // FULLSCREEN FUNCTIONS
   // ============================================
   const toggleFullscreen = useCallback(async () => {
     const doc: any = document;
@@ -298,17 +169,135 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // Game Loop - Optimized for 60FPS
+  // JUMP FUNCTION - Immediate Response
   // ============================================
+  const executeJump = useCallback(() => {
+    if (!isPlayingRef.current || gameState.isGameOver) return;
+    if (!isGroundedRef.current) return;
+    
+    // IMMEDIATE velocity change
+    setRunnerVy(JUMP_FORCE);
+    isGroundedRef.current = false;
+    setIsJumping(true);
+    
+    // Create particles
+    const newParticles: Particle[] = [];
+    for (let i = 0; i < 8; i++) {
+      newParticles.push({
+        id: particleIdRef.current++,
+        x: RUNNER_X + RUNNER_WIDTH / 2,
+        y: GROUND_Y,
+        vx: (Math.random() - 0.5) * 8,
+        vy: -Math.random() * 5 - 2,
+        life: 30,
+        color: ['#a855f7', '#3b82f6', '#ec4899', '#22d3ee'][Math.floor(Math.random() * 4)],
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+  }, [gameState.isGameOver]);
+
+  // ============================================
+  // CRITICAL: Unified Input Handling (Pointer Events)
+  // ============================================
+  useEffect(() => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+
+    // Pointer events handle both mouse and touch [^24^]
+    const handlePointerDown = (e: PointerEvent) => {
+      // Only jump if clicking on game area, not on buttons
+      if ((e.target as HTMLElement).closest('button')) return;
+      
+      if (isPlayingRef.current && !gameState.isGameOver) {
+        e.preventDefault();
+        executeJump();
+      }
+    };
+
+    // Use pointer events for unified handling
+    if (window.PointerEvent) {
+      gameContainer.addEventListener('pointerdown', handlePointerDown, { passive: false });
+    } else {
+      // Fallback for older browsers
+      const handleTouchStart = (e: TouchEvent) => {
+        if (isPlayingRef.current && !gameState.isGameOver) {
+          e.preventDefault();
+          executeJump();
+        }
+      };
+      
+      const handleMouseDown = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        if (isPlayingRef.current && !gameState.isGameOver) {
+          executeJump();
+        }
+      };
+
+      gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+      gameContainer.addEventListener('mousedown', handleMouseDown);
+      
+      return () => {
+        gameContainer.removeEventListener('touchstart', handleTouchStart);
+        gameContainer.removeEventListener('mousedown', handleMouseDown);
+      };
+    }
+
+    return () => {
+      gameContainer.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [executeJump, gameState.isGameOver]);
+
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        executeJump();
+      }
+      if (e.code === 'KeyF') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { passive: false });
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [executeJump, toggleFullscreen]);
+
+  // Ground detection
+  useEffect(() => {
+    const groundY = GROUND_Y - RUNNER_HEIGHT;
+    const isOnGround = runnerY >= groundY - 2;
+    
+    if (isOnGround && !isGroundedRef.current) {
+      isGroundedRef.current = true;
+      setIsJumping(false);
+    } else if (!isOnGround && isGroundedRef.current) {
+      isGroundedRef.current = false;
+    }
+  }, [runnerY]);
+
+  const createCollisionParticles = (x: number, y: number) => {
+    const newParticles: Particle[] = [];
+    for (let i = 0; i < 15; i++) {
+      newParticles.push({
+        id: particleIdRef.current++,
+        x, y,
+        vx: (Math.random() - 0.5) * 15,
+        vy: (Math.random() - 0.5) * 15,
+        life: 40,
+        color: ['#ef4444', '#f97316', '#eab308'][Math.floor(Math.random() * 3)],
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+  };
+
   const startGame = useCallback(() => {
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
     }
 
     isGroundedRef.current = true;
-    jumpRequestedRef.current = false;
-    runnerYRef.current = GROUND_Y - RUNNER_HEIGHT;
-    runnerVyRef.current = 0;
 
     setGameState({
       isPlaying: true,
@@ -409,7 +398,7 @@ export default function MiniGamePageContent() {
   const checkCollision = useCallback(() => {
     const runnerHitbox = {
       x: RUNNER_X + 15,
-      y: runnerYRef.current + 10,
+      y: runnerY + 10,
       width: RUNNER_WIDTH - 30,
       height: RUNNER_HEIGHT - 20,
     };
@@ -428,64 +417,32 @@ export default function MiniGamePageContent() {
         runnerHitbox.y < obstacleHitbox.y + obstacleHitbox.height &&
         runnerHitbox.y + runnerHitbox.height > obstacleHitbox.y
       ) {
-        // Collision particles
-        const newParticles: Particle[] = [];
-        for (let i = 0; i < 15; i++) {
-          newParticles.push({
-            id: particleIdRef.current++,
-            x: obstacle.x + obstacle.width / 2,
-            y: obstacle.y + obstacle.height / 2,
-            vx: (Math.random() - 0.5) * 15,
-            vy: (Math.random() - 0.5) * 15,
-            life: 40,
-            color: ['#ef4444', '#f97316', '#eab308'][Math.floor(Math.random() * 3)],
-          });
-        }
-        setParticles(prev => [...prev, ...newParticles]);
+        createCollisionParticles(obstacle.x + obstacle.width / 2, obstacle.y + obstacle.height / 2);
         gameOver();
         return true;
       }
     }
     return false;
-  }, [obstacles, gameOver]);
+  }, [obstacles, runnerY, gameOver]);
 
-  // Main game loop
+  // Game loop
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
-    let lastTime = performance.now();
-    let accumulator = 0;
-    const timeStep = 1000 / 60; // 60 FPS
-    
-    const gameLoop = (currentTime: number) => {
-      const deltaTime = currentTime - lastTime;
-      lastTime = currentTime;
-      accumulator += deltaTime;
-
-      // Fixed time step for physics
-      while (accumulator >= timeStep) {
-        // Update physics using ref for immediate response
-        runnerVyRef.current += GRAVITY;
-        runnerYRef.current += runnerVyRef.current;
+    const gameLoop = () => {
+      setRunnerY(prev => {
+        let newY = prev + runnerVy;
+        let newVy = runnerVy + GRAVITY;
         
-        const groundY = GROUND_Y - RUNNER_HEIGHT;
-        if (runnerYRef.current >= groundY) {
-          runnerYRef.current = groundY;
-          runnerVyRef.current = 0;
-          if (!isGroundedRef.current) {
-            isGroundedRef.current = true;
-            setIsJumping(false);
-          }
+        if (newY >= GROUND_Y - RUNNER_HEIGHT) {
+          newY = GROUND_Y - RUNNER_HEIGHT;
+          newVy = 0;
         }
+        
+        setRunnerVy(newVy);
+        return newY;
+      });
 
-        // Sync state with ref (throttled)
-        setRunnerY(runnerYRef.current);
-        setRunnerVy(runnerVyRef.current);
-
-        accumulator -= timeStep;
-      }
-
-      // Update obstacles
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed }))
@@ -503,14 +460,12 @@ export default function MiniGamePageContent() {
         return newObstacles;
       });
 
-      // Update particles
       setParticles(prev => 
         prev
           .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 1 }))
           .filter(p => p.life > 0)
       );
 
-      // Update score
       setGameState(prev => ({
         ...prev,
         score: prev.score + 1,
@@ -520,9 +475,7 @@ export default function MiniGamePageContent() {
 
       checkCollision();
       
-      if (isPlayingRef.current) {
-        gameLoopRef.current = requestAnimationFrame(gameLoop);
-      }
+      gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
     gameLoopRef.current = requestAnimationFrame(gameLoop);
@@ -530,7 +483,7 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, checkCollision, spawnObstacle]);
+  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
 
   // Draw background
   useEffect(() => {
@@ -549,7 +502,6 @@ export default function MiniGamePageContent() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 60; i++) {
       const x = ((i * 73 + gameState.distance * 0.05) % (GAME_WIDTH + 100)) - 50;
@@ -563,14 +515,12 @@ export default function MiniGamePageContent() {
     }
     ctx.globalAlpha = 1;
 
-    // Ground
     const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
     groundGradient.addColorStop(0, '#2d2d44');
     groundGradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = groundGradient;
     ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
 
-    // Ground line
     ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 3;
     ctx.shadowBlur = 10;
@@ -581,7 +531,6 @@ export default function MiniGamePageContent() {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Moving ground lines
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
@@ -700,6 +649,14 @@ export default function MiniGamePageContent() {
             <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto">
               Jump over obstacles and survive as long as possible! <span className="text-purple-400 font-semibold">Earn XP</span> based on your score.
             </p>
+            <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">SPACE</span>
+              <span>or</span>
+              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">CLICK</span>
+              <span>or</span>
+              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">F</span>
+              <span>for Fullscreen</span>
+            </div>
           </motion.div>
         )}
 
@@ -713,8 +670,14 @@ export default function MiniGamePageContent() {
                 <CardContent className="p-0">
                   <div 
                     ref={gameContainerRef}
-                    className={`relative w-full select-none ${isFullscreen ? 'h-screen' : ''}`}
-                    style={{ aspectRatio: isFullscreen ? 'auto' : '2/1', maxHeight: isFullscreen ? '100vh' : '500px', cursor: gameState.isPlaying ? 'pointer' : 'default' }}
+                    id="game-container"
+                    className="relative w-full select-none touch-none"
+                    style={{ 
+                      aspectRatio: isFullscreen ? 'auto' : '2/1', 
+                      maxHeight: isFullscreen ? '100vh' : '500px',
+                      cursor: gameState.isPlaying ? 'pointer' : 'default',
+                      touchAction: 'none' // Critical for touch [^24^]
+                    }}
                   >
                     <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="absolute inset-0 w-full h-full" />
 
@@ -830,28 +793,18 @@ export default function MiniGamePageContent() {
                       </motion.div>
                     )}
 
-                    {/* Fullscreen Button */}
-                    {isFullscreenSupported && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={toggleFullscreen}
-                        className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all group"
-                      >
-                        {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
-                      </motion.button>
-                    )}
-
-                    {/* Fullscreen Hint */}
-                    {!isFullscreen && isFullscreenSupported && !gameState.isPlaying && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="absolute bottom-3 right-3 z-40">
-                        <button onClick={toggleFullscreen} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-600/30 backdrop-blur-md border border-purple-500/50 text-xs text-purple-200 hover:bg-purple-600/50 transition-all">
-                          <MonitorPlay className="w-4 h-4" /> Fullscreen
-                        </button>
-                      </motion.div>
-                    )}
+                    {/* Fullscreen Toggle Button */}
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={toggleFullscreen}
+                      className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all group"
+                      title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
+                    >
+                      {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
+                    </motion.button>
                   </div>
                 </CardContent>
               </Card>
