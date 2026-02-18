@@ -61,6 +61,9 @@ const BASE_SPEED = 5;
 const MAX_SPEED = 15;
 const SPEED_INCREMENT = 0.002;
 
+// Jump cooldown to prevent double jumps
+const JUMP_COOLDOWN = 200; // ms
+
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet()
   
@@ -88,7 +91,11 @@ export default function MiniGamePageContent() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameLoopRef = useRef<number>();
   const gameContainerRef = useRef<HTMLDivElement>(null);
-  const touchStartTimeRef = useRef<number>(0);
+  
+  // Jump timing refs to prevent missed jumps
+  const lastJumpTime = useRef(0);
+  const jumpQueued = useRef(false);
+  const isGroundedRef = useRef(true);
 
   // Load saved data
   useEffect(() => {
@@ -99,32 +106,75 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // FIXED: Proper touch handling for mobile
+  // FIXED: Improved jump function with cooldown and queuing
+  // ============================================
+  
+  const performJump = useCallback(() => {
+    const now = Date.now();
+    
+    // Check cooldown
+    if (now - lastJumpTime.current < JUMP_COOLDOWN) {
+      return;
+    }
+    
+    // Check if grounded or already jumping
+    if (!isGroundedRef.current && isJumping) {
+      // Queue the jump for when landing
+      jumpQueued.current = true;
+      return;
+    }
+    
+    if (!isGroundedRef.current) {
+      return;
+    }
+
+    lastJumpTime.current = now;
+    setRunnerVy(JUMP_FORCE);
+    setIsJumping(true);
+    isGroundedRef.current = false;
+    jumpQueued.current = false;
+    createJumpParticles();
+  }, [isJumping]);
+
+  // Process queued jumps when landing
+  useEffect(() => {
+    if (isGroundedRef.current && jumpQueued.current && gameState.isPlaying) {
+      jumpQueued.current = false;
+      performJump();
+    }
+  }, [isGroundedRef.current, gameState.isPlaying, performJump]);
+
+  // Update grounded status based on runner position
+  useEffect(() => {
+    const groundY = GROUND_Y - RUNNER_HEIGHT;
+    const isOnGround = runnerY >= groundY - 5; // Small threshold
+    
+    if (isOnGround && !isGroundedRef.current) {
+      isGroundedRef.current = true;
+      setIsJumping(false);
+    } else if (!isOnGround && isGroundedRef.current) {
+      isGroundedRef.current = false;
+    }
+  }, [runnerY]);
+
+  // ============================================
+  // FIXED: Proper touch handling with better event management
   // ============================================
   
   const handleGameAreaTouch = useCallback((e: TouchEvent) => {
-    // Only jump if game is playing and not clicking a button
     if (isButtonPressed) return;
     
     if (gameState.isPlaying && !gameState.isGameOver) {
       e.preventDefault();
-      if (!isJumping) {
-        setRunnerVy(JUMP_FORCE);
-        setIsJumping(true);
-        createJumpParticles();
-      }
+      performJump();
     }
-  }, [gameState.isPlaying, gameState.isGameOver, isJumping, isButtonPressed]);
+  }, [gameState.isPlaying, gameState.isGameOver, isButtonPressed, performJump]);
 
   // Jump function for keyboard/desktop
   const jump = useCallback(() => {
     if (!gameState.isPlaying || gameState.isGameOver) return;
-    if (!isJumping) {
-      setRunnerVy(JUMP_FORCE);
-      setIsJumping(true);
-      createJumpParticles();
-    }
-  }, [gameState.isPlaying, gameState.isGameOver, isJumping]);
+    performJump();
+  }, [gameState.isPlaying, gameState.isGameOver, performJump]);
 
   const createJumpParticles = () => {
     const newParticles: Particle[] = [];
@@ -158,16 +208,19 @@ export default function MiniGamePageContent() {
   };
 
   // ============================================
-  // FIXED: Start game with proper state reset
+  // FIXED: Start game with proper state reset including jump states
   // ============================================
   const startGame = useCallback(() => {
-    // Clear any existing game loop
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current);
       gameLoopRef.current = undefined;
     }
 
-    // Reset all game state
+    // Reset jump-related refs
+    lastJumpTime.current = 0;
+    jumpQueued.current = false;
+    isGroundedRef.current = true;
+
     setGameState({
       isPlaying: true,
       isGameOver: false,
@@ -297,19 +350,24 @@ export default function MiniGamePageContent() {
     return false;
   }, [obstacles, runnerY, gameOver]);
 
-  // Game loop
+  // Game loop - FIXED: Better timing with requestAnimationFrame
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
-    const gameLoop = () => {
+    let lastTime = performance.now();
+    
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      lastTime = currentTime;
+
       setRunnerY(prev => {
         let newY = prev + runnerVy;
         let newVy = runnerVy + GRAVITY;
         
-        if (newY >= GROUND_Y - RUNNER_HEIGHT) {
-          newY = GROUND_Y - RUNNER_HEIGHT;
+        const groundY = GROUND_Y - RUNNER_HEIGHT;
+        if (newY >= groundY) {
+          newY = groundY;
           newVy = 0;
-          setIsJumping(false);
         }
         
         setRunnerVy(newVy);
@@ -347,36 +405,47 @@ export default function MiniGamePageContent() {
       }));
 
       checkCollision();
+      
+      if (gameState.isPlaying) {
+        gameLoopRef.current = requestAnimationFrame(gameLoop);
+      }
     };
 
-    gameLoopRef.current = window.setInterval(gameLoop, 1000 / 60);
+    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    
     return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
 
-  // Keyboard controls
+  // Keyboard controls - FIXED: Prevent default to avoid page scroll
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         jump();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { passive: false });
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch controls for game area only
+  // Touch controls for game area only - FIXED: Better touch handling
   useEffect(() => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
 
-    gameContainer.addEventListener('touchstart', handleGameAreaTouch, { passive: false });
+    const handleTouch = (e: TouchEvent) => {
+      handleGameAreaTouch(e);
+    };
+
+    // Use { passive: false } to allow preventDefault
+    gameContainer.addEventListener('touchstart', handleTouch, { passive: false });
 
     return () => {
-      gameContainer.removeEventListener('touchstart', handleGameAreaTouch);
+      gameContainer.removeEventListener('touchstart', handleTouch);
     };
   }, [handleGameAreaTouch]);
 
@@ -510,16 +579,12 @@ export default function MiniGamePageContent() {
     }
   };
 
-  // ============================================
-  // FIXED: Button handlers with proper touch support
-  // ============================================
-  
+  // Button handlers
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setIsButtonPressed(true);
     startGame();
-    // Reset button flag after a short delay
     setTimeout(() => setIsButtonPressed(false), 100);
   };
 
@@ -589,7 +654,7 @@ export default function MiniGamePageContent() {
                   <div 
                     ref={gameContainerRef}
                     id="game-container"
-                    className="relative w-full select-none"
+                    className="relative w-full select-none touch-none"
                     style={{ aspectRatio: '2/1', maxHeight: '500px' }}
                   >
                     <canvas
@@ -603,7 +668,7 @@ export default function MiniGamePageContent() {
                       {/* Character */}
                       {(gameState.isPlaying || gameState.isGameOver) && (
                         <motion.div
-                          className="absolute z-20"
+                          className="absolute z-20 will-change-transform"
                           style={{
                             left: `${(RUNNER_X / GAME_WIDTH) * 100}%`,
                             top: `${(runnerY / GAME_HEIGHT) * 100}%`,
@@ -691,9 +756,6 @@ export default function MiniGamePageContent() {
                             </motion.div>
                             <p className="text-gray-400 mb-6 text-sm md:text-base">Jump over obstacles and earn XP!</p>
                             
-                            {/* ============================================
-                                FIXED: Button with proper touch handlers
-                            ============================================ */}
                             <Button
                               onClick={handleStartGame}
                               onTouchStart={(e) => {
@@ -745,9 +807,6 @@ export default function MiniGamePageContent() {
                               </motion.p>
                             )}
                             
-                            {/* ============================================
-                                FIXED: Play Again button with proper touch handlers
-                            ============================================ */}
                             <Button
                               onClick={handlePlayAgain}
                               onTouchStart={(e) => {
@@ -818,7 +877,7 @@ export default function MiniGamePageContent() {
             </motion.div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Same as before */}
           <div className="lg:col-span-4 space-y-4">
             {/* Your Stats */}
             <motion.div
