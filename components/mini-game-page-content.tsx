@@ -63,7 +63,6 @@ const JUMP_FORCE = -15;
 const BASE_SPEED = 5;
 const MAX_SPEED = 15;
 const SPEED_INCREMENT = 0.002;
-const JUMP_COOLDOWN = 200;
 
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet()
@@ -85,11 +84,7 @@ export default function MiniGamePageContent() {
   const [xpEarned, setXpEarned] = useState(0);
   const [totalXp, setTotalXp] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
-  const [isButtonPressed, setIsButtonPressed] = useState(false);
   
-  // ============================================
-  // NEW: Fullscreen state
-  // ============================================
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFullscreenSupported, setIsFullscreenSupported] = useState(true);
 
@@ -100,9 +95,12 @@ export default function MiniGamePageContent() {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameWrapperRef = useRef<HTMLDivElement>(null);
   
-  const lastJumpTime = useRef(0);
-  const jumpQueued = useRef(false);
+  // Direct refs for immediate jump - NO DELAY
   const isGroundedRef = useRef(true);
+  const jumpRequestedRef = useRef(false);
+  const runnerYRef = useRef(GROUND_Y - RUNNER_HEIGHT);
+  const runnerVyRef = useRef(0);
+  const isPlayingRef = useRef(false);
 
   // Load saved data
   useEffect(() => {
@@ -111,7 +109,6 @@ export default function MiniGamePageContent() {
     const savedXp = localStorage.getItem('runnerTotalXp');
     if (savedXp) setTotalXp(parseInt(savedXp));
     
-    // Check fullscreen support
     const doc: any = document;
     const fullscreenEnabled = document.fullscreenEnabled || 
                              doc.webkitFullscreenEnabled || 
@@ -120,10 +117,131 @@ export default function MiniGamePageContent() {
     setIsFullscreenSupported(!!fullscreenEnabled);
   }, []);
 
+  // Sync refs with state
+  useEffect(() => {
+    isPlayingRef.current = gameState.isPlaying;
+  }, [gameState.isPlaying]);
+
+  useEffect(() => {
+    runnerYRef.current = runnerY;
+  }, [runnerY]);
+
+  useEffect(() => {
+    runnerVyRef.current = runnerVy;
+  }, [runnerVy]);
+
   // ============================================
-  // NEW: Fullscreen handlers
+  // CRITICAL: Immediate Jump Function - NO DELAY
   // ============================================
-  
+  const executeJump = useCallback(() => {
+    if (!isPlayingRef.current || gameState.isGameOver) return false;
+    if (!isGroundedRef.current) return false;
+    
+    // IMMEDIATE velocity change
+    runnerVyRef.current = JUMP_FORCE;
+    setRunnerVy(JUMP_FORCE);
+    isGroundedRef.current = false;
+    setIsJumping(true);
+    
+    // Create particles immediately
+    const newParticles: Particle[] = [];
+    for (let i = 0; i < 8; i++) {
+      newParticles.push({
+        id: particleIdRef.current++,
+        x: RUNNER_X + RUNNER_WIDTH / 2,
+        y: GROUND_Y,
+        vx: (Math.random() - 0.5) * 8,
+        vy: -Math.random() * 5 - 2,
+        life: 30,
+        color: ['#a855f7', '#3b82f6', '#ec4899', '#22d3ee'][Math.floor(Math.random() * 4)],
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+    
+    return true;
+  }, [gameState.isGameOver]);
+
+  // Jump request from inputs
+  const requestJump = useCallback(() => {
+    if (isGroundedRef.current) {
+      executeJump();
+    } else {
+      // Queue jump for when landing
+      jumpRequestedRef.current = true;
+    }
+  }, [executeJump]);
+
+  // Check for queued jump when landing
+  useEffect(() => {
+    const groundY = GROUND_Y - RUNNER_HEIGHT;
+    const isOnGround = runnerYRef.current >= groundY - 2;
+    
+    if (isOnGround && !isGroundedRef.current) {
+      isGroundedRef.current = true;
+      setIsJumping(false);
+      
+      // Execute queued jump immediately
+      if (jumpRequestedRef.current && isPlayingRef.current) {
+        jumpRequestedRef.current = false;
+        setTimeout(() => executeJump(), 10);
+      }
+    } else if (!isOnGround && isGroundedRef.current) {
+      isGroundedRef.current = false;
+    }
+  }, [runnerY, executeJump]);
+
+  // ============================================
+  // CRITICAL: Direct Event Listeners - NO REACT DELAY
+  // ============================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        requestJump();
+      }
+      if (e.code === 'KeyF') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    // Use capture phase for immediate response
+    window.addEventListener('keydown', handleKeyDown, { passive: false, capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [requestJump]);
+
+  // Direct touch handler
+  useEffect(() => {
+    const gameContainer = gameContainerRef.current;
+    if (!gameContainer) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (!isPlayingRef.current) return;
+      e.preventDefault();
+      requestJump();
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!isPlayingRef.current) return;
+      // Only jump if not clicking a button
+      if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+        requestJump();
+      }
+    };
+
+    gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+    gameContainer.addEventListener('mousedown', handleMouseDown);
+
+    return () => {
+      gameContainer.removeEventListener('touchstart', handleTouchStart);
+      gameContainer.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [requestJump]);
+
+  // ============================================
+  // Fullscreen Functions
+  // ============================================
   const toggleFullscreen = useCallback(async () => {
     const doc: any = document;
     const wrapper = gameWrapperRef.current;
@@ -131,7 +249,6 @@ export default function MiniGamePageContent() {
 
     try {
       if (!isFullscreen) {
-        // Enter fullscreen
         if (wrapper.requestFullscreen) {
           await wrapper.requestFullscreen();
         } else if (wrapper.webkitRequestFullscreen) {
@@ -142,7 +259,6 @@ export default function MiniGamePageContent() {
           await wrapper.msRequestFullscreen();
         }
       } else {
-        // Exit fullscreen
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         } else if (doc.webkitExitFullscreen) {
@@ -158,7 +274,6 @@ export default function MiniGamePageContent() {
     }
   }, [isFullscreen]);
 
-  // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       const doc: any = document;
@@ -183,105 +298,17 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // Jump function with cooldown and queuing
+  // Game Loop - Optimized for 60FPS
   // ============================================
-  
-  const performJump = useCallback(() => {
-    const now = Date.now();
-    
-    if (now - lastJumpTime.current < JUMP_COOLDOWN) {
-      return;
-    }
-    
-    if (!isGroundedRef.current && isJumping) {
-      jumpQueued.current = true;
-      return;
-    }
-    
-    if (!isGroundedRef.current) {
-      return;
-    }
-
-    lastJumpTime.current = now;
-    setRunnerVy(JUMP_FORCE);
-    setIsJumping(true);
-    isGroundedRef.current = false;
-    jumpQueued.current = false;
-    createJumpParticles();
-  }, [isJumping]);
-
-  useEffect(() => {
-    if (isGroundedRef.current && jumpQueued.current && gameState.isPlaying) {
-      jumpQueued.current = false;
-      performJump();
-    }
-  }, [isGroundedRef.current, gameState.isPlaying, performJump]);
-
-  useEffect(() => {
-    const groundY = GROUND_Y - RUNNER_HEIGHT;
-    const isOnGround = runnerY >= groundY - 5;
-    
-    if (isOnGround && !isGroundedRef.current) {
-      isGroundedRef.current = true;
-      setIsJumping(false);
-    } else if (!isOnGround && isGroundedRef.current) {
-      isGroundedRef.current = false;
-    }
-  }, [runnerY]);
-
-  const handleGameAreaTouch = useCallback((e: TouchEvent) => {
-    if (isButtonPressed) return;
-    
-    if (gameState.isPlaying && !gameState.isGameOver) {
-      e.preventDefault();
-      performJump();
-    }
-  }, [gameState.isPlaying, gameState.isGameOver, isButtonPressed, performJump]);
-
-  const jump = useCallback(() => {
-    if (!gameState.isPlaying || gameState.isGameOver) return;
-    performJump();
-  }, [gameState.isPlaying, gameState.isGameOver, performJump]);
-
-  const createJumpParticles = () => {
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < 6; i++) {
-      newParticles.push({
-        id: particleIdRef.current++,
-        x: RUNNER_X + RUNNER_WIDTH / 2,
-        y: GROUND_Y,
-        vx: (Math.random() - 0.5) * 6,
-        vy: -Math.random() * 4 - 1,
-        life: 25,
-        color: ['#a855f7', '#3b82f6', '#ec4899'][Math.floor(Math.random() * 3)],
-      });
-    }
-    setParticles(prev => [...prev, ...newParticles]);
-  };
-
-  const createCollisionParticles = (x: number, y: number) => {
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < 12; i++) {
-      newParticles.push({
-        id: particleIdRef.current++,
-        x, y,
-        vx: (Math.random() - 0.5) * 12,
-        vy: (Math.random() - 0.5) * 12,
-        life: 35,
-        color: ['#ef4444', '#f97316', '#eab308'][Math.floor(Math.random() * 3)],
-      });
-    }
-    setParticles(prev => [...prev, ...newParticles]);
-  };
-
   const startGame = useCallback(() => {
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
     }
 
-    lastJumpTime.current = 0;
-    jumpQueued.current = false;
     isGroundedRef.current = true;
+    jumpRequestedRef.current = false;
+    runnerYRef.current = GROUND_Y - RUNNER_HEIGHT;
+    runnerVyRef.current = 0;
 
     setGameState({
       isPlaying: true,
@@ -298,7 +325,6 @@ export default function MiniGamePageContent() {
     setObstacles([]);
     setParticles([]);
     obstacleIdRef.current = 0;
-    setIsButtonPressed(false);
   }, [gameState.highScore]);
 
   const spawnObstacle = useCallback(() => {
@@ -323,12 +349,10 @@ export default function MiniGamePageContent() {
         break;
     }
     
-    const obstacleY = GROUND_Y - obstacleHeight;
-    
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
       x: GAME_WIDTH + 50 + Math.random() * 150,
-      y: obstacleY,
+      y: GROUND_Y - obstacleHeight,
       width: obstacleWidth,
       height: obstacleHeight,
       type,
@@ -385,7 +409,7 @@ export default function MiniGamePageContent() {
   const checkCollision = useCallback(() => {
     const runnerHitbox = {
       x: RUNNER_X + 15,
-      y: runnerY + 10,
+      y: runnerYRef.current + 10,
       width: RUNNER_WIDTH - 30,
       height: RUNNER_HEIGHT - 20,
     };
@@ -404,38 +428,64 @@ export default function MiniGamePageContent() {
         runnerHitbox.y < obstacleHitbox.y + obstacleHitbox.height &&
         runnerHitbox.y + runnerHitbox.height > obstacleHitbox.y
       ) {
-        createCollisionParticles(obstacle.x + obstacle.width / 2, obstacle.y + obstacle.height / 2);
+        // Collision particles
+        const newParticles: Particle[] = [];
+        for (let i = 0; i < 15; i++) {
+          newParticles.push({
+            id: particleIdRef.current++,
+            x: obstacle.x + obstacle.width / 2,
+            y: obstacle.y + obstacle.height / 2,
+            vx: (Math.random() - 0.5) * 15,
+            vy: (Math.random() - 0.5) * 15,
+            life: 40,
+            color: ['#ef4444', '#f97316', '#eab308'][Math.floor(Math.random() * 3)],
+          });
+        }
+        setParticles(prev => [...prev, ...newParticles]);
         gameOver();
         return true;
       }
     }
     return false;
-  }, [obstacles, runnerY, gameOver]);
+  }, [obstacles, gameOver]);
 
-  // Game loop
+  // Main game loop
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
     let lastTime = performance.now();
+    let accumulator = 0;
+    const timeStep = 1000 / 60; // 60 FPS
     
     const gameLoop = (currentTime: number) => {
       const deltaTime = currentTime - lastTime;
       lastTime = currentTime;
+      accumulator += deltaTime;
 
-      setRunnerY(prev => {
-        let newY = prev + runnerVy;
-        let newVy = runnerVy + GRAVITY;
+      // Fixed time step for physics
+      while (accumulator >= timeStep) {
+        // Update physics using ref for immediate response
+        runnerVyRef.current += GRAVITY;
+        runnerYRef.current += runnerVyRef.current;
         
         const groundY = GROUND_Y - RUNNER_HEIGHT;
-        if (newY >= groundY) {
-          newY = groundY;
-          newVy = 0;
+        if (runnerYRef.current >= groundY) {
+          runnerYRef.current = groundY;
+          runnerVyRef.current = 0;
+          if (!isGroundedRef.current) {
+            isGroundedRef.current = true;
+            setIsJumping(false);
+          }
         }
-        
-        setRunnerVy(newVy);
-        return newY;
-      });
 
+        // Sync state with ref (throttled)
+        setRunnerY(runnerYRef.current);
+        setRunnerVy(runnerVyRef.current);
+
+        accumulator -= timeStep;
+      }
+
+      // Update obstacles
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed }))
@@ -453,12 +503,14 @@ export default function MiniGamePageContent() {
         return newObstacles;
       });
 
+      // Update particles
       setParticles(prev => 
         prev
           .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 1 }))
           .filter(p => p.life > 0)
       );
 
+      // Update score
       setGameState(prev => ({
         ...prev,
         score: prev.score + 1,
@@ -468,7 +520,7 @@ export default function MiniGamePageContent() {
 
       checkCollision();
       
-      if (gameState.isPlaying) {
+      if (isPlayingRef.current) {
         gameLoopRef.current = requestAnimationFrame(gameLoop);
       }
     };
@@ -478,42 +530,7 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
-
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault();
-        e.stopPropagation();
-        jump();
-      }
-      // Fullscreen toggle with F key
-      if (e.code === 'KeyF') {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, { passive: false });
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [jump, toggleFullscreen]);
-
-  // Touch controls
-  useEffect(() => {
-    const gameContainer = gameContainerRef.current;
-    if (!gameContainer) return;
-
-    const handleTouch = (e: TouchEvent) => {
-      handleGameAreaTouch(e);
-    };
-
-    gameContainer.addEventListener('touchstart', handleTouch, { passive: false });
-
-    return () => {
-      gameContainer.removeEventListener('touchstart', handleTouch);
-    };
-  }, [handleGameAreaTouch]);
+  }, [gameState.isPlaying, gameState.speed, checkCollision, spawnObstacle]);
 
   // Draw background
   useEffect(() => {
@@ -532,6 +549,7 @@ export default function MiniGamePageContent() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    // Stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 60; i++) {
       const x = ((i * 73 + gameState.distance * 0.05) % (GAME_WIDTH + 100)) - 50;
@@ -545,12 +563,14 @@ export default function MiniGamePageContent() {
     }
     ctx.globalAlpha = 1;
 
+    // Ground
     const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
     groundGradient.addColorStop(0, '#2d2d44');
     groundGradient.addColorStop(1, '#1a1a2e');
     ctx.fillStyle = groundGradient;
     ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
 
+    // Ground line
     ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 3;
     ctx.shadowBlur = 10;
@@ -561,6 +581,7 @@ export default function MiniGamePageContent() {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
+    // Moving ground lines
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
@@ -647,96 +668,58 @@ export default function MiniGamePageContent() {
 
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    e.preventDefault();
-    setIsButtonPressed(true);
     startGame();
-    setTimeout(() => setIsButtonPressed(false), 100);
   };
 
   const handlePlayAgain = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    e.preventDefault();
-    setIsButtonPressed(true);
     startGame();
-    setTimeout(() => setIsButtonPressed(false), 100);
   };
 
   return (
     <div className={`min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden ${isFullscreen ? 'fullscreen-mode' : ''}`}>
-      {/* Animated Background */}
+      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[150px]" />
       </div>
 
       <div className={`relative z-10 container mx-auto px-4 py-6 max-w-7xl ${isFullscreen ? 'h-screen flex flex-col justify-center' : ''}`}>
-        {/* Header - Hidden in fullscreen */}
+        {/* Header */}
         {!isFullscreen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-6"
-          >
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 mb-4">
               <Sparkles className="w-4 h-4 text-purple-400" />
               <span className="text-sm font-medium bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
                 Endless Runner Challenge
               </span>
             </div>
-            
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3">
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-                Neon Runner
-              </span>
+              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">Neon Runner</span>
             </h1>
-            
             <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto">
-              Jump over obstacles and survive as long as possible! 
-              <span className="text-purple-400 font-semibold"> Earn XP</span> based on your score.
+              Jump over obstacles and survive as long as possible! <span className="text-purple-400 font-semibold">Earn XP</span> based on your score.
             </p>
-            
-            <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">
-              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">SPACE</span>
-              <span>or</span>
-              <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">TAP</span>
-              <span>to jump</span>
-            </div>
           </motion.div>
         )}
 
         <div className={`grid ${isFullscreen ? 'grid-cols-1 h-full' : 'grid-cols-1 lg:grid-cols-12'} gap-6`}>
-          {/* Main Game Area */}
+          {/* Game Area */}
           <div className={`${isFullscreen ? 'w-full h-full flex items-center justify-center' : 'lg:col-span-8'}`}>
-            <motion.div
-              ref={gameWrapperRef}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className={`relative ${isFullscreen ? 'w-full max-w-6xl' : ''}`}
-            >
+            <motion.div ref={gameWrapperRef} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`relative ${isFullscreen ? 'w-full max-w-6xl' : ''}`}>
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-2xl blur opacity-30" />
               
               <Card className={`relative bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden ${isFullscreen ? 'border-0 rounded-none' : ''}`}>
                 <CardContent className="p-0">
                   <div 
                     ref={gameContainerRef}
-                    id="game-container"
-                    className={`relative w-full select-none touch-none ${isFullscreen ? 'h-screen' : ''}`}
-                    style={{ 
-                      aspectRatio: isFullscreen ? 'auto' : '2/1', 
-                      maxHeight: isFullscreen ? '100vh' : '500px' 
-                    }}
+                    className={`relative w-full select-none ${isFullscreen ? 'h-screen' : ''}`}
+                    style={{ aspectRatio: isFullscreen ? 'auto' : '2/1', maxHeight: isFullscreen ? '100vh' : '500px', cursor: gameState.isPlaying ? 'pointer' : 'default' }}
                   >
-                    <canvas
-                      ref={canvasRef}
-                      width={GAME_WIDTH}
-                      height={GAME_HEIGHT}
-                      className="absolute inset-0 w-full h-full"
-                    />
+                    <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="absolute inset-0 w-full h-full" />
 
                     <div className="absolute inset-0 overflow-hidden">
-                      {/* Character */}
+                      {/* Runner */}
                       {(gameState.isPlaying || gameState.isGameOver) && (
                         <motion.div
                           className="absolute z-20 will-change-transform"
@@ -746,19 +729,14 @@ export default function MiniGamePageContent() {
                             width: `${(RUNNER_WIDTH / GAME_WIDTH) * 100}%`,
                             height: `${(RUNNER_HEIGHT / GAME_HEIGHT) * 100}%`,
                           }}
-                          animate={gameState.isPlaying && !isJumping ? { 
-                            scaleY: [1, 0.95, 1],
-                            y: [0, 2, 0]
-                          } : {}}
+                          animate={gameState.isPlaying && !isJumping ? { scaleY: [1, 0.95, 1], y: [0, 2, 0] } : {}}
                           transition={{ repeat: Infinity, duration: 0.15 }}
                         >
                           <img 
                             src="/images/character-jump.png"
                             alt="Runner"
                             className="w-full h-full object-contain"
-                            style={{
-                              filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))',
-                            }}
+                            style={{ filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))' }}
                             draggable={false}
                           />
                         </motion.div>
@@ -780,18 +758,13 @@ export default function MiniGamePageContent() {
                             src="/images/character-jump.png"
                             alt="Runner"
                             className="w-full h-full object-contain"
-                            style={{
-                              filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))',
-                            }}
+                            style={{ filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))' }}
                             draggable={false}
                           />
                         </motion.div>
                       )}
                       
-                      {/* Obstacles */}
                       {obstacles.map(renderObstacle)}
-
-                      {/* Particles */}
                       {particles.map(particle => (
                         <div
                           key={particle.id}
@@ -811,38 +784,13 @@ export default function MiniGamePageContent() {
                       {/* Start Screen */}
                       <AnimatePresence>
                         {!gameState.isPlaying && !gameState.isGameOver && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-40"
-                          >
-                            <motion.div
-                              animate={{ scale: [1, 1.05, 1] }}
-                              transition={{ repeat: Infinity, duration: 2 }}
-                            >
-                              <h2 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                                Ready to Run?
-                              </h2>
+                          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-40">
+                            <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                              <h2 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Ready to Run?</h2>
                             </motion.div>
                             <p className="text-gray-400 mb-6 text-sm md:text-base">Jump over obstacles and earn XP!</p>
-                            
-                            <Button
-                              onClick={handleStartGame}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setIsButtonPressed(true);
-                              }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleStartGame(e);
-                              }}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-purple-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation"
-                              style={{ touchAction: 'manipulation' }}
-                            >
-                              <Play className="w-5 h-5 mr-2" />
-                              Start Game
+                            <Button onClick={handleStartGame} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-purple-500/25 transition-all hover:scale-105 active:scale-95">
+                              <Play className="w-5 h-5 mr-2" /> Start Game
                             </Button>
                           </motion.div>
                         )}
@@ -851,49 +799,17 @@ export default function MiniGamePageContent() {
                       {/* Game Over Screen */}
                       <AnimatePresence>
                         {gameState.isGameOver && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-50"
-                          >
-                            <motion.div
-                              initial={{ scale: 0, rotate: -180 }}
-                              animate={{ scale: 1, rotate: 0 }}
-                              transition={{ type: "spring", stiffness: 200 }}
-                              className="text-5xl md:text-6xl mb-4"
-                            >
-                              💥
-                            </motion.div>
+                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-50">
+                            <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 200 }} className="text-5xl md:text-6xl mb-4">💥</motion.div>
                             <h2 className="text-3xl md:text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
                             <p className="text-xl md:text-2xl text-white mb-2 font-bold">Score: {gameState.score}</p>
                             {gameState.score > gameState.highScore && (
-                              <motion.p 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="text-yellow-400 mb-4 flex items-center gap-2 font-semibold"
-                              >
-                                <Trophy className="w-5 h-5" />
-                                New High Score!
+                              <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-yellow-400 mb-4 flex items-center gap-2 font-semibold">
+                                <Trophy className="w-5 h-5" /> New High Score!
                               </motion.p>
                             )}
-                            
-                            <Button
-                              onClick={handlePlayAgain}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setIsButtonPressed(true);
-                              }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePlayAgain(e);
-                              }}
-                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-cyan-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation"
-                              style={{ touchAction: 'manipulation' }}
-                            >
-                              <RotateCcw className="w-5 h-5 mr-2" />
-                              Play Again
+                            <Button onClick={handlePlayAgain} className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-cyan-500/25 transition-all hover:scale-105 active:scale-95">
+                              <RotateCcw className="w-5 h-5 mr-2" /> Play Again
                             </Button>
                           </motion.div>
                         )}
@@ -902,29 +818,19 @@ export default function MiniGamePageContent() {
 
                     {/* Score Overlay */}
                     {gameState.isPlaying && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-30"
-                      >
+                      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-30">
                         <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-purple-500/40 shadow-lg shadow-purple-500/20">
                           <div className="text-xs text-purple-300 uppercase tracking-wider font-semibold">Score</div>
-                          <div className="text-2xl md:text-3xl font-bold text-white">
-                            {gameState.score}
-                          </div>
+                          <div className="text-2xl md:text-3xl font-bold text-white">{gameState.score}</div>
                         </div>
                         <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-cyan-500/40 shadow-lg shadow-cyan-500/20">
                           <div className="text-xs text-cyan-300 uppercase tracking-wider font-semibold">Speed</div>
-                          <div className="text-2xl md:text-3xl font-bold text-cyan-400">
-                            {gameState.speed.toFixed(1)}x
-                          </div>
+                          <div className="text-2xl md:text-3xl font-bold text-cyan-400">{gameState.speed.toFixed(1)}x</div>
                         </div>
                       </motion.div>
                     )}
 
-                    {/* ============================================
-                        NEW: Fullscreen Toggle Button
-                    ============================================ */}
+                    {/* Fullscreen Button */}
                     {isFullscreenSupported && (
                       <motion.button
                         initial={{ opacity: 0, scale: 0.8 }}
@@ -933,30 +839,16 @@ export default function MiniGamePageContent() {
                         whileTap={{ scale: 0.9 }}
                         onClick={toggleFullscreen}
                         className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all group"
-                        title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
                       >
-                        {isFullscreen ? (
-                          <Minimize2 className="w-5 h-5 text-white group-hover:text-cyan-400 transition-colors" />
-                        ) : (
-                          <Maximize2 className="w-5 h-5 text-white group-hover:text-cyan-400 transition-colors" />
-                        )}
+                        {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
                       </motion.button>
                     )}
 
                     {/* Fullscreen Hint */}
                     {!isFullscreen && isFullscreenSupported && !gameState.isPlaying && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 1 }}
-                        className="absolute bottom-3 right-3 z-40"
-                      >
-                        <button
-                          onClick={toggleFullscreen}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-600/30 backdrop-blur-md border border-purple-500/50 text-xs text-purple-200 hover:bg-purple-600/50 transition-all"
-                        >
-                          <MonitorPlay className="w-4 h-4" />
-                          Fullscreen
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="absolute bottom-3 right-3 z-40">
+                        <button onClick={toggleFullscreen} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-600/30 backdrop-blur-md border border-purple-500/50 text-xs text-purple-200 hover:bg-purple-600/50 transition-all">
+                          <MonitorPlay className="w-4 h-4" /> Fullscreen
                         </button>
                       </motion.div>
                     )}
@@ -965,23 +857,18 @@ export default function MiniGamePageContent() {
               </Card>
             </motion.div>
 
-            {/* Quick Stats Bar - Hidden in fullscreen */}
+            {/* Quick Stats */}
             {!isFullscreen && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-4 grid grid-cols-3 gap-3"
-              >
-                <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-500/40 rounded-xl p-3 text-center shadow-lg shadow-purple-500/10">
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-4 grid grid-cols-3 gap-3">
+                <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-500/40 rounded-xl p-3 text-center">
                   <div className="text-purple-300 text-xs mb-1 uppercase tracking-wider font-semibold">Current</div>
                   <div className="text-xl md:text-2xl font-bold text-white">{gameState.score}</div>
                 </div>
-                <div className="bg-gradient-to-br from-pink-900/50 to-pink-800/30 border border-pink-500/40 rounded-xl p-3 text-center shadow-lg shadow-pink-500/10">
+                <div className="bg-gradient-to-br from-pink-900/50 to-pink-800/30 border border-pink-500/40 rounded-xl p-3 text-center">
                   <div className="text-pink-300 text-xs mb-1 uppercase tracking-wider font-semibold">Best</div>
                   <div className="text-xl md:text-2xl font-bold text-white">{Math.max(gameState.highScore, gameState.score)}</div>
                 </div>
-                <div className="bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-500/40 rounded-xl p-3 text-center shadow-lg shadow-cyan-500/10">
+                <div className="bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-500/40 rounded-xl p-3 text-center">
                   <div className="text-cyan-300 text-xs mb-1 uppercase tracking-wider font-semibold">XP Earned</div>
                   <div className="text-xl md:text-2xl font-bold text-white">+{Math.min(gameState.score, 250)}</div>
                 </div>
@@ -989,68 +876,52 @@ export default function MiniGamePageContent() {
             )}
           </div>
 
-          {/* Sidebar - Hidden in fullscreen */}
+          {/* Sidebar */}
           {!isFullscreen && (
             <div className="lg:col-span-4 space-y-4">
-              {/* Your Stats */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <Card className="bg-gray-900/70 border-purple-500/30 backdrop-blur-xl overflow-hidden shadow-xl shadow-purple-500/5">
+              {/* Stats Cards */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
+                <Card className="bg-gray-900/70 border-purple-500/30 backdrop-blur-xl overflow-hidden">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
                         <Trophy className="w-5 h-5 text-white" />
                       </div>
                       Your Stats
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all hover:bg-white/10">
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                          <Flame className="w-4 h-4 text-orange-400" />
-                        </div>
-                        <span className="text-gray-300 text-sm font-medium">High Score</span>
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        <span className="text-gray-300 text-sm">High Score</span>
                       </div>
                       <span className="text-2xl font-bold text-yellow-400">{gameState.highScore}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all hover:bg-white/10">
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                          <Zap className="w-4 h-4 text-purple-400" />
-                        </div>
-                        <span className="text-gray-300 text-sm font-medium">Total XP</span>
+                        <Zap className="w-4 h-4 text-purple-400" />
+                        <span className="text-gray-300 text-sm">Total XP</span>
                       </div>
                       <span className="text-2xl font-bold text-purple-400">{totalXp}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all hover:bg-white/10">
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                          <Gamepad2 className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <span className="text-gray-300 text-sm font-medium">Games Played</span>
+                        <Gamepad2 className="w-4 h-4 text-cyan-400" />
+                        <span className="text-gray-300 text-sm">Games Played</span>
                       </div>
-                      <span className="text-2xl font-bold text-cyan-400">
-                        {Math.floor(totalXp / 125) || 0}
-                      </span>
+                      <span className="text-2xl font-bold text-cyan-400">{Math.floor(totalXp / 125) || 0}</span>
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
 
               {/* XP Rewards */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Card className="bg-gray-900/70 border-green-500/30 backdrop-blur-xl overflow-hidden shadow-xl shadow-green-500/5">
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+                <Card className="bg-gray-900/70 border-green-500/30 backdrop-blur-xl overflow-hidden">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
                         <Award className="w-5 h-5 text-white" />
                       </div>
                       XP Rewards
@@ -1058,29 +929,18 @@ export default function MiniGamePageContent() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {[
-                      { score: 100, xp: 50, color: "from-gray-600 to-gray-500", icon: Star, label: "Score 100+" },
-                      { score: 500, xp: 100, color: "from-yellow-600 to-orange-500", icon: Trophy, label: "Score 500+" },
-                      { score: 1000, xp: 200, color: "from-purple-600 to-pink-500", icon: Award, label: "Score 1000+" },
+                      { score: 100, xp: 50, icon: Star, label: "Score 100+" },
+                      { score: 500, xp: 100, icon: Trophy, label: "Score 500+" },
+                      { score: 1000, xp: 200, icon: Award, label: "Score 1000+" },
                     ].map((reward, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 group hover:bg-white/10 transition-all hover:border-green-500/30">
+                      <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${reward.color} flex items-center justify-center shadow-lg opacity-80 group-hover:opacity-100 transition-all group-hover:scale-110`}>
-                            <reward.icon className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-gray-300 text-sm font-medium">{reward.label}</span>
+                          <reward.icon className="w-4 h-4 text-yellow-400" />
+                          <span className="text-gray-300 text-sm">{reward.label}</span>
                         </div>
                         <span className="text-green-400 font-bold text-sm">+{reward.xp} XP</span>
                       </div>
                     ))}
-                    
-                    <div className="flex justify-between items-center p-3 rounded-xl border border-green-500/30 bg-green-500/10">
-                      <span className="text-gray-300 text-sm flex items-center gap-2 font-medium">
-                        <TrendingUp className="w-4 h-4 text-green-400" />
-                        Per 10 points
-                      </span>
-                      <span className="text-green-400 font-bold text-sm">+1 XP</span>
-                    </div>
-                    
                     <div className="text-center p-3 bg-white/5 rounded-xl border border-white/5">
                       <span className="text-xs text-gray-500">Max per game: </span>
                       <span className="text-xs text-purple-400 font-bold">250 XP</span>
@@ -1090,34 +950,22 @@ export default function MiniGamePageContent() {
               </motion.div>
 
               {/* Quest Target */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Card className="bg-gray-900/70 border-orange-500/30 backdrop-blur-xl overflow-hidden relative shadow-xl shadow-orange-500/5">
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
+                <Card className="bg-gray-900/70 border-orange-500/30 backdrop-blur-xl overflow-hidden relative">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
-                  
-                  <CardHeader className="pb-3 relative">
+                  <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg text-orange-300">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center">
                         <Target className="w-5 h-5 text-white" />
                       </div>
                       Quest Target
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="relative">
-                    <p className="text-gray-300 text-sm mb-3 font-medium">Score 500+ points in a single run!</p>
-                    
+                  <CardContent>
+                    <p className="text-gray-300 text-sm mb-3">Score 500+ points in a single run!</p>
                     <div className="relative h-4 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                      <motion.div
-                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (gameState.score / 500) * 100)}%` }}
-                        transition={{ type: "spring", stiffness: 100 }}
-                      />
+                      <motion.div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full" initial={{ width: 0 }} animate={{ width: `${Math.min(100, (gameState.score / 500) * 100)}%` }} />
                     </div>
-                    
                     <div className="flex justify-between mt-2">
                       <span className="text-gray-500 text-xs">Progress</span>
                       <span className="text-orange-400 font-bold text-sm">{Math.min(gameState.score, 500)} / 500</span>
@@ -1135,59 +983,34 @@ export default function MiniGamePageContent() {
         <DialogContent className="bg-gray-900/95 border-purple-500/30 backdrop-blur-xl text-white max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
-              <Sparkles className="w-6 h-6 text-yellow-400" />
-              Game Complete!
+              <Sparkles className="w-6 h-6 text-yellow-400" /> Game Complete!
             </DialogTitle>
           </DialogHeader>
           <div className="text-center py-6">
-            <motion.div 
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2"
-            >
+            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
               +{xpEarned} XP
             </motion.div>
-            <p className="text-gray-400 text-sm">Earned from your run!</p>
-            
             <div className="mt-6 space-y-2">
-              <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
                 <span className="text-gray-400 text-sm">Final Score</span>
                 <span className="text-white font-bold text-lg">{gameState.score}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
                 <span className="text-gray-400 text-sm">Total XP</span>
                 <span className="text-purple-400 font-bold text-lg">{totalXp}</span>
               </div>
             </div>
-            
-            <Button
-              onClick={() => setShowXpPopup(false)}
-              className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-3 rounded-full shadow-lg shadow-purple-500/25"
-            >
+            <Button onClick={() => setShowXpPopup(false)} className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold px-8 py-3 rounded-full">
               Awesome!
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Add this style for fullscreen mode */}
       <style jsx global>{`
-        .fullscreen-mode {
-          background: #0a0a0f;
-        }
-        .fullscreen-mode .container {
-          max-width: 100% !important;
-          padding: 0 !important;
-        }
-        :fullscreen {
-          background: #0a0a0f;
-        }
-        :-webkit-full-screen {
-          background: #0a0a0f;
-        }
-        :-moz-full-screen {
-          background: #0a0a0f;
-        }
+        .fullscreen-mode { background: #0a0a0f; }
+        :fullscreen { background: #0a0a0f; }
+        :-webkit-full-screen { background: #0a0a0f; }
       `}</style>
     </div>
   );
