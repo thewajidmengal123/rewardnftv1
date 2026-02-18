@@ -18,8 +18,7 @@ import {
   Award,
   Flame,
   Maximize2,
-  Minimize2,
-  Smartphone
+  Minimize2
 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 
@@ -87,10 +86,9 @@ export default function MiniGamePageContent() {
   const [isButtonPressed, setIsButtonPressed] = useState(false);
   
   // ============================================
-  // FIXED: Fullscreen state with CSS fallback
+  // FIXED: Fullscreen state - only native API
   // ============================================
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCSSFullscreen, setIsCSSFullscreen] = useState(false);
 
   const obstacleIdRef = useRef(0);
   const particleIdRef = useRef(0);
@@ -98,7 +96,6 @@ export default function MiniGamePageContent() {
   const gameLoopRef = useRef<number>();
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameWrapperRef = useRef<HTMLDivElement>(null);
-  const touchStartTimeRef = useRef<number>(0);
 
   // Load saved data
   useEffect(() => {
@@ -109,89 +106,41 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // FIXED: Fullscreen functions with iOS fallback
+  // FIXED: Simple fullscreen toggle
   // ============================================
-  const isFullscreenSupported = useCallback(() => {
-    const doc: any = document;
-    return !!(
-      doc.fullscreenEnabled ||
-      doc.webkitFullscreenEnabled ||
-      doc.mozFullScreenEnabled ||
-      doc.msFullscreenEnabled
-    );
-  }, []);
-
-  const enterCSSFullscreen = useCallback(() => {
-    setIsCSSFullscreen(true);
-    document.body.style.overflow = 'hidden';
-    
-    // Scroll to top
-    window.scrollTo(0, 0);
-    
-    // Prevent zoom on mobile
-    const viewport = document.querySelector('meta[name=viewport]');
-    if (viewport) {
-      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-    }
-  }, []);
-
-  const exitCSSFullscreen = useCallback(() => {
-    setIsCSSFullscreen(false);
-    document.body.style.overflow = '';
-    
-    // Restore zoom
-    const viewport = document.querySelector('meta[name=viewport]');
-    if (viewport) {
-      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
-    }
-  }, []);
-
   const toggleFullscreen = useCallback(async () => {
     const doc: any = document;
     const wrapper = gameWrapperRef.current;
     if (!wrapper) return;
 
     try {
-      if (!isFullscreen && !isCSSFullscreen) {
-        // Try native fullscreen first
-        if (isFullscreenSupported()) {
-          if (wrapper.requestFullscreen) {
-            await wrapper.requestFullscreen();
-          } else if (wrapper.webkitRequestFullscreen) {
-            await wrapper.webkitRequestFullscreen();
-          } else if (wrapper.mozRequestFullScreen) {
-            await wrapper.mozRequestFullScreen();
-          } else if (wrapper.msRequestFullscreen) {
-            await wrapper.msRequestFullscreen();
-          }
-        } else {
-          // Fallback to CSS fullscreen for iOS
-          enterCSSFullscreen();
+      if (!isFullscreen) {
+        // Enter fullscreen
+        if (wrapper.requestFullscreen) {
+          await wrapper.requestFullscreen();
+        } else if (wrapper.webkitRequestFullscreen) {
+          await wrapper.webkitRequestFullscreen();
+        } else if (wrapper.mozRequestFullScreen) {
+          await wrapper.mozRequestFullScreen();
+        } else if (wrapper.msRequestFullscreen) {
+          await wrapper.msRequestFullscreen();
         }
       } else {
         // Exit fullscreen
-        if (isCSSFullscreen) {
-          exitCSSFullscreen();
-        } else {
-          if (document.exitFullscreen) {
-            await document.exitFullscreen();
-          } else if (doc.webkitExitFullscreen) {
-            await doc.webkitExitFullscreen();
-          } else if (doc.mozCancelFullScreen) {
-            await doc.mozCancelFullScreen();
-          } else if (doc.msExitFullscreen) {
-            await doc.msExitFullscreen();
-          }
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
         }
       }
     } catch (error) {
       console.error('Fullscreen error:', error);
-      // Fallback to CSS fullscreen on error
-      if (!isCSSFullscreen) {
-        enterCSSFullscreen();
-      }
     }
-  }, [isFullscreen, isCSSFullscreen, enterCSSFullscreen, exitCSSFullscreen, isFullscreenSupported]);
+  }, [isFullscreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -201,11 +150,6 @@ export default function MiniGamePageContent() {
                                doc.mozFullScreenElement || 
                                doc.msFullscreenElement;
       setIsFullscreen(!!fullscreenElement);
-      
-      // If exiting native fullscreen, also reset CSS fullscreen
-      if (!fullscreenElement && isCSSFullscreen) {
-        setIsCSSFullscreen(false);
-      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -219,14 +163,13 @@ export default function MiniGamePageContent() {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, [isCSSFullscreen]);
+  }, []);
 
   // ============================================
   // FIXED: Proper touch handling for mobile
   // ============================================
   
   const handleGameAreaTouch = useCallback((e: TouchEvent) => {
-    // Only jump if game is playing and not clicking a button
     if (isButtonPressed) return;
     
     if (gameState.isPlaying && !gameState.isGameOver) {
@@ -284,13 +227,11 @@ export default function MiniGamePageContent() {
   // FIXED: Start game with proper state reset
   // ============================================
   const startGame = useCallback(() => {
-    // Clear any existing game loop
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current);
       gameLoopRef.current = undefined;
     }
 
-    // Reset all game state
     setGameState({
       isPlaying: true,
       isGameOver: false,
@@ -485,15 +426,11 @@ export default function MiniGamePageContent() {
         e.preventDefault();
         jump();
       }
-      // Exit fullscreen on ESC
-      if (e.code === 'Escape' && isCSSFullscreen) {
-        exitCSSFullscreen();
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [jump, isCSSFullscreen, exitCSSFullscreen]);
+  }, [jump]);
 
   // Touch controls for game area only
   useEffect(() => {
@@ -646,7 +583,6 @@ export default function MiniGamePageContent() {
     e.preventDefault();
     setIsButtonPressed(true);
     startGame();
-    // Reset button flag after a short delay
     setTimeout(() => setIsButtonPressed(false), 100);
   };
 
@@ -658,13 +594,10 @@ export default function MiniGamePageContent() {
     setTimeout(() => setIsButtonPressed(false), 100);
   };
 
-  // Check if iOS device
-  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-
   return (
-    <div className={`min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden ${isFullscreen || isCSSFullscreen ? 'fullscreen-mode' : ''}`}>
+    <div className={`min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden ${isFullscreen ? 'fullscreen-active' : ''}`}>
       {/* Animated Background - Hidden in fullscreen */}
-      {(!isFullscreen && !isCSSFullscreen) && (
+      {!isFullscreen && (
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
@@ -672,9 +605,9 @@ export default function MiniGamePageContent() {
         </div>
       )}
 
-      <div className={`relative z-10 container mx-auto px-4 py-6 max-w-7xl ${isCSSFullscreen ? 'fullscreen-container' : ''}`}>
+      <div className={`relative z-10 mx-auto px-4 py-6 ${isFullscreen ? 'w-full h-screen max-w-none p-0' : 'container max-w-7xl'}`}>
         {/* Hero Section - Hidden in fullscreen */}
-        {(!isFullscreen && !isCSSFullscreen) && (
+        {!isFullscreen && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -707,40 +640,40 @@ export default function MiniGamePageContent() {
           </motion.div>
         )}
 
-        <div className={`grid ${isFullscreen || isCSSFullscreen ? 'grid-cols-1 h-screen items-center' : 'grid-cols-1 lg:grid-cols-12 gap-6'}`}>
+        <div className={`${isFullscreen ? 'h-full flex items-center justify-center' : 'grid grid-cols-1 lg:grid-cols-12 gap-6'}`}>
           {/* Main Game Area */}
-          <div className={isFullscreen || isCSSFullscreen ? 'w-full h-full flex items-center justify-center' : 'lg:col-span-8'}>
+          <div className={`${isFullscreen ? 'w-full h-full flex items-center justify-center' : 'lg:col-span-8'}`}>
             <motion.div
               ref={gameWrapperRef}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1 }}
-              className={`relative ${isCSSFullscreen ? 'fixed inset-0 z-50 bg-[#0a0a0f]' : ''}`}
+              className={`relative ${isFullscreen ? 'w-full h-full' : ''}`}
             >
-              {!isCSSFullscreen && (
+              {!isFullscreen && (
                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-2xl blur opacity-30" />
               )}
               
-              <Card className={`relative bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden ${isCSSFullscreen ? 'border-0 rounded-none h-screen w-full' : ''}`}>
-                <CardContent className={`p-0 ${isCSSFullscreen ? 'h-full' : ''}`}>
+              <Card className={`relative bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden ${isFullscreen ? 'border-0 rounded-none w-full h-full' : ''}`}>
+                <CardContent className={`p-0 ${isFullscreen ? 'h-full' : ''}`}>
                   <div 
                     ref={gameContainerRef}
                     id="game-container"
-                    className={`relative w-full select-none ${isCSSFullscreen ? 'h-full flex items-center justify-center' : ''}`}
+                    className={`relative w-full select-none ${isFullscreen ? 'h-full flex items-center justify-center bg-[#0a0a0f]' : ''}`}
                     style={{ 
-                      aspectRatio: isCSSFullscreen ? 'auto' : '2/1', 
-                      maxHeight: isCSSFullscreen ? '100vh' : '500px',
-                      height: isCSSFullscreen ? '100%' : 'auto'
+                      aspectRatio: isFullscreen ? 'auto' : '2/1', 
+                      maxHeight: isFullscreen ? '100vh' : '500px',
+                      height: isFullscreen ? '100%' : 'auto'
                     }}
                   >
                     <canvas
                       ref={canvasRef}
                       width={GAME_WIDTH}
                       height={GAME_HEIGHT}
-                      className={`${isCSSFullscreen ? 'w-full h-full object-contain max-h-screen' : 'absolute inset-0 w-full h-full'}`}
+                      className={`${isFullscreen ? 'w-full h-full object-contain max-h-screen max-w-[100vw]' : 'absolute inset-0 w-full h-full'}`}
                     />
 
-                    <div className={`${isCSSFullscreen ? 'absolute inset-0 w-full h-full' : 'absolute inset-0 overflow-hidden'}`}>
+                    <div className={`${isFullscreen ? 'absolute inset-0 w-full h-full' : 'absolute inset-0 overflow-hidden'}`}>
                       {/* Character */}
                       {(gameState.isPlaying || gameState.isGameOver) && (
                         <motion.div
@@ -927,47 +860,29 @@ export default function MiniGamePageContent() {
                       </motion.div>
                     )}
 
-                    {/* ============================================
-                        FIXED: Fullscreen Toggle Button with iOS warning
-                    ============================================ */}
+                    {/* Fullscreen Toggle Button */}
                     <motion.button
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={toggleFullscreen}
-                      className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all flex items-center gap-2"
-                      title={isFullscreen || isCSSFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                      className="absolute top-3 right-3 z-50 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 hover:bg-white/10 transition-all"
+                      title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                     >
-                      {isFullscreen || isCSSFullscreen ? (
+                      {isFullscreen ? (
                         <Minimize2 className="w-5 h-5 text-white" />
                       ) : (
                         <Maximize2 className="w-5 h-5 text-white" />
                       )}
-                      {isIOS && !isFullscreen && !isCSSFullscreen && (
-                        <span className="text-xs text-yellow-400 hidden md:inline">iOS: Rotate to landscape</span>
-                      )}
                     </motion.button>
-
-                    {/* CSS Fullscreen Exit Button */}
-                    {isCSSFullscreen && (
-                      <motion.button
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onClick={exitCSSFullscreen}
-                        className="fixed bottom-6 right-6 z-[100] px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-lg shadow-purple-500/30 font-bold flex items-center gap-2"
-                      >
-                        <Minimize2 className="w-5 h-5" />
-                        Exit Fullscreen
-                      </motion.button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
 
             {/* Quick Stats Bar - Hidden in fullscreen */}
-            {(!isFullscreen && !isCSSFullscreen) && (
+            {!isFullscreen && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -991,7 +906,7 @@ export default function MiniGamePageContent() {
           </div>
 
           {/* Sidebar - Hidden in fullscreen */}
-          {(!isFullscreen && !isCSSFullscreen) && (
+          {!isFullscreen && (
             <div className="lg:col-span-4 space-y-4">
               {/* Your Stats */}
               <motion.div
@@ -1172,7 +1087,7 @@ export default function MiniGamePageContent() {
       </Dialog>
 
       <style jsx global>{`
-        .fullscreen-mode {
+        .fullscreen-active {
           background: #0a0a0f;
         }
         :fullscreen {
@@ -1183,34 +1098,6 @@ export default function MiniGamePageContent() {
         }
         :-moz-full-screen {
           background: #0a0a0f;
-        }
-        
-        /* CSS Fullscreen fallback styles */
-        .fullscreen-container {
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          width: 100vw !important;
-          height: 100vh !important;
-          z-index: 9999 !important;
-          background: #0a0a0f !important;
-          overflow: hidden !important;
-          padding: 0 !important;
-          margin: 0 !important;
-        }
-        
-        .fullscreen-container * {
-          max-width: 100vw !important;
-          max-height: 100vh !important;
-        }
-        
-        /* Prevent pull-to-refresh on mobile */
-        body.fullscreen-mode {
-          overscroll-behavior: none;
-          position: fixed;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
         }
       `}</style>
     </div>
