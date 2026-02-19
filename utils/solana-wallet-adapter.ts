@@ -1,14 +1,13 @@
 "use client"
 
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js"
-import { toast } from "@/components/ui/use-toast"
 import { 
   isMobileDevice, 
   isInWalletBrowser, 
   redirectToWalletApp,
   getPendingConnection,
   clearPendingConnection
-} from "@/utils/mobile-wallet-adapter"
+} from "./mobile-wallet-adapter"
 
 // ==================== ERRORS ====================
 
@@ -84,7 +83,7 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
   }
 
   private _initializeProvider(): void {
-    this._provider = (window as any).solana || (window as any).phantom?.solana
+    this._provider = (window as any).solana || (window as any).phantom?.solflare
     
     if (this._provider?.isConnected && this._provider?.publicKey) {
       this._publicKey = new PublicKey(this._provider.publicKey.toString())
@@ -137,16 +136,12 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
 
       // Check if returning from mobile redirect
       const pending = getPendingConnection()
-      if (pending === 'phantom') {
+      if (pending?.wallet === 'phantom') {
         clearPendingConnection()
         await new Promise(r => setTimeout(r, 500))
         this._initializeProvider()
         
         if (this._connected && this._publicKey) {
-          toast({
-            title: "Wallet Connected",
-            description: `Connected to ${this._publicKey.toString().slice(0, 4)}...${this._publicKey.toString().slice(-4)}`,
-          })
           return
         }
       }
@@ -178,11 +173,6 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
       this._connected = true
       this._setupEventListeners()
 
-      toast({
-        title: "Wallet Connected",
-        description: `Connected to ${this._publicKey.toString().slice(0, 4)}...${this._publicKey.toString().slice(-4)}`,
-      })
-
     } catch (error: any) {
       if (error.code === 4001) {
         throw new WalletConnectionError("User rejected the connection request")
@@ -205,10 +195,6 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
       this._connected = false
       this._connecting = false
       clearPendingConnection()
-      toast({
-        title: "Wallet Disconnected",
-        description: "Your wallet has been disconnected",
-      })
     }
   }
 
@@ -312,16 +298,12 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
       if (this._connecting || this._connected) return
 
       const pending = getPendingConnection()
-      if (pending === 'solflare') {
+      if (pending?.wallet === 'solflare') {
         clearPendingConnection()
         await new Promise(r => setTimeout(r, 500))
         this._initializeProvider()
         
         if (this._connected && this._publicKey) {
-          toast({
-            title: "Wallet Connected",
-            description: `Connected to ${this._publicKey.toString().slice(0, 4)}...${this._publicKey.toString().slice(-4)}`,
-          })
           return
         }
       }
@@ -351,11 +333,6 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
       this._connected = true
       this._setupEventListeners()
 
-      toast({
-        title: "Wallet Connected",
-        description: `Connected to ${this._publicKey.toString().slice(0, 4)}...${this._publicKey.toString().slice(-4)}`,
-      })
-
     } catch (error: any) {
       if (error.code === 4001) {
         throw new WalletConnectionError("User rejected the connection request")
@@ -378,10 +355,6 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
       this._connected = false
       this._connecting = false
       clearPendingConnection()
-      toast({
-        title: "Wallet Disconnected",
-        description: "Your wallet has been disconnected",
-      })
     }
   }
 
