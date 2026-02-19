@@ -84,38 +84,49 @@ export default function MiniGamePageContent() {
   const [totalXp, setTotalXp] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
   const [isButtonPressed, setIsButtonPressed] = useState(false);
-  
-  // ============================================
-  // FIXED: Fullscreen state - only native API
-  // ============================================
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const obstacleIdRef = useRef(0);
   const particleIdRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameLoopRef = useRef<number>();
+  const gameLoopRef = useRef<number | null>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Load saved data
+  // Load saved data - wrapped in try-catch
   useEffect(() => {
-    const saved = localStorage.getItem('runnerHighScore');
-    if (saved) setGameState(prev => ({ ...prev, highScore: parseInt(saved) }));
-    const savedXp = localStorage.getItem('runnerTotalXp');
-    if (savedXp) setTotalXp(parseInt(savedXp));
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('runnerHighScore');
+        if (saved) {
+          const highScore = parseInt(saved);
+          if (!isNaN(highScore)) {
+            setGameState(prev => ({ ...prev, highScore }));
+          }
+        }
+        const savedXp = localStorage.getItem('runnerTotalXp');
+        if (savedXp) {
+          const xp = parseInt(savedXp);
+          if (!isNaN(xp)) {
+            setTotalXp(xp);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved data:', error);
+    }
   }, []);
 
-  // ============================================
-  // FIXED: Simple fullscreen toggle
-  // ============================================
+  // Fullscreen toggle
   const toggleFullscreen = useCallback(async () => {
+    if (typeof document === 'undefined') return;
+    
     const doc: any = document;
     const wrapper = gameWrapperRef.current;
     if (!wrapper) return;
 
     try {
       if (!isFullscreen) {
-        // Enter fullscreen
         if (wrapper.requestFullscreen) {
           await wrapper.requestFullscreen();
         } else if (wrapper.webkitRequestFullscreen) {
@@ -126,7 +137,6 @@ export default function MiniGamePageContent() {
           await wrapper.msRequestFullscreen();
         }
       } else {
-        // Exit fullscreen
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         } else if (doc.webkitExitFullscreen) {
@@ -143,6 +153,8 @@ export default function MiniGamePageContent() {
   }, [isFullscreen]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+
     const handleFullscreenChange = () => {
       const doc: any = document;
       const fullscreenElement = document.fullscreenElement || 
@@ -165,10 +177,7 @@ export default function MiniGamePageContent() {
     };
   }, []);
 
-  // ============================================
-  // FIXED: Proper touch handling for mobile
-  // ============================================
-  
+  // Touch handling for mobile
   const handleGameAreaTouch = useCallback((e: TouchEvent) => {
     if (isButtonPressed) return;
     
@@ -182,7 +191,7 @@ export default function MiniGamePageContent() {
     }
   }, [gameState.isPlaying, gameState.isGameOver, isJumping, isButtonPressed]);
 
-  // Jump function for keyboard/desktop
+  // Jump function
   const jump = useCallback(() => {
     if (!gameState.isPlaying || gameState.isGameOver) return;
     if (!isJumping) {
@@ -223,13 +232,11 @@ export default function MiniGamePageContent() {
     setParticles(prev => [...prev, ...newParticles]);
   };
 
-  // ============================================
-  // FIXED: Start game with proper state reset
-  // ============================================
+  // Start game
   const startGame = useCallback(() => {
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current);
-      gameLoopRef.current = undefined;
+      gameLoopRef.current = null;
     }
 
     setGameState({
@@ -270,6 +277,9 @@ export default function MiniGamePageContent() {
         obstacleHeight = 30;
         obstacleWidth = 25;
         break;
+      default:
+        obstacleHeight = 35;
+        obstacleWidth = 35;
     }
     
     const obstacleY = GROUND_Y - obstacleHeight;
@@ -294,11 +304,24 @@ export default function MiniGamePageContent() {
     
     const newTotalXp = totalXp + earnedXp;
     setTotalXp(newTotalXp);
-    localStorage.setItem('runnerTotalXp', newTotalXp.toString());
+    
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('runnerTotalXp', newTotalXp.toString());
+      }
+    } catch (error) {
+      console.error('Error saving XP:', error);
+    }
     
     if (gameState.score > gameState.highScore) {
       setGameState(prev => ({ ...prev, highScore: gameState.score }));
-      localStorage.setItem('runnerHighScore', gameState.score.toString());
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('runnerHighScore', gameState.score.toString());
+        }
+      } catch (error) {
+        console.error('Error saving high score:', error);
+      }
     }
 
     setShowXpPopup(true);
@@ -415,7 +438,10 @@ export default function MiniGamePageContent() {
 
     gameLoopRef.current = window.setInterval(gameLoop, 1000 / 60);
     return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current);
+        gameLoopRef.current = null;
+      }
     };
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
 
@@ -432,7 +458,7 @@ export default function MiniGamePageContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch controls for game area only
+  // Touch controls
   useEffect(() => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
@@ -571,13 +597,12 @@ export default function MiniGamePageContent() {
             </div>
           </div>
         );
+      default:
+        return null;
     }
   };
 
-  // ============================================
-  // FIXED: Button handlers with proper touch support
-  // ============================================
-  
+  // Button handlers
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -594,9 +619,14 @@ export default function MiniGamePageContent() {
     setTimeout(() => setIsButtonPressed(false), 100);
   };
 
+  // Error boundary fallback
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   return (
     <div className={`min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden ${isFullscreen ? 'fullscreen-active' : ''}`}>
-      {/* Animated Background - Hidden in fullscreen */}
+      {/* Animated Background */}
       {!isFullscreen && (
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
@@ -606,7 +636,7 @@ export default function MiniGamePageContent() {
       )}
 
       <div className={`relative z-10 mx-auto px-4 py-6 ${isFullscreen ? 'w-full h-screen max-w-none p-0' : 'container max-w-7xl'}`}>
-        {/* Hero Section - Hidden in fullscreen */}
+        {/* Hero Section */}
         {!isFullscreen && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
@@ -881,7 +911,7 @@ export default function MiniGamePageContent() {
               </Card>
             </motion.div>
 
-            {/* Quick Stats Bar - Hidden in fullscreen */}
+            {/* Quick Stats Bar */}
             {!isFullscreen && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -905,7 +935,7 @@ export default function MiniGamePageContent() {
             )}
           </div>
 
-          {/* Sidebar - Hidden in fullscreen */}
+          {/* Sidebar */}
           {!isFullscreen && (
             <div className="lg:col-span-4 space-y-4">
               {/* Your Stats */}
