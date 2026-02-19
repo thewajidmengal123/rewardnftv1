@@ -1,7 +1,5 @@
 "use client"
 
-import { toast } from "@/components/ui/use-toast"
-
 // Extend Window interface
 declare global {
   interface Window {
@@ -26,6 +24,12 @@ export function isIOSDevice(): boolean {
     (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
 }
 
+export function isIOSSafari(): boolean {
+  if (!isIOSDevice()) return false
+  const ua = navigator.userAgent.toLowerCase()
+  return ua.includes('webkit') && !ua.includes('chrome') && !ua.includes('firefox')
+}
+
 export function isInWalletBrowser(): boolean {
   if (typeof window === "undefined") return false
   const ua = navigator.userAgent.toLowerCase()
@@ -34,58 +38,96 @@ export function isInWalletBrowser(): boolean {
 
 // ==================== SESSION STORAGE ====================
 
-const PENDING_KEY = 'wallet_pending'
-const PENDING_TIME_KEY = 'wallet_pending_time'
+const CONNECTION_ATTEMPT_KEY = 'wallet_connection_attempt'
 
 export function savePendingConnection(walletName: string): void {
   if (typeof window === "undefined") return
-  sessionStorage.setItem(PENDING_KEY, walletName)
-  sessionStorage.setItem(PENDING_TIME_KEY, Date.now().toString())
-}
-
-export function getPendingConnection(): string | null {
-  if (typeof window === "undefined") return null
   
-  const wallet = sessionStorage.getItem(PENDING_KEY)
-  const time = sessionStorage.getItem(PENDING_TIME_KEY)
-  
-  if (!wallet || !time) return null
-  
-  // Expire after 5 minutes
-  if (Date.now() - parseInt(time) > 5 * 60 * 1000) {
-    clearPendingConnection()
-    return null
+  const attemptData = {
+    wallet: walletName,
+    timestamp: Date.now(),
+    url: window.location.href,
+    method: 'browse'
   }
   
-  return wallet
+  sessionStorage.setItem(CONNECTION_ATTEMPT_KEY, JSON.stringify(attemptData))
+}
+
+export function getPendingConnection(): { wallet: string; timestamp: number; url?: string; method?: string } | null {
+  if (typeof window === "undefined") return null
+  
+  const data = sessionStorage.getItem(CONNECTION_ATTEMPT_KEY)
+  if (!data) return null
+  
+  try {
+    const attempt = JSON.parse(data)
+    if (Date.now() - attempt.timestamp > 5 * 60 * 1000) {
+      clearPendingConnection()
+      return null
+    }
+    return attempt
+  } catch {
+    return null
+  }
 }
 
 export function clearPendingConnection(): void {
   if (typeof window === "undefined") return
-  sessionStorage.removeItem(PENDING_KEY)
-  sessionStorage.removeItem(PENDING_TIME_KEY)
+  sessionStorage.removeItem(CONNECTION_ATTEMPT_KEY)
 }
 
 // ==================== DEEP LINKS ====================
 
-export function redirectToWalletApp(walletName: string): void {
-  if (typeof window === "undefined") return
-  
-  const currentUrl = window.location.href
+export function getWalletDeepLink(walletName: string, action: string = 'connect'): string {
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
   const encodedUrl = encodeURIComponent(currentUrl)
-  
-  let deepLink = ''
-  
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+
   switch (walletName.toLowerCase()) {
     case 'phantom':
-      deepLink = `https://phantom.app/ul/v1/browse/${encodedUrl}`
-      break
+      if (action === 'connect') {
+        return `https://phantom.app/ul/v1/browse/${encodedUrl}?ref=${encodeURIComponent(origin)}`
+      }
+      return `https://phantom.app/ul/v1/${action}`
+
     case 'solflare':
-      deepLink = `https://solflare.com/ul/browse/${encodedUrl}`
-      break
+      if (action === 'connect') {
+        return `https://solflare.com/ul/browse/${encodedUrl}?ref=${encodeURIComponent(origin)}`
+      }
+      return `solflare://${action}`
+
     default:
-      return
+      return currentUrl
   }
+}
+
+export function getWalletUniversalLink(walletName: string): string {
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const encodedUrl = encodeURIComponent(currentUrl)
+
+  switch (walletName.toLowerCase()) {
+    case 'phantom':
+      return `https://phantom.app/ul/v1/browse/${encodedUrl}`
+    case 'solflare':
+      return `https://solflare.com/ul/browse/${encodedUrl}`
+    default:
+      return currentUrl
+  }
+}
+
+// Legacy functions
+export function getPhantomDeepLink(url: string): string {
+  return getWalletDeepLink('phantom', 'connect')
+}
+
+export function getPhantomUniversalLink(action: string, params: Record<string, string> = {}): string {
+  return getWalletDeepLink('phantom', action)
+}
+
+// ==================== REDIRECT ====================
+
+export function redirectToWalletApp(walletName: string): void {
+  const deepLink = getWalletUniversalLink(walletName)
   
   console.log("Redirecting to:", deepLink)
   savePendingConnection(walletName)
@@ -97,13 +139,31 @@ export function redirectToWalletApp(walletName: string): void {
   }
 }
 
-// ==================== CONNECTION RESTORE ====================
+export async function connectToMobileWallet(walletName: string): Promise<boolean> {
+  try {
+    savePendingConnection(walletName)
+    const universalLink = getWalletUniversalLink(walletName)
+    
+    if (isIOSDevice()) {
+      window.location.href = universalLink
+    } else {
+      window.location.replace(universalLink)
+    }
+    
+    return true
+  } catch (error) {
+    console.error(`Failed to connect to ${walletName} mobile:`, error)
+    return false
+  }
+}
+
+// ==================== CHECK RETURN ====================
 
 export async function checkMobileReturn(): Promise<boolean> {
   const pending = getPendingConnection()
   if (!pending) return false
   
-  console.log("Checking return from:", pending)
+  console.log("Checking return from:", pending.wallet)
   await new Promise(r => setTimeout(r, 800))
   
   const provider = (window as any).solana || (window as any).solflare
@@ -127,29 +187,22 @@ export async function checkMobileReturn(): Promise<boolean> {
   return false
 }
 
-// ==================== WALLET DETECTION ====================
-
-export function isPhantomInstalled(): boolean {
-  if (typeof window === "undefined") return false
-  return !!(window.phantom?.solana) || isInWalletBrowser()
+export function checkConnectionReturn(): { wallet: string; timestamp: number; url?: string; method?: string } | null {
+  return getPendingConnection()
 }
 
-export function isSolflareInstalled(): boolean {
-  if (typeof window === "undefined") return false
-  return !!(window.solflare?.isSolflare) || isInWalletBrowser()
-}
+// ==================== DEBUG ====================
 
-export function getWalletAdapter(walletName: string): any {
-  if (typeof window === "undefined") return null
-  
-  switch (walletName.toLowerCase()) {
-    case 'phantom':
-      return window.solana || window.phantom?.solana
-    case 'solflare':
-      return window.solflare
-    default:
-      return null
-  }
+export function debugMobileWalletConnection(walletName: string) {
+  console.log('Mobile Wallet Debug:', {
+    walletName,
+    isMobile: isMobileDevice(),
+    isIOS: isIOSDevice(),
+    isSafari: isIOSSafari(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+    universalLink: getWalletUniversalLink(walletName),
+    deepLink: getWalletDeepLink(walletName, 'connect')
+  })
 }
 
 // ==================== HOOK ====================
@@ -158,10 +211,13 @@ export function useMobileWallet() {
   return {
     isMobile: isMobileDevice(),
     isIOS: isIOSDevice(),
+    isIOSSafari: isIOSSafari(),
     isInWalletBrowser: isInWalletBrowser(),
     redirectToWallet: redirectToWalletApp,
+    connectMobile: connectToMobileWallet,
     checkReturn: checkMobileReturn,
     getPending: getPendingConnection,
-    clearPending: clearPendingConnection
+    clearPending: clearPendingConnection,
+    debug: debugMobileWalletConnection
   }
 }
