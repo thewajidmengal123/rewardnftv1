@@ -164,7 +164,7 @@ export async function checkMobileReturn(): Promise<boolean> {
   if (!pending) return false
   
   console.log("Checking return from:", pending.wallet)
-  await new Promise(r => setTimeout(r, 800))
+  await new Promise(r => setTimeout(r, 1000))
   
   const provider = (window as any).solana || (window as any).solflare
   
