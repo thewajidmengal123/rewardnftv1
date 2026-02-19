@@ -1,16 +1,9 @@
 "use client"
 
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js"
-import { 
-  isMobileDevice, 
-  isInWalletBrowser, 
-  redirectToWalletApp,
-  getPendingConnection,
-  clearPendingConnection
-} from "./mobile-wallet-adapter"
+import { toast } from "@/components/ui/use-toast"
 
-// ==================== ERRORS ====================
-
+// Standard Solana Wallet Adapter Error Types
 export class WalletError extends Error {
   constructor(message: string, public code?: number) {
     super(message)
@@ -39,8 +32,7 @@ export class WalletConnectionError extends WalletError {
   }
 }
 
-// ==================== ADAPTER INTERFACE ====================
-
+// Wallet Ready States (following Solana Wallet Adapter standard)
 export enum WalletReadyState {
   Installed = "Installed",
   NotDetected = "NotDetected", 
@@ -48,6 +40,7 @@ export enum WalletReadyState {
   Unsupported = "Unsupported",
 }
 
+// Standard Wallet Adapter Interface
 export interface BaseWalletAdapter {
   name: string
   url: string
@@ -59,13 +52,13 @@ export interface BaseWalletAdapter {
   
   connect(): Promise<void>
   disconnect(): Promise<void>
+  sendTransaction?(transaction: Transaction | VersionedTransaction, connection: any, options?: any): Promise<string>
   signTransaction?(transaction: Transaction | VersionedTransaction): Promise<Transaction | VersionedTransaction>
   signAllTransactions?(transactions: (Transaction | VersionedTransaction)[]): Promise<(Transaction | VersionedTransaction)[]>
   signMessage?(message: Uint8Array): Promise<Uint8Array>
 }
 
-// ==================== PHANTOM ADAPTER ====================
-
+// Phantom Wallet Adapter (following standard patterns)
 export class PhantomWalletAdapter implements BaseWalletAdapter {
   name = "Phantom"
   url = "https://phantom.app"
@@ -77,44 +70,12 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
   private _connected = false
 
   constructor() {
-    if (typeof window !== "undefined") {
-      this._initializeProvider()
-    }
-  }
-
-  private _initializeProvider(): void {
-    this._provider = (window as any).solana || (window as any).phantom?.solana
-    
-    if (this._provider?.isConnected && this._provider?.publicKey) {
-      this._publicKey = new PublicKey(this._provider.publicKey.toString())
-      this._connected = true
-      this._setupEventListeners()
-    }
-  }
-
-  private _setupEventListeners(): void {
-    if (!this._provider) return
-    
-    this._provider.on?.("accountChanged", (publicKey: any) => {
-      if (publicKey) {
-        this._publicKey = new PublicKey(publicKey.toString())
-        this._connected = true
-      } else {
-        this._publicKey = null
-        this._connected = false
-      }
-    })
-
-    this._provider.on?.("disconnect", () => {
-      this._publicKey = null
-      this._connected = false
-    })
+    this._provider = typeof window !== "undefined" ? (window as any).solana : null
   }
 
   get readyState(): WalletReadyState {
     if (typeof window === "undefined") return WalletReadyState.Unsupported
     if (this._provider?.isPhantom) return WalletReadyState.Installed
-    if (isMobileDevice()) return WalletReadyState.Loadable
     return WalletReadyState.NotDetected
   }
 
@@ -133,48 +94,18 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
   async connect(): Promise<void> {
     try {
       if (this._connecting || this._connected) return
-
-      // Check if returning from mobile redirect
-      const pending = getPendingConnection()
-      if (pending?.wallet === 'phantom') {
-        clearPendingConnection()
-        await new Promise(r => setTimeout(r, 800))
-        this._initializeProvider()
-        
-        if (this._connected && this._publicKey) {
-          console.log("✅ Phantom connected via mobile return")
-          return
-        }
-      }
-
-      // Mobile: redirect to app
-      if (isMobileDevice() && !isInWalletBrowser()) {
-        console.log("📱 Mobile detected, redirecting to Phantom app...")
-        redirectToWalletApp('phantom')
-        return new Promise(() => {}) // Never resolves, page reloads
-      }
-
-      // Desktop: normal connect
-      if (!this._provider) {
-        throw new WalletNotFoundError("Phantom")
-      }
+      if (!this._provider) throw new WalletNotFoundError("Phantom")
 
       this._connecting = true
 
-      try {
-        await this._provider.connect({ onlyIfTrusted: true })
-      } catch (silentError) {
-        await this._provider.connect()
-      }
-
-      if (!this._provider.publicKey) {
-        throw new WalletConnectionError("No public key returned")
-      }
-
-      this._publicKey = new PublicKey(this._provider.publicKey.toString())
+      const response = await this._provider.connect()
+      this._publicKey = new PublicKey(response.publicKey.toString())
       this._connected = true
-      this._setupEventListeners()
 
+      toast({
+        title: "Wallet Connected",
+        description: `Connected to Phantom wallet`,
+      })
     } catch (error: any) {
       if (error.code === 4001) {
         throw new WalletConnectionError("User rejected the connection request")
@@ -191,46 +122,47 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
         await this._provider.disconnect()
       }
     } catch (error) {
-      console.warn("Error disconnecting:", error)
+      console.warn("Error disconnecting from Phantom:", error)
     } finally {
       this._publicKey = null
       this._connected = false
       this._connecting = false
-      clearPendingConnection()
     }
   }
 
   async signTransaction(transaction: Transaction | VersionedTransaction): Promise<Transaction | VersionedTransaction> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       return await this._provider.signTransaction(transaction)
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Transaction signing failed: ${error.message}`)
     }
   }
 
   async signAllTransactions(transactions: (Transaction | VersionedTransaction)[]): Promise<(Transaction | VersionedTransaction)[]> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       return await this._provider.signAllTransactions(transactions)
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Transaction signing failed: ${error.message}`)
     }
   }
 
   async signMessage(message: Uint8Array): Promise<Uint8Array> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       const response = await this._provider.signMessage(message)
       return response.signature
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Message signing failed: ${error.message}`)
     }
   }
 }
 
-// ==================== SOLFLARE ADAPTER ====================
-
+// Solflare Wallet Adapter
 export class SolflareWalletAdapter implements BaseWalletAdapter {
   name = "Solflare"
   url = "https://solflare.com"
@@ -242,44 +174,12 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
   private _connected = false
 
   constructor() {
-    if (typeof window !== "undefined") {
-      this._initializeProvider()
-    }
-  }
-
-  private _initializeProvider(): void {
-    this._provider = (window as any).solflare
-    
-    if (this._provider?.isConnected && this._provider?.publicKey) {
-      this._publicKey = new PublicKey(this._provider.publicKey.toString())
-      this._connected = true
-      this._setupEventListeners()
-    }
-  }
-
-  private _setupEventListeners(): void {
-    if (!this._provider) return
-    
-    this._provider.on?.("accountChanged", (publicKey: any) => {
-      if (publicKey) {
-        this._publicKey = new PublicKey(publicKey.toString())
-        this._connected = true
-      } else {
-        this._publicKey = null
-        this._connected = false
-      }
-    })
-
-    this._provider.on?.("disconnect", () => {
-      this._publicKey = null
-      this._connected = false
-    })
+    this._provider = typeof window !== "undefined" ? (window as any).solflare : null
   }
 
   get readyState(): WalletReadyState {
     if (typeof window === "undefined") return WalletReadyState.Unsupported
     if (this._provider?.isSolflare) return WalletReadyState.Installed
-    if (isMobileDevice()) return WalletReadyState.Loadable
     return WalletReadyState.NotDetected
   }
 
@@ -298,45 +198,18 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
   async connect(): Promise<void> {
     try {
       if (this._connecting || this._connected) return
-
-      const pending = getPendingConnection()
-      if (pending?.wallet === 'solflare') {
-        clearPendingConnection()
-        await new Promise(r => setTimeout(r, 800))
-        this._initializeProvider()
-        
-        if (this._connected && this._publicKey) {
-          console.log("✅ Solflare connected via mobile return")
-          return
-        }
-      }
-
-      if (isMobileDevice() && !isInWalletBrowser()) {
-        console.log("📱 Mobile detected, redirecting to Solflare app...")
-        redirectToWalletApp('solflare')
-        return new Promise(() => {})
-      }
-
-      if (!this._provider) {
-        throw new WalletNotFoundError("Solflare")
-      }
+      if (!this._provider) throw new WalletNotFoundError("Solflare")
 
       this._connecting = true
 
-      try {
-        await this._provider.connect({ onlyIfTrusted: true })
-      } catch (silentError) {
-        await this._provider.connect()
-      }
-
-      if (!this._provider.publicKey) {
-        throw new WalletConnectionError("No public key returned")
-      }
-
-      this._publicKey = new PublicKey(this._provider.publicKey.toString())
+      const response = await this._provider.connect()
+      this._publicKey = new PublicKey(response.publicKey.toString())
       this._connected = true
-      this._setupEventListeners()
 
+      toast({
+        title: "Wallet Connected",
+        description: `Connected to Solflare wallet`,
+      })
     } catch (error: any) {
       if (error.code === 4001) {
         throw new WalletConnectionError("User rejected the connection request")
@@ -353,46 +226,47 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
         await this._provider.disconnect()
       }
     } catch (error) {
-      console.warn("Error disconnecting:", error)
+      console.warn("Error disconnecting from Solflare:", error)
     } finally {
       this._publicKey = null
       this._connected = false
       this._connecting = false
-      clearPendingConnection()
     }
   }
 
   async signTransaction(transaction: Transaction | VersionedTransaction): Promise<Transaction | VersionedTransaction> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       return await this._provider.signTransaction(transaction)
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Transaction signing failed: ${error.message}`)
     }
   }
 
   async signAllTransactions(transactions: (Transaction | VersionedTransaction)[]): Promise<(Transaction | VersionedTransaction)[]> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       return await this._provider.signAllTransactions(transactions)
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Transaction signing failed: ${error.message}`)
     }
   }
 
   async signMessage(message: Uint8Array): Promise<Uint8Array> {
     if (!this._connected || !this._provider) throw new WalletNotConnectedError()
+    
     try {
       const response = await this._provider.signMessage(message)
       return response.signature
     } catch (error: any) {
-      throw new WalletError(`Signing failed: ${error.message}`)
+      throw new WalletError(`Message signing failed: ${error.message}`)
     }
   }
 }
 
-// ==================== FACTORY ====================
-
+// Wallet Adapter Factory
 export function createWalletAdapter(walletName: string): BaseWalletAdapter | null {
   switch (walletName.toLowerCase()) {
     case "phantom":
@@ -404,16 +278,19 @@ export function createWalletAdapter(walletName: string): BaseWalletAdapter | nul
   }
 }
 
+// Get all available wallet adapters
 export function getAvailableWalletAdapters(): BaseWalletAdapter[] {
   const adapters: BaseWalletAdapter[] = []
   
+  // Add Phantom if available
   const phantom = new PhantomWalletAdapter()
-  if (phantom.readyState !== WalletReadyState.Unsupported) {
+  if (phantom.readyState === WalletReadyState.Installed) {
     adapters.push(phantom)
   }
   
+  // Add Solflare if available
   const solflare = new SolflareWalletAdapter()
-  if (solflare.readyState !== WalletReadyState.Unsupported) {
+  if (solflare.readyState === WalletReadyState.Installed) {
     adapters.push(solflare)
   }
   
