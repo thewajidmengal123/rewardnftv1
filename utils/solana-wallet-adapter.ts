@@ -83,7 +83,7 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
   }
 
   private _initializeProvider(): void {
-    this._provider = (window as any).solana || (window as any).phantom?.solflare
+    this._provider = (window as any).solana || (window as any).phantom?.solana
     
     if (this._provider?.isConnected && this._provider?.publicKey) {
       this._publicKey = new PublicKey(this._provider.publicKey.toString())
@@ -138,16 +138,18 @@ export class PhantomWalletAdapter implements BaseWalletAdapter {
       const pending = getPendingConnection()
       if (pending?.wallet === 'phantom') {
         clearPendingConnection()
-        await new Promise(r => setTimeout(r, 500))
+        await new Promise(r => setTimeout(r, 800))
         this._initializeProvider()
         
         if (this._connected && this._publicKey) {
+          console.log("✅ Phantom connected via mobile return")
           return
         }
       }
 
       // Mobile: redirect to app
       if (isMobileDevice() && !isInWalletBrowser()) {
+        console.log("📱 Mobile detected, redirecting to Phantom app...")
         redirectToWalletApp('phantom')
         return new Promise(() => {}) // Never resolves, page reloads
       }
@@ -300,15 +302,17 @@ export class SolflareWalletAdapter implements BaseWalletAdapter {
       const pending = getPendingConnection()
       if (pending?.wallet === 'solflare') {
         clearPendingConnection()
-        await new Promise(r => setTimeout(r, 500))
+        await new Promise(r => setTimeout(r, 800))
         this._initializeProvider()
         
         if (this._connected && this._publicKey) {
+          console.log("✅ Solflare connected via mobile return")
           return
         }
       }
 
       if (isMobileDevice() && !isInWalletBrowser()) {
+        console.log("📱 Mobile detected, redirecting to Solflare app...")
         redirectToWalletApp('solflare')
         return new Promise(() => {})
       }
