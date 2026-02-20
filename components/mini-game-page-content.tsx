@@ -18,7 +18,10 @@ import {
   Award,
   Flame,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Moon,
+  Sun,
+  Sunrise
 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 
@@ -50,6 +53,8 @@ interface Particle {
   color: string;
 }
 
+type TimeOfDay = 'night' | 'morning' | 'noon';
+
 // Game Constants
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 500;
@@ -62,6 +67,65 @@ const JUMP_FORCE = -15;
 const BASE_SPEED = 5;
 const MAX_SPEED = 15;
 const SPEED_INCREMENT = 0.002;
+
+// Day cycle thresholds (score-based)
+const DAY_CYCLE_THRESHOLDS = {
+  night: 0,
+  morning: 300,
+  noon: 700,
+  cycleLength: 1200, // After 1200 score, cycle repeats
+};
+
+// Visual configurations for each time of day
+const TIME_CONFIG: Record<TimeOfDay, {
+  skyGradient: string[];
+  groundColor: string[];
+  starOpacity: number;
+  sunMoonIcon: React.ElementType;
+  ambientLight: string;
+  overlayColor: string;
+  overlayOpacity: number;
+  particleColors: string[];
+  lineColor: string;
+  lineGlow: string;
+}> = {
+  night: {
+    skyGradient: ['#0a0a0f', '#0f0f1a', '#1a1a2e'],
+    groundColor: ['#2d2d44', '#1a1a2e'],
+    starOpacity: 1,
+    sunMoonIcon: Moon,
+    ambientLight: 'rgba(168, 85, 247, 0.15)',
+    overlayColor: '#0a0a1f',
+    overlayOpacity: 0.3,
+    particleColors: ['#a855f7', '#3b82f6', '#ec4899'],
+    lineColor: '#a855f7',
+    lineGlow: '#a855f7',
+  },
+  morning: {
+    skyGradient: ['#1a1a3e', '#2d1b69', '#ff6b35'],
+    groundColor: ['#3d3d5c', '#2a2a3e'],
+    starOpacity: 0.3,
+    sunMoonIcon: Sunrise,
+    ambientLight: 'rgba(255, 107, 53, 0.2)',
+    overlayColor: '#ff6b35',
+    overlayOpacity: 0.15,
+    particleColors: ['#ff6b35', '#f97316', '#eab308'],
+    lineColor: '#ff6b35',
+    lineGlow: '#ff6b35',
+  },
+  noon: {
+    skyGradient: ['#0ea5e9', '#38bdf8', '#7dd3fc'],
+    groundColor: ['#4a5568', '#2d3748'],
+    starOpacity: 0,
+    sunMoonIcon: Sun,
+    ambientLight: 'rgba(14, 165, 233, 0.25)',
+    overlayColor: '#0ea5e9',
+    overlayOpacity: 0.1,
+    particleColors: ['#0ea5e9', '#38bdf8', '#22d3ee'],
+    lineColor: '#38bdf8',
+    lineGlow: '#0ea5e9',
+  },
+};
 
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet()
@@ -85,6 +149,8 @@ export default function MiniGamePageContent() {
   const [showXpPopup, setShowXpPopup] = useState(false);
   const [isButtonPressed, setIsButtonPressed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('night');
+  const [cycleCount, setCycleCount] = useState(0);
 
   const obstacleIdRef = useRef(0);
   const particleIdRef = useRef(0);
@@ -102,6 +168,52 @@ export default function MiniGamePageContent() {
     const savedXp = localStorage.getItem('runnerTotalXp');
     if (savedXp) setTotalXp(parseInt(savedXp));
   }, []);
+
+  // ============================================
+  // NEW: Day cycle system based on score
+  // ============================================
+  useEffect(() => {
+    const score = gameState.score;
+    const cyclePosition = score % DAY_CYCLE_THRESHOLDS.cycleLength;
+
+    let newTimeOfDay: TimeOfDay;
+    if (cyclePosition < DAY_CYCLE_THRESHOLDS.morning) {
+      newTimeOfDay = 'night';
+    } else if (cyclePosition < DAY_CYCLE_THRESHOLDS.noon) {
+      newTimeOfDay = 'morning';
+    } else {
+      newTimeOfDay = 'noon';
+    }
+
+    setTimeOfDay(newTimeOfDay);
+    setCycleCount(Math.floor(score / DAY_CYCLE_THRESHOLDS.cycleLength));
+  }, [gameState.score]);
+
+  const getTimeProgress = () => {
+    const cyclePosition = gameState.score % DAY_CYCLE_THRESHOLDS.cycleLength;
+    if (cyclePosition < DAY_CYCLE_THRESHOLDS.morning) {
+      return { 
+        current: cyclePosition, 
+        max: DAY_CYCLE_THRESHOLDS.morning, 
+        phase: 'night',
+        nextPhase: 'morning'
+      };
+    } else if (cyclePosition < DAY_CYCLE_THRESHOLDS.noon) {
+      return { 
+        current: cyclePosition - DAY_CYCLE_THRESHOLDS.morning, 
+        max: DAY_CYCLE_THRESHOLDS.noon - DAY_CYCLE_THRESHOLDS.morning, 
+        phase: 'morning',
+        nextPhase: 'noon'
+      };
+    } else {
+      return { 
+        current: cyclePosition - DAY_CYCLE_THRESHOLDS.noon, 
+        max: DAY_CYCLE_THRESHOLDS.cycleLength - DAY_CYCLE_THRESHOLDS.noon, 
+        phase: 'noon',
+        nextPhase: 'night'
+      };
+    }
+  };
 
   // ============================================
   // FIXED: Optimized jump with immediate response
@@ -130,6 +242,7 @@ export default function MiniGamePageContent() {
   }, [gameState.isPlaying, gameState.isGameOver, triggerJump]);
 
   const createJumpParticles = () => {
+    const config = TIME_CONFIG[timeOfDay];
     const newParticles: Particle[] = [];
     for (let i = 0; i < 6; i++) {
       newParticles.push({
@@ -139,7 +252,7 @@ export default function MiniGamePageContent() {
         vx: (Math.random() - 0.5) * 6,
         vy: -Math.random() * 4 - 1,
         life: 25,
-        color: ['#a855f7', '#3b82f6', '#ec4899'][Math.floor(Math.random() * 3)],
+        color: config.particleColors[Math.floor(Math.random() * config.particleColors.length)],
       });
     }
     setParticles(prev => [...prev, ...newParticles]);
@@ -188,6 +301,8 @@ export default function MiniGamePageContent() {
     obstacleIdRef.current = 0;
     lastTimeRef.current = performance.now();
     setIsButtonPressed(false);
+    setTimeOfDay('night');
+    setCycleCount(0);
   }, [gameState.highScore]);
 
   const spawnObstacle = useCallback(() => {
@@ -495,7 +610,9 @@ export default function MiniGamePageContent() {
     };
   }, []);
 
-  // Draw background
+  // ============================================
+  // NEW: Dynamic background drawing based on time of day
+  // ============================================
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -503,45 +620,55 @@ export default function MiniGamePageContent() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const config = TIME_CONFIG[timeOfDay];
+
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    // Dynamic sky gradient based on time of day
     const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-    gradient.addColorStop(0, '#0a0a0f');
-    gradient.addColorStop(0.5, '#0f0f1a');
-    gradient.addColorStop(1, '#1a1a2e');
+    config.skyGradient.forEach((color, index) => {
+      gradient.addColorStop(index / (config.skyGradient.length - 1), color);
+    });
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 60; i++) {
-      const x = ((i * 73 + gameState.distance * 0.05) % (GAME_WIDTH + 100)) - 50;
-      const y = (i * 37) % (GAME_HEIGHT * 0.6);
-      const size = (i % 3) + 0.5;
-      const opacity = 0.2 + (i % 5) * 0.15;
-      ctx.globalAlpha = opacity;
-      ctx.beginPath();
-      ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fill();
+    // Stars (visible during night and early morning)
+    if (config.starOpacity > 0) {
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 60; i++) {
+        const x = ((i * 73 + gameState.distance * 0.05) % (GAME_WIDTH + 100)) - 50;
+        const y = (i * 37) % (GAME_HEIGHT * 0.6);
+        const size = (i % 3) + 0.5;
+        const opacity = (0.2 + (i % 5) * 0.15) * config.starOpacity;
+        ctx.globalAlpha = opacity;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
 
+    // Ground with time-appropriate colors
     const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
-    groundGradient.addColorStop(0, '#2d2d44');
-    groundGradient.addColorStop(1, '#1a1a2e');
+    config.groundColor.forEach((color, index) => {
+      groundGradient.addColorStop(index / (config.groundColor.length - 1), color);
+    });
     ctx.fillStyle = groundGradient;
     ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
 
-    ctx.strokeStyle = '#a855f7';
+    // Dynamic ground line with glow
+    ctx.strokeStyle = config.lineColor;
     ctx.lineWidth = 3;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = '#a855f7';
+    ctx.shadowColor = config.lineGlow;
     ctx.beginPath();
     ctx.moveTo(0, GROUND_Y);
     ctx.lineTo(GAME_WIDTH, GROUND_Y);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.strokeStyle = '#3b82f6';
+    // Moving ground details
+    ctx.strokeStyle = config.lineColor;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
     for (let i = 0; i < 15; i++) {
@@ -552,7 +679,7 @@ export default function MiniGamePageContent() {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-  }, [gameState.distance]);
+  }, [gameState.distance, timeOfDay]);
 
   const renderObstacle = (obstacle: Obstacle) => {
     const leftPercent = (obstacle.x / GAME_WIDTH) * 100;
@@ -645,6 +772,9 @@ export default function MiniGamePageContent() {
     setTimeout(() => setIsButtonPressed(false), 100);
   };
 
+  const TimeIcon = TIME_CONFIG[timeOfDay].sunMoonIcon;
+  const timeProgress = getTimeProgress();
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
       {/* Animated Background */}
@@ -723,11 +853,77 @@ export default function MiniGamePageContent() {
                       )}
                     </button>
 
+                    {/* Time of Day Indicator */}
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={timeOfDay}
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        transition={{ duration: 0.5 }}
+                        className="absolute top-4 left-4 z-40 flex items-center gap-2"
+                      >
+                        <div 
+                          className="flex items-center gap-2 px-3 py-2 rounded-full border backdrop-blur-md"
+                          style={{
+                            backgroundColor: `${TIME_CONFIG[timeOfDay].overlayColor}40`,
+                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
+                            boxShadow: `0 0 20px ${TIME_CONFIG[timeOfDay].ambientLight}`,
+                          }}
+                        >
+                          <TimeIcon className="w-5 h-5" style={{ color: TIME_CONFIG[timeOfDay].lineColor }} />
+                          <span className="text-sm font-bold capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
+                            {timeOfDay}
+                          </span>
+                          {cycleCount > 0 && (
+                            <span className="text-xs opacity-70" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
+                              (Cycle {cycleCount + 1})
+                            </span>
+                          )}
+                        </div>
+                      </motion.div>
+                    </AnimatePresence>
+
+                    {/* Time Progress Bar */}
+                    {gameState.isPlaying && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="absolute top-16 left-4 z-30"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-1.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
+                            <motion.div
+                              className="h-full rounded-full"
+                              style={{ backgroundColor: TIME_CONFIG[timeOfDay].lineColor }}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(timeProgress.current / timeProgress.max) * 100}%` }}
+                              transition={{ type: "spring", stiffness: 100 }}
+                            />
+                          </div>
+                          <span className="text-xs opacity-60 capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
+                            → {timeProgress.nextPhase}
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+
                     <canvas
                       ref={canvasRef}
                       width={GAME_WIDTH}
                       height={GAME_HEIGHT}
                       className="absolute inset-0 w-full h-full"
+                    />
+
+                    {/* Ambient Light Overlay */}
+                    <motion.div
+                      key={timeOfDay}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: TIME_CONFIG[timeOfDay].overlayOpacity }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1 }}
+                      className="absolute inset-0 pointer-events-none z-10"
+                      style={{ backgroundColor: TIME_CONFIG[timeOfDay].overlayColor }}
                     />
 
                     <div className="absolute inset-0 overflow-hidden">
@@ -752,7 +948,7 @@ export default function MiniGamePageContent() {
                             alt="Runner"
                             className="w-full h-full object-contain"
                             style={{
-                              filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))',
+                              filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)`,
                             }}
                             draggable={false}
                           />
@@ -776,7 +972,7 @@ export default function MiniGamePageContent() {
                             alt="Runner"
                             className="w-full h-full object-contain"
                             style={{
-                              filter: 'drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))',
+                              filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)`,
                             }}
                             draggable={false}
                           />
@@ -902,15 +1098,40 @@ export default function MiniGamePageContent() {
                         animate={{ opacity: 1, y: 0 }}
                         className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-30"
                       >
-                        <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-purple-500/40 shadow-lg shadow-purple-500/20">
-                          <div className="text-xs text-purple-300 uppercase tracking-wider font-semibold">Score</div>
+                        <div 
+                          className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg"
+                          style={{ 
+                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
+                            boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}`
+                          }}
+                        >
+                          <div 
+                            className="text-xs uppercase tracking-wider font-semibold"
+                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
+                          >
+                            Score
+                          </div>
                           <div className="text-2xl md:text-3xl font-bold text-white">
                             {gameState.score}
                           </div>
                         </div>
-                        <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-cyan-500/40 shadow-lg shadow-cyan-500/20">
-                          <div className="text-xs text-cyan-300 uppercase tracking-wider font-semibold">Speed</div>
-                          <div className="text-2xl md:text-3xl font-bold text-cyan-400">
+                        <div 
+                          className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg"
+                          style={{ 
+                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
+                            boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}`
+                          }}
+                        >
+                          <div 
+                            className="text-xs uppercase tracking-wider font-semibold"
+                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
+                          >
+                            Speed
+                          </div>
+                          <div 
+                            className="text-2xl md:text-3xl font-bold"
+                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
+                          >
                             {gameState.speed.toFixed(1)}x
                           </div>
                         </div>
