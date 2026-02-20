@@ -65,7 +65,7 @@ const SPEED_INCREMENT = 0.002;
 
 export default function MiniGamePageContent() {
   const { publicKey } = useWallet()
-  
+
   const [gameState, setGameState] = useState<GameState>({
     isPlaying: false,
     isGameOver: false,
@@ -106,7 +106,7 @@ export default function MiniGamePageContent() {
   // ============================================
   // FIXED: Optimized jump with immediate response
   // ============================================
-  
+
   const triggerJump = useCallback(() => {
     if (!isJumping && gameState.isPlaying && !gameState.isGameOver) {
       setRunnerVy(JUMP_FORCE);
@@ -117,7 +117,7 @@ export default function MiniGamePageContent() {
 
   const handleGameAreaTouch = useCallback((e: TouchEvent) => {
     if (isButtonPressed) return;
-    
+
     if (gameState.isPlaying && !gameState.isGameOver) {
       e.preventDefault();
       triggerJump();
@@ -179,7 +179,7 @@ export default function MiniGamePageContent() {
       speed: BASE_SPEED,
       distance: 0,
     });
-    
+
     setRunnerY(GROUND_Y - RUNNER_HEIGHT);
     setRunnerVy(0);
     setIsJumping(false);
@@ -193,10 +193,10 @@ export default function MiniGamePageContent() {
   const spawnObstacle = useCallback(() => {
     const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
     const type = types[Math.floor(Math.random() * types.length)];
-    
+
     let obstacleHeight: number;
     let obstacleWidth: number;
-    
+
     switch (type) {
       case 'cactus':
         obstacleHeight = 50;
@@ -211,9 +211,9 @@ export default function MiniGamePageContent() {
         obstacleWidth = 25;
         break;
     }
-    
+
     const obstacleY = GROUND_Y - obstacleHeight;
-    
+
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
       x: GAME_WIDTH + 50 + Math.random() * 150,
@@ -222,20 +222,20 @@ export default function MiniGamePageContent() {
       height: obstacleHeight,
       type,
     };
-    
+
     setObstacles(prev => [...prev, obstacle]);
   }, []);
 
   const gameOver = useCallback(() => {
     setGameState(prev => ({ ...prev, isPlaying: false, isGameOver: true }));
-    
+
     const earnedXp = Math.min(gameState.score, 250);
     setXpEarned(earnedXp);
-    
+
     const newTotalXp = totalXp + earnedXp;
     setTotalXp(newTotalXp);
     localStorage.setItem('runnerTotalXp', newTotalXp.toString());
-    
+
     if (gameState.score > gameState.highScore) {
       setGameState(prev => ({ ...prev, highScore: gameState.score }));
       localStorage.setItem('runnerHighScore', gameState.score.toString());
@@ -249,7 +249,7 @@ export default function MiniGamePageContent() {
     try {
       if (!publicKey) return;
       const walletAddress = publicKey.toString();
-      
+
       const response = await fetch('/api/xp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,7 +263,7 @@ export default function MiniGamePageContent() {
           }
         }),
       });
-      
+
       const data = await response.json();
       if (data.success) console.log('✅ XP awarded:', data.data);
     } catch (error) {
@@ -317,13 +317,13 @@ export default function MiniGamePageContent() {
       setRunnerY(prev => {
         let newY = prev + runnerVy * timeScale;
         let newVy = runnerVy + GRAVITY * timeScale;
-        
+
         if (newY >= GROUND_Y - RUNNER_HEIGHT) {
           newY = GROUND_Y - RUNNER_HEIGHT;
           newVy = 0;
           setIsJumping(false);
         }
-        
+
         setRunnerVy(newVy);
         return newY;
       });
@@ -332,16 +332,16 @@ export default function MiniGamePageContent() {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed * timeScale }))
           .filter(obs => obs.x > -100);
-        
+
         const lastObs = newObstacles[newObstacles.length - 1];
         const minGap = 250 + Math.random() * 200;
-        
+
         if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
           if (Math.random() < 0.02 + gameState.speed * 0.001) {
             spawnObstacle();
           }
         }
-        
+
         return newObstacles;
       });
 
@@ -364,7 +364,7 @@ export default function MiniGamePageContent() {
     };
 
     gameLoopRef.current = requestAnimationFrame(gameLoop);
-    
+
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
@@ -415,7 +415,7 @@ export default function MiniGamePageContent() {
   // ============================================
   // FIXED: Fullscreen handling with iOS/Phantom fallbacks
   // ============================================
-  
+
   const toggleFullscreen = useCallback(async () => {
     const container = gameContainerRef.current;
     if (!container) return;
@@ -488,7 +488,7 @@ export default function MiniGamePageContent() {
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
@@ -499,7 +499,7 @@ export default function MiniGamePageContent() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -559,7 +559,7 @@ export default function MiniGamePageContent() {
     const topPercent = (obstacle.y / GAME_HEIGHT) * 100;
     const widthPercent = (obstacle.width / GAME_WIDTH) * 100;
     const heightPercent = (obstacle.height / GAME_HEIGHT) * 100;
-    
+
     switch (obstacle.type) {
       case 'cactus':
         return (
@@ -628,7 +628,7 @@ export default function MiniGamePageContent() {
   // ============================================
   // FIXED: Button handlers with proper touch support
   // ============================================
-  
+
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -667,18 +667,18 @@ export default function MiniGamePageContent() {
               Endless Runner Challenge
             </span>
           </div>
-          
+
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3">
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
               Neon Runner
             </span>
           </h1>
-          
+
           <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto">
             Jump over obstacles and survive as long as possible! 
             <span className="text-purple-400 font-semibold"> Earn XP</span> based on your score.
           </p>
-          
+
           <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">
             <span className="px-2 py-1 bg-white/10 rounded text-xs font-mono border border-white/10">SPACE</span>
             <span>or</span>
@@ -697,7 +697,7 @@ export default function MiniGamePageContent() {
               className="relative"
             >
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-2xl blur opacity-30" />
-              
+
               <Card className="relative bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden">
                 <CardContent className="p-0">
                   <div 
@@ -782,7 +782,7 @@ export default function MiniGamePageContent() {
                           />
                         </motion.div>
                       )}
-                      
+
                       {/* Obstacles */}
                       {obstacles.map(renderObstacle)}
 
@@ -821,7 +821,7 @@ export default function MiniGamePageContent() {
                               </h2>
                             </motion.div>
                             <p className="text-gray-400 mb-6 text-sm md:text-base">Jump over obstacles and earn XP!</p>
-                            
+
                             <Button
                               onClick={handleStartGame}
                               onTouchStart={(e) => {
@@ -872,7 +872,7 @@ export default function MiniGamePageContent() {
                                 New High Score!
                               </motion.p>
                             )}
-                            
+
                             <Button
                               onClick={handlePlayAgain}
                               onTouchStart={(e) => {
@@ -981,7 +981,7 @@ export default function MiniGamePageContent() {
                   </div>
                   <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all hover:bg-white/10">
                     <div className="flex items-center gap-3">
-                      <div className="Name="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
                         <Gamepad2 className="w-4 h-4 text-cyan-400" />
                       </div>
                       <span className="text-gray-300 text-sm font-medium">Games Played</span>
@@ -1025,7 +1025,7 @@ export default function MiniGamePageContent() {
                       <span className="text-green-400 font-bold text-sm">+{reward.xp} XP</span>
                     </div>
                   ))}
-                  
+
                   <div className="flex justify-between items-center p-3 rounded-xl border border-green-500/30 bg-green-500/10">
                     <span className="text-gray-300 text-sm flex items-center gap-2 font-medium">
                       <TrendingUp className="w-4 h-4 text-green-400" />
@@ -1033,7 +1033,7 @@ export default function MiniGamePageContent() {
                     </span>
                     <span className="text-green-400 font-bold text-sm">+1 XP</span>
                   </div>
-                  
+
                   <div className="text-center p-3 bg-white/5 rounded-xl border border-white/5">
                     <span className="text-xs text-gray-500">Max per game: </span>
                     <span className="text-xs text-purple-400 font-bold">250 XP</span>
@@ -1050,7 +1050,7 @@ export default function MiniGamePageContent() {
             >
               <Card className="bg-gray-900/70 border-orange-500/30 backdrop-blur-xl overflow-hidden relative shadow-xl shadow-orange-500/5">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
-                
+
                 <CardHeader className="pb-3 relative">
                   <CardTitle className="flex items-center gap-2 text-lg text-orange-300">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
@@ -1061,7 +1061,7 @@ export default function MiniGamePageContent() {
                 </CardHeader>
                 <CardContent className="relative">
                   <p className="text-gray-300 text-sm mb-3 font-medium">Score 500+ points in a single run!</p>
-                  
+
                   <div className="relative h-4 bg-black/50 rounded-full overflow-hidden border border-white/10">
                     <motion.div
                       className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full"
@@ -1070,7 +1070,7 @@ export default function MiniGamePageContent() {
                       transition={{ type: "spring", stiffness: 100 }}
                     />
                   </div>
-                  
+
                   <div className="flex justify-between mt-2">
                     <span className="text-gray-500 text-xs">Progress</span>
                     <span className="text-orange-400 font-bold text-sm">{Math.min(gameState.score, 500)} / 500</span>
@@ -1100,7 +1100,7 @@ export default function MiniGamePageContent() {
               +{xpEarned} XP
             </motion.div>
             <p className="text-gray-400 text-sm">Earned from your run!</p>
-            
+
             <div className="mt-6 space-y-2">
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/10">
                 <span className="text-gray-400 text-sm">Final Score</span>
@@ -1111,7 +1111,7 @@ export default function MiniGamePageContent() {
                 <span className="text-purple-400 font-bold text-lg">{totalXp}</span>
               </div>
             </div>
-            
+
             <Button
               onClick={() => setShowXpPopup(false)}
               className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-3 rounded-full shadow-lg shadow-purple-500/25"
