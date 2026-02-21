@@ -53,7 +53,7 @@ interface Particle {
   color: string;
 }
 
-type TimeOfDay = 'night' | 'morning' | 'noon';
+type TimeOfDay = 'morning' | 'noon' | 'night';
 
 // Game Constants
 const GAME_WIDTH = 1000;
@@ -68,13 +68,8 @@ const BASE_SPEED = 5;
 const MAX_SPEED = 15;
 const SPEED_INCREMENT = 0.002;
 
-// Day cycle thresholds (score-based)
-const DAY_CYCLE_THRESHOLDS = {
-  night: 0,
-  morning: 300,
-  noon: 700,
-  cycleLength: 1200, // After 1200 score, cycle repeats
-};
+// Day cycle thresholds - switch every 3000 score
+const PHASE_DURATION = 3000;
 
 // Visual configurations for each time of day
 const TIME_CONFIG: Record<TimeOfDay, {
@@ -89,18 +84,6 @@ const TIME_CONFIG: Record<TimeOfDay, {
   lineColor: string;
   lineGlow: string;
 }> = {
-  night: {
-    skyGradient: ['#0a0a0f', '#0f0f1a', '#1a1a2e'],
-    groundColor: ['#2d2d44', '#1a1a2e'],
-    starOpacity: 1,
-    sunMoonIcon: Moon,
-    ambientLight: 'rgba(168, 85, 247, 0.15)',
-    overlayColor: '#0a0a1f',
-    overlayOpacity: 0.3,
-    particleColors: ['#a855f7', '#3b82f6', '#ec4899'],
-    lineColor: '#a855f7',
-    lineGlow: '#a855f7',
-  },
   morning: {
     skyGradient: ['#1a1a3e', '#2d1b69', '#ff6b35'],
     groundColor: ['#3d3d5c', '#2a2a3e'],
@@ -124,6 +107,18 @@ const TIME_CONFIG: Record<TimeOfDay, {
     particleColors: ['#0ea5e9', '#38bdf8', '#22d3ee'],
     lineColor: '#38bdf8',
     lineGlow: '#0ea5e9',
+  },
+  night: {
+    skyGradient: ['#0a0a0f', '#0f0f1a', '#1a1a2e'],
+    groundColor: ['#2d2d44', '#1a1a2e'],
+    starOpacity: 1,
+    sunMoonIcon: Moon,
+    ambientLight: 'rgba(168, 85, 247, 0.15)',
+    overlayColor: '#0a0a1f',
+    overlayOpacity: 0.3,
+    particleColors: ['#a855f7', '#3b82f6', '#ec4899'],
+    lineColor: '#a855f7',
+    lineGlow: '#a855f7',
   },
 };
 
@@ -149,7 +144,7 @@ export default function MiniGamePageContent() {
   const [showXpPopup, setShowXpPopup] = useState(false);
   const [isButtonPressed, setIsButtonPressed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('night');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
   const [cycleCount, setCycleCount] = useState(0);
 
   const obstacleIdRef = useRef(0);
@@ -170,53 +165,53 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // NEW: Day cycle system based on score
+  // Day cycle system - switch every 3000 score
   // ============================================
   useEffect(() => {
     const score = gameState.score;
-    const cyclePosition = score % DAY_CYCLE_THRESHOLDS.cycleLength;
+    const cyclePosition = score % (PHASE_DURATION * 3);
 
     let newTimeOfDay: TimeOfDay;
-    if (cyclePosition < DAY_CYCLE_THRESHOLDS.morning) {
-      newTimeOfDay = 'night';
-    } else if (cyclePosition < DAY_CYCLE_THRESHOLDS.noon) {
+    if (cyclePosition < PHASE_DURATION) {
       newTimeOfDay = 'morning';
-    } else {
+    } else if (cyclePosition < PHASE_DURATION * 2) {
       newTimeOfDay = 'noon';
+    } else {
+      newTimeOfDay = 'night';
     }
 
     setTimeOfDay(newTimeOfDay);
-    setCycleCount(Math.floor(score / DAY_CYCLE_THRESHOLDS.cycleLength));
+    setCycleCount(Math.floor(score / (PHASE_DURATION * 3)));
   }, [gameState.score]);
 
   const getTimeProgress = () => {
-    const cyclePosition = gameState.score % DAY_CYCLE_THRESHOLDS.cycleLength;
-    if (cyclePosition < DAY_CYCLE_THRESHOLDS.morning) {
+    const cyclePosition = gameState.score % (PHASE_DURATION * 3);
+    if (cyclePosition < PHASE_DURATION) {
       return { 
         current: cyclePosition, 
-        max: DAY_CYCLE_THRESHOLDS.morning, 
-        phase: 'night',
-        nextPhase: 'morning'
-      };
-    } else if (cyclePosition < DAY_CYCLE_THRESHOLDS.noon) {
-      return { 
-        current: cyclePosition - DAY_CYCLE_THRESHOLDS.morning, 
-        max: DAY_CYCLE_THRESHOLDS.noon - DAY_CYCLE_THRESHOLDS.morning, 
+        max: PHASE_DURATION, 
         phase: 'morning',
         nextPhase: 'noon'
       };
-    } else {
+    } else if (cyclePosition < PHASE_DURATION * 2) {
       return { 
-        current: cyclePosition - DAY_CYCLE_THRESHOLDS.noon, 
-        max: DAY_CYCLE_THRESHOLDS.cycleLength - DAY_CYCLE_THRESHOLDS.noon, 
+        current: cyclePosition - PHASE_DURATION, 
+        max: PHASE_DURATION, 
         phase: 'noon',
         nextPhase: 'night'
+      };
+    } else {
+      return { 
+        current: cyclePosition - PHASE_DURATION * 2, 
+        max: PHASE_DURATION, 
+        phase: 'night',
+        nextPhase: 'morning'
       };
     }
   };
 
   // ============================================
-  // FIXED: Optimized jump with immediate response
+  // Optimized jump with immediate response
   // ============================================
 
   const triggerJump = useCallback(() => {
@@ -274,7 +269,7 @@ export default function MiniGamePageContent() {
   };
 
   // ============================================
-  // FIXED: Start game with proper state reset
+  // Start game with proper state reset
   // ============================================
   const startGame = useCallback(() => {
     // Cancel any existing animation frame
@@ -301,7 +296,7 @@ export default function MiniGamePageContent() {
     obstacleIdRef.current = 0;
     lastTimeRef.current = performance.now();
     setIsButtonPressed(false);
-    setTimeOfDay('night');
+    setTimeOfDay('morning');
     setCycleCount(0);
   }, [gameState.highScore]);
 
@@ -417,7 +412,7 @@ export default function MiniGamePageContent() {
   }, [obstacles, runnerY, gameOver]);
 
   // ============================================
-  // FIXED: requestAnimationFrame for smooth 60fps
+  // requestAnimationFrame for smooth 60fps
   // ============================================
   useEffect(() => {
     if (!gameState.isPlaying) return;
@@ -449,10 +444,12 @@ export default function MiniGamePageContent() {
           .filter(obs => obs.x > -100);
 
         const lastObs = newObstacles[newObstacles.length - 1];
-        const minGap = 250 + Math.random() * 200;
+        // Slightly reduced gap for more obstacles
+        const minGap = 220 + Math.random() * 180;
 
         if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
-          if (Math.random() < 0.02 + gameState.speed * 0.001) {
+          // Increased spawn chance for more obstacles
+          if (Math.random() < 0.025 + gameState.speed * 0.0012) {
             spawnObstacle();
           }
         }
@@ -528,7 +525,7 @@ export default function MiniGamePageContent() {
   }, [handleGameAreaTouch]);
 
   // ============================================
-  // FIXED: Fullscreen handling with iOS/Phantom fallbacks
+  // Fullscreen handling with iOS/Phantom fallbacks
   // ============================================
 
   const toggleFullscreen = useCallback(async () => {
@@ -611,7 +608,7 @@ export default function MiniGamePageContent() {
   }, []);
 
   // ============================================
-  // NEW: Dynamic background drawing based on time of day
+  // Dynamic background drawing based on time of day
   // ============================================
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -753,7 +750,7 @@ export default function MiniGamePageContent() {
   };
 
   // ============================================
-  // FIXED: Button handlers with proper touch support
+  // Button handlers with proper touch support
   // ============================================
 
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
@@ -892,7 +889,7 @@ export default function MiniGamePageContent() {
                         className="absolute top-16 left-4 z-30"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-24 h-1.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
+                          <div className="w-32 h-1.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
                             <motion.div
                               className="h-full rounded-full"
                               style={{ backgroundColor: TIME_CONFIG[timeOfDay].lineColor }}
