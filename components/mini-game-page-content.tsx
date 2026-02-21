@@ -21,7 +21,10 @@ import {
   Minimize2,
   Moon,
   Sun,
-  Sunrise
+  Sunrise,
+  Car,
+  Bike,
+  Plane
 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 
@@ -40,7 +43,7 @@ interface Obstacle {
   y: number;
   width: number;
   height: number;
-  type: 'cactus' | 'rock' | 'spike';
+  type: 'car' | 'bike' | 'plane' | 'cactus' | 'rock' | 'spike';
 }
 
 interface Particle {
@@ -164,9 +167,7 @@ export default function MiniGamePageContent() {
     if (savedXp) setTotalXp(parseInt(savedXp));
   }, []);
 
-  // ============================================
   // Day cycle system - switch every 3000 score
-  // ============================================
   useEffect(() => {
     const score = gameState.score;
     const cyclePosition = score % (PHASE_DURATION * 3);
@@ -209,10 +210,6 @@ export default function MiniGamePageContent() {
       };
     }
   };
-
-  // ============================================
-  // Optimized jump with immediate response
-  // ============================================
 
   const triggerJump = useCallback(() => {
     if (!isJumping && gameState.isPlaying && !gameState.isGameOver) {
@@ -268,17 +265,12 @@ export default function MiniGamePageContent() {
     setParticles(prev => [...prev, ...newParticles]);
   };
 
-  // ============================================
-  // Start game with proper state reset
-  // ============================================
   const startGame = useCallback(() => {
-    // Cancel any existing animation frame
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = undefined;
     }
 
-    // Reset all game state
     setGameState({
       isPlaying: true,
       isGameOver: false,
@@ -300,33 +292,54 @@ export default function MiniGamePageContent() {
     setCycleCount(0);
   }, [gameState.highScore]);
 
+  // ============================================
+  // NEW: Vehicle obstacles with higher spawn rate
+  // ============================================
   const spawnObstacle = useCallback(() => {
-    const types: Obstacle['type'][] = ['cactus', 'rock', 'spike'];
+    // All obstacle types including new vehicles
+    const types: Obstacle['type'][] = ['car', 'bike', 'plane', 'cactus', 'rock', 'spike'];
     const type = types[Math.floor(Math.random() * types.length)];
 
     let obstacleHeight: number;
     let obstacleWidth: number;
+    let obstacleY: number;
 
     switch (type) {
+      case 'car':
+        obstacleHeight = 55;
+        obstacleWidth = 90;
+        obstacleY = GROUND_Y - obstacleHeight;
+        break;
+      case 'bike':
+        obstacleHeight = 40;
+        obstacleWidth = 60;
+        obstacleY = GROUND_Y - obstacleHeight;
+        break;
+      case 'plane':
+        obstacleHeight = 35;
+        obstacleWidth = 80;
+        obstacleY = GROUND_Y - obstacleHeight - 60 - Math.random() * 40; // Flying in air
+        break;
       case 'cactus':
         obstacleHeight = 50;
         obstacleWidth = 30;
+        obstacleY = GROUND_Y - obstacleHeight;
         break;
       case 'rock':
         obstacleHeight = 35;
         obstacleWidth = 35;
+        obstacleY = GROUND_Y - obstacleHeight;
         break;
       case 'spike':
         obstacleHeight = 30;
         obstacleWidth = 25;
+        obstacleY = GROUND_Y - obstacleHeight;
         break;
     }
 
-    const obstacleY = GROUND_Y - obstacleHeight;
-
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
-      x: GAME_WIDTH + 50 + Math.random() * 150,
+      x: GAME_WIDTH + 50 + Math.random() * 100,
       y: obstacleY,
       width: obstacleWidth,
       height: obstacleHeight,
@@ -412,7 +425,7 @@ export default function MiniGamePageContent() {
   }, [obstacles, runnerY, gameOver]);
 
   // ============================================
-  // requestAnimationFrame for smooth 60fps
+  // MUCH MORE OBSTACLES - Increased spawn rates
   // ============================================
   useEffect(() => {
     if (!gameState.isPlaying) return;
@@ -420,8 +433,6 @@ export default function MiniGamePageContent() {
     const gameLoop = (currentTime: number) => {
       const deltaTime = currentTime - lastTimeRef.current;
       lastTimeRef.current = currentTime;
-
-      // Physics update with delta time normalization (assuming 60fps baseline)
       const timeScale = deltaTime / 16.67;
 
       setRunnerY(prev => {
@@ -441,15 +452,15 @@ export default function MiniGamePageContent() {
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed * timeScale }))
-          .filter(obs => obs.x > -100);
+          .filter(obs => obs.x > -150);
 
         const lastObs = newObstacles[newObstacles.length - 1];
-        // Slightly reduced gap for more obstacles
-        const minGap = 220 + Math.random() * 180;
+        // MUCH smaller gap = MORE obstacles
+        const minGap = 180 + Math.random() * 150;
 
         if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
-          // Increased spawn chance for more obstacles
-          if (Math.random() < 0.025 + gameState.speed * 0.0012) {
+          // MUCH higher spawn chance = MORE obstacles
+          if (Math.random() < 0.035 + gameState.speed * 0.0015) {
             spawnObstacle();
           }
         }
@@ -482,7 +493,7 @@ export default function MiniGamePageContent() {
     };
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
 
-  // Keyboard controls with debouncing
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
@@ -508,7 +519,7 @@ export default function MiniGamePageContent() {
     };
   }, [jump]);
 
-  // Touch controls for game area only
+  // Touch controls
   useEffect(() => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
@@ -524,23 +535,18 @@ export default function MiniGamePageContent() {
     };
   }, [handleGameAreaTouch]);
 
-  // ============================================
-  // Fullscreen handling with iOS/Phantom fallbacks
-  // ============================================
-
+  // Fullscreen handling
   const toggleFullscreen = useCallback(async () => {
     const container = gameContainerRef.current;
     if (!container) return;
 
     try {
       if (!document.fullscreenElement) {
-        // Try standard fullscreen API
         if (container.requestFullscreen) {
           await container.requestFullscreen();
         } else if ((container as any).webkitRequestFullscreen) {
           await (container as any).webkitRequestFullscreen();
         } else {
-          // Fallback: maximize viewport on iOS/Phantom
           container.style.position = 'fixed';
           container.style.top = '0';
           container.style.left = '0';
@@ -556,7 +562,6 @@ export default function MiniGamePageContent() {
         } else if ((document as any).webkitExitFullscreen) {
           await (document as any).webkitExitFullscreen();
         } else {
-          // Reset fallback styles
           container.style.position = '';
           container.style.top = '';
           container.style.left = '';
@@ -568,8 +573,6 @@ export default function MiniGamePageContent() {
         setIsFullscreen(false);
       }
     } catch (err) {
-      console.log('Fullscreen not supported, using viewport maximization');
-      // Toggle viewport maximization fallback
       if (!isFullscreen) {
         container.style.position = 'fixed';
         container.style.top = '0';
@@ -592,7 +595,6 @@ export default function MiniGamePageContent() {
     }
   }, [isFullscreen]);
 
-  // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -607,9 +609,7 @@ export default function MiniGamePageContent() {
     };
   }, []);
 
-  // ============================================
-  // Dynamic background drawing based on time of day
-  // ============================================
+  // Background drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -621,7 +621,6 @@ export default function MiniGamePageContent() {
 
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Dynamic sky gradient based on time of day
     const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
     config.skyGradient.forEach((color, index) => {
       gradient.addColorStop(index / (config.skyGradient.length - 1), color);
@@ -629,7 +628,6 @@ export default function MiniGamePageContent() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Stars (visible during night and early morning)
     if (config.starOpacity > 0) {
       ctx.fillStyle = '#ffffff';
       for (let i = 0; i < 60; i++) {
@@ -645,7 +643,6 @@ export default function MiniGamePageContent() {
       ctx.globalAlpha = 1;
     }
 
-    // Ground with time-appropriate colors
     const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GAME_HEIGHT);
     config.groundColor.forEach((color, index) => {
       groundGradient.addColorStop(index / (config.groundColor.length - 1), color);
@@ -653,7 +650,6 @@ export default function MiniGamePageContent() {
     ctx.fillStyle = groundGradient;
     ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
 
-    // Dynamic ground line with glow
     ctx.strokeStyle = config.lineColor;
     ctx.lineWidth = 3;
     ctx.shadowBlur = 10;
@@ -664,7 +660,6 @@ export default function MiniGamePageContent() {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Moving ground details
     ctx.strokeStyle = config.lineColor;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
@@ -678,6 +673,9 @@ export default function MiniGamePageContent() {
     ctx.globalAlpha = 1;
   }, [gameState.distance, timeOfDay]);
 
+  // ============================================
+  // NEW: Vehicle obstacle renderers
+  // ============================================
   const renderObstacle = (obstacle: Obstacle) => {
     const leftPercent = (obstacle.x / GAME_WIDTH) * 100;
     const topPercent = (obstacle.y / GAME_HEIGHT) * 100;
@@ -685,11 +683,96 @@ export default function MiniGamePageContent() {
     const heightPercent = (obstacle.height / GAME_HEIGHT) * 100;
 
     switch (obstacle.type) {
+      case 'car':
+        return (
+          <div
+            key={obstacle.id}
+            className="absolute z-20"
+            style={{
+              left: `${leftPercent}%`,
+              top: `${topPercent}%`,
+              width: `${widthPercent}%`,
+              height: `${heightPercent}%`,
+            }}
+          >
+            <div className="relative w-full h-full">
+              {/* Car body */}
+              <div className="absolute bottom-0 left-0 right-0 h-[70%] bg-gradient-to-b from-red-500 to-red-700 rounded-lg shadow-lg">
+                {/* Car roof */}
+                <div className="absolute top-0 left-[20%] right-[20%] h-[40%] bg-gradient-to-b from-red-400 to-red-600 rounded-t-lg" />
+                {/* Windows */}
+                <div className="absolute top-[10%] left-[25%] w-[20%] h-[25%] bg-cyan-300/70 rounded" />
+                <div className="absolute top-[10%] right-[25%] w-[20%] h-[25%] bg-cyan-300/70 rounded" />
+              </div>
+              {/* Wheels */}
+              <div className="absolute -bottom-[10%] left-[10%] w-[20%] h-[30%] bg-gray-900 rounded-full border-2 border-gray-600" />
+              <div className="absolute -bottom-[10%] right-[10%] w-[20%] h-[30%] bg-gray-900 rounded-full border-2 border-gray-600" />
+              {/* Headlights */}
+              <div className="absolute bottom-[20%] left-0 w-[8%] h-[20%] bg-yellow-300 rounded-r shadow-[0_0_10px_rgba(253,224,71,0.8)]" />
+            </div>
+          </div>
+        );
+
+      case 'bike':
+        return (
+          <div
+            key={obstacle.id}
+            className="absolute z-20"
+            style={{
+              left: `${leftPercent}%`,
+              top: `${topPercent}%`,
+              width: `${widthPercent}%`,
+              height: `${heightPercent}%`,
+            }}
+          >
+            <div className="relative w-full h-full">
+              {/* Bike frame */}
+              <div className="absolute bottom-[20%] left-[20%] right-[20%] h-[30%] bg-gradient-to-r from-orange-500 to-orange-600 rounded" />
+              {/* Wheels */}
+              <div className="absolute bottom-0 left-0 w-[35%] h-[50%] border-4 border-gray-800 rounded-full bg-transparent">
+                <div className="absolute inset-[20%] border-2 border-gray-600 rounded-full" />
+              </div>
+              <div className="absolute bottom-0 right-0 w-[35%] h-[50%] border-4 border-gray-800 rounded-full bg-transparent">
+                <div className="absolute inset-[20%] border-2 border-gray-600 rounded-full" />
+              </div>
+              {/* Handlebars */}
+              <div className="absolute top-[20%] right-[15%] w-[5%] h-[30%] bg-gray-700 rounded" />
+            </div>
+          </div>
+        );
+
+      case 'plane':
+        return (
+          <div
+            key={obstacle.id}
+            className="absolute z-20"
+            style={{
+              left: `${leftPercent}%`,
+              top: `${topPercent}%`,
+              width: `${widthPercent}%`,
+              height: `${heightPercent}%`,
+            }}
+          >
+            <div className="relative w-full h-full">
+              {/* Plane body */}
+              <div className="absolute top-[30%] left-[10%] right-[10%] h-[40%] bg-gradient-to-r from-blue-400 to-blue-600 rounded-full shadow-lg" />
+              {/* Wings */}
+              <div className="absolute top-[10%] left-[30%] w-[40%] h-[80%] bg-gradient-to-b from-blue-300 to-blue-500 rounded-lg" />
+              {/* Tail */}
+              <div className="absolute top-[20%] right-[5%] w-[20%] h-[60%] bg-gradient-to-b from-blue-400 to-blue-600 rounded" />
+              {/* Windows */}
+              <div className="absolute top-[40%] left-[25%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
+              <div className="absolute top-[40%] left-[40%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
+              <div className="absolute top-[40%] left-[55%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
+            </div>
+          </div>
+        );
+
       case 'cactus':
         return (
           <div
             key={obstacle.id}
-            className="absolute"
+            className="absolute z-20"
             style={{
               left: `${leftPercent}%`,
               top: `${topPercent}%`,
@@ -704,11 +787,12 @@ export default function MiniGamePageContent() {
             </div>
           </div>
         );
+
       case 'rock':
         return (
           <div
             key={obstacle.id}
-            className="absolute"
+            className="absolute z-20"
             style={{
               left: `${leftPercent}%`,
               top: `${topPercent}%`,
@@ -719,11 +803,12 @@ export default function MiniGamePageContent() {
             <div className="w-full h-full bg-gradient-to-br from-gray-600 via-gray-500 to-gray-700 rounded-lg shadow-lg shadow-gray-500/20 transform rotate-2" />
           </div>
         );
+
       case 'spike':
         return (
           <div
             key={obstacle.id}
-            className="absolute"
+            className="absolute z-20"
             style={{
               left: `${leftPercent}%`,
               top: `${topPercent}%`,
@@ -748,10 +833,6 @@ export default function MiniGamePageContent() {
         );
     }
   };
-
-  // ============================================
-  // Button handlers with proper touch support
-  // ============================================
 
   const handleStartGame = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
@@ -976,7 +1057,7 @@ export default function MiniGamePageContent() {
                         </motion.div>
                       )}
 
-                      {/* Obstacles */}
+                      {/* Obstacles - Now includes vehicles */}
                       {obstacles.map(renderObstacle)}
 
                       {/* Particles */}
