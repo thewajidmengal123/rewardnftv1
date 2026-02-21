@@ -21,10 +21,7 @@ import {
   Minimize2,
   Moon,
   Sun,
-  Sunrise,
-  Car,
-  Bike,
-  Plane
+  Sunrise
 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 
@@ -43,7 +40,7 @@ interface Obstacle {
   y: number;
   width: number;
   height: number;
-  type: 'car' | 'bike' | 'plane' | 'cactus' | 'rock' | 'spike';
+  type: 'car' | 'bike' | 'plane' | 'cactus' | 'rock' | 'spike' | 'truck' | 'helicopter';
 }
 
 interface Particle {
@@ -58,7 +55,6 @@ interface Particle {
 
 type TimeOfDay = 'morning' | 'noon' | 'night';
 
-// Game Constants
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 500;
 const GROUND_Y = 380;
@@ -67,14 +63,11 @@ const RUNNER_HEIGHT = 90;
 const RUNNER_X = 150;
 const GRAVITY = 0.8;
 const JUMP_FORCE = -15;
-const BASE_SPEED = 5;
-const MAX_SPEED = 15;
-const SPEED_INCREMENT = 0.002;
-
-// Day cycle thresholds - switch every 3000 score
+const BASE_SPEED = 6;
+const MAX_SPEED = 18;
+const SPEED_INCREMENT = 0.003;
 const PHASE_DURATION = 3000;
 
-// Visual configurations for each time of day
 const TIME_CONFIG: Record<TimeOfDay, {
   skyGradient: string[];
   groundColor: string[];
@@ -156,10 +149,8 @@ export default function MiniGamePageContent() {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameLoopRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
-  const touchStartTimeRef = useRef<number>(0);
   const jumpPressedRef = useRef<boolean>(false);
 
-  // Load saved data
   useEffect(() => {
     const saved = localStorage.getItem('runnerHighScore');
     if (saved) setGameState(prev => ({ ...prev, highScore: parseInt(saved) }));
@@ -167,7 +158,6 @@ export default function MiniGamePageContent() {
     if (savedXp) setTotalXp(parseInt(savedXp));
   }, []);
 
-  // Day cycle system - switch every 3000 score
   useEffect(() => {
     const score = gameState.score;
     const cyclePosition = score % (PHASE_DURATION * 3);
@@ -188,26 +178,11 @@ export default function MiniGamePageContent() {
   const getTimeProgress = () => {
     const cyclePosition = gameState.score % (PHASE_DURATION * 3);
     if (cyclePosition < PHASE_DURATION) {
-      return { 
-        current: cyclePosition, 
-        max: PHASE_DURATION, 
-        phase: 'morning',
-        nextPhase: 'noon'
-      };
+      return { current: cyclePosition, max: PHASE_DURATION, phase: 'morning', nextPhase: 'noon' };
     } else if (cyclePosition < PHASE_DURATION * 2) {
-      return { 
-        current: cyclePosition - PHASE_DURATION, 
-        max: PHASE_DURATION, 
-        phase: 'noon',
-        nextPhase: 'night'
-      };
+      return { current: cyclePosition - PHASE_DURATION, max: PHASE_DURATION, phase: 'noon', nextPhase: 'night' };
     } else {
-      return { 
-        current: cyclePosition - PHASE_DURATION * 2, 
-        max: PHASE_DURATION, 
-        phase: 'night',
-        nextPhase: 'morning'
-      };
+      return { current: cyclePosition - PHASE_DURATION * 2, max: PHASE_DURATION, phase: 'night', nextPhase: 'morning' };
     }
   };
 
@@ -221,7 +196,6 @@ export default function MiniGamePageContent() {
 
   const handleGameAreaTouch = useCallback((e: TouchEvent) => {
     if (isButtonPressed) return;
-
     if (gameState.isPlaying && !gameState.isGameOver) {
       e.preventDefault();
       triggerJump();
@@ -292,12 +266,8 @@ export default function MiniGamePageContent() {
     setCycleCount(0);
   }, [gameState.highScore]);
 
-  // ============================================
-  // NEW: Vehicle obstacles with higher spawn rate
-  // ============================================
   const spawnObstacle = useCallback(() => {
-    // All obstacle types including new vehicles
-    const types: Obstacle['type'][] = ['car', 'bike', 'plane', 'cactus', 'rock', 'spike'];
+    const types: Obstacle['type'][] = ['car', 'bike', 'plane', 'cactus', 'rock', 'spike', 'truck', 'helicopter'];
     const type = types[Math.floor(Math.random() * types.length)];
 
     let obstacleHeight: number;
@@ -305,6 +275,11 @@ export default function MiniGamePageContent() {
     let obstacleY: number;
 
     switch (type) {
+      case 'truck':
+        obstacleHeight = 70;
+        obstacleWidth = 110;
+        obstacleY = GROUND_Y - obstacleHeight;
+        break;
       case 'car':
         obstacleHeight = 55;
         obstacleWidth = 90;
@@ -318,7 +293,12 @@ export default function MiniGamePageContent() {
       case 'plane':
         obstacleHeight = 35;
         obstacleWidth = 80;
-        obstacleY = GROUND_Y - obstacleHeight - 60 - Math.random() * 40; // Flying in air
+        obstacleY = GROUND_Y - obstacleHeight - 20 - Math.random() * 20;
+        break;
+      case 'helicopter':
+        obstacleHeight = 45;
+        obstacleWidth = 75;
+        obstacleY = GROUND_Y - obstacleHeight - 30 - Math.random() * 25;
         break;
       case 'cactus':
         obstacleHeight = 50;
@@ -339,7 +319,7 @@ export default function MiniGamePageContent() {
 
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
-      x: GAME_WIDTH + 50 + Math.random() * 100,
+      x: GAME_WIDTH + 50 + Math.random() * 80,
       y: obstacleY,
       width: obstacleWidth,
       height: obstacleHeight,
@@ -351,10 +331,8 @@ export default function MiniGamePageContent() {
 
   const gameOver = useCallback(() => {
     setGameState(prev => ({ ...prev, isPlaying: false, isGameOver: true }));
-
     const earnedXp = Math.min(gameState.score, 250);
     setXpEarned(earnedXp);
-
     const newTotalXp = totalXp + earnedXp;
     setTotalXp(newTotalXp);
     localStorage.setItem('runnerTotalXp', newTotalXp.toString());
@@ -424,9 +402,6 @@ export default function MiniGamePageContent() {
     return false;
   }, [obstacles, runnerY, gameOver]);
 
-  // ============================================
-  // MUCH MORE OBSTACLES - Increased spawn rates
-  // ============================================
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
@@ -452,15 +427,13 @@ export default function MiniGamePageContent() {
       setObstacles(prev => {
         const newObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed * timeScale }))
-          .filter(obs => obs.x > -150);
+          .filter(obs => obs.x > -180);
 
         const lastObs = newObstacles[newObstacles.length - 1];
-        // MUCH smaller gap = MORE obstacles
-        const minGap = 180 + Math.random() * 150;
+        const minGap = 140 + Math.random() * 120;
 
         if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
-          // MUCH higher spawn chance = MORE obstacles
-          if (Math.random() < 0.035 + gameState.speed * 0.0015) {
+          if (Math.random() < 0.045 + gameState.speed * 0.002) {
             spawnObstacle();
           }
         }
@@ -493,7 +466,6 @@ export default function MiniGamePageContent() {
     };
   }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision, spawnObstacle]);
 
-  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
@@ -519,7 +491,6 @@ export default function MiniGamePageContent() {
     };
   }, [jump]);
 
-  // Touch controls
   useEffect(() => {
     const gameContainer = gameContainerRef.current;
     if (!gameContainer) return;
@@ -535,7 +506,6 @@ export default function MiniGamePageContent() {
     };
   }, [handleGameAreaTouch]);
 
-  // Fullscreen handling
   const toggleFullscreen = useCallback(async () => {
     const container = gameContainerRef.current;
     if (!container) return;
@@ -609,7 +579,6 @@ export default function MiniGamePageContent() {
     };
   }, []);
 
-  // Background drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -673,9 +642,6 @@ export default function MiniGamePageContent() {
     ctx.globalAlpha = 1;
   }, [gameState.distance, timeOfDay]);
 
-  // ============================================
-  // NEW: Vehicle obstacle renderers
-  // ============================================
   const renderObstacle = (obstacle: Obstacle) => {
     const leftPercent = (obstacle.x / GAME_WIDTH) * 100;
     const topPercent = (obstacle.y / GAME_HEIGHT) * 100;
@@ -683,31 +649,32 @@ export default function MiniGamePageContent() {
     const heightPercent = (obstacle.height / GAME_HEIGHT) * 100;
 
     switch (obstacle.type) {
+      case 'truck':
+        return (
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
+            <div className="relative w-full h-full">
+              <div className="absolute bottom-[30%] left-0 w-[65%] h-[70%] bg-gradient-to-b from-gray-400 to-gray-600 rounded-l-lg border-2 border-gray-500" />
+              <div className="absolute bottom-[30%] right-0 w-[35%] h-[70%] bg-gradient-to-b from-red-500 to-red-700 rounded-r-lg">
+                <div className="absolute top-[20%] right-[10%] w-[40%] h-[30%] bg-cyan-300/70 rounded" />
+              </div>
+              <div className="absolute -bottom-[5%] left-[10%] w-[15%] h-[25%] bg-gray-900 rounded-full border-2 border-gray-600" />
+              <div className="absolute -bottom-[5%] left-[35%] w-[15%] h-[25%] bg-gray-900 rounded-full border-2 border-gray-600" />
+              <div className="absolute -bottom-[5%] right-[10%] w-[15%] h-[25%] bg-gray-900 rounded-full border-2 border-gray-600" />
+            </div>
+          </div>
+        );
+
       case 'car':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="relative w-full h-full">
-              {/* Car body */}
               <div className="absolute bottom-0 left-0 right-0 h-[70%] bg-gradient-to-b from-red-500 to-red-700 rounded-lg shadow-lg">
-                {/* Car roof */}
                 <div className="absolute top-0 left-[20%] right-[20%] h-[40%] bg-gradient-to-b from-red-400 to-red-600 rounded-t-lg" />
-                {/* Windows */}
                 <div className="absolute top-[10%] left-[25%] w-[20%] h-[25%] bg-cyan-300/70 rounded" />
                 <div className="absolute top-[10%] right-[25%] w-[20%] h-[25%] bg-cyan-300/70 rounded" />
               </div>
-              {/* Wheels */}
               <div className="absolute -bottom-[10%] left-[10%] w-[20%] h-[30%] bg-gray-900 rounded-full border-2 border-gray-600" />
               <div className="absolute -bottom-[10%] right-[10%] w-[20%] h-[30%] bg-gray-900 rounded-full border-2 border-gray-600" />
-              {/* Headlights */}
               <div className="absolute bottom-[20%] left-0 w-[8%] h-[20%] bg-yellow-300 rounded-r shadow-[0_0_10px_rgba(253,224,71,0.8)]" />
             </div>
           </div>
@@ -715,27 +682,15 @@ export default function MiniGamePageContent() {
 
       case 'bike':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="relative w-full h-full">
-              {/* Bike frame */}
               <div className="absolute bottom-[20%] left-[20%] right-[20%] h-[30%] bg-gradient-to-r from-orange-500 to-orange-600 rounded" />
-              {/* Wheels */}
               <div className="absolute bottom-0 left-0 w-[35%] h-[50%] border-4 border-gray-800 rounded-full bg-transparent">
                 <div className="absolute inset-[20%] border-2 border-gray-600 rounded-full" />
               </div>
               <div className="absolute bottom-0 right-0 w-[35%] h-[50%] border-4 border-gray-800 rounded-full bg-transparent">
                 <div className="absolute inset-[20%] border-2 border-gray-600 rounded-full" />
               </div>
-              {/* Handlebars */}
               <div className="absolute top-[20%] right-[15%] w-[5%] h-[30%] bg-gray-700 rounded" />
             </div>
           </div>
@@ -743,24 +698,11 @@ export default function MiniGamePageContent() {
 
       case 'plane':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="relative w-full h-full">
-              {/* Plane body */}
               <div className="absolute top-[30%] left-[10%] right-[10%] h-[40%] bg-gradient-to-r from-blue-400 to-blue-600 rounded-full shadow-lg" />
-              {/* Wings */}
               <div className="absolute top-[10%] left-[30%] w-[40%] h-[80%] bg-gradient-to-b from-blue-300 to-blue-500 rounded-lg" />
-              {/* Tail */}
               <div className="absolute top-[20%] right-[5%] w-[20%] h-[60%] bg-gradient-to-b from-blue-400 to-blue-600 rounded" />
-              {/* Windows */}
               <div className="absolute top-[40%] left-[25%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
               <div className="absolute top-[40%] left-[40%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
               <div className="absolute top-[40%] left-[55%] w-[8%] h-[20%] bg-cyan-200/80 rounded-full" />
@@ -768,18 +710,23 @@ export default function MiniGamePageContent() {
           </div>
         );
 
+      case 'helicopter':
+        return (
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
+            <div className="relative w-full h-full">
+              <div className="absolute top-[30%] left-[20%] right-[10%] h-[50%] bg-gradient-to-r from-green-500 to-green-700 rounded-full" />
+              <div className="absolute top-[35%] left-[25%] w-[25%] h-[40%] bg-cyan-300/70 rounded-full" />
+              <div className="absolute top-[40%] right-0 w-[25%] h-[20%] bg-gradient-to-r from-green-600 to-green-800" />
+              <div className="absolute top-[30%] right-0 w-[5%] h-[40%] bg-gray-700" />
+              <div className="absolute top-[10%] left-[30%] right-[30%] h-[10%] bg-gray-800 rounded-full" />
+              <div className="absolute top-0 left-[48%] w-[4%] h-[30%] bg-gray-700" />
+            </div>
+          </div>
+        );
+
       case 'cactus':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="relative w-full h-full">
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[40%] h-full bg-gradient-to-t from-green-700 to-green-500 rounded-full shadow-lg shadow-green-500/30" />
               <div className="absolute bottom-[30%] left-0 w-[35%] h-[40%] bg-gradient-to-r from-green-700 to-green-500 rounded-full origin-bottom-right rotate-[-25deg]" />
@@ -790,43 +737,18 @@ export default function MiniGamePageContent() {
 
       case 'rock':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="w-full h-full bg-gradient-to-br from-gray-600 via-gray-500 to-gray-700 rounded-lg shadow-lg shadow-gray-500/20 transform rotate-2" />
           </div>
         );
 
       case 'spike':
         return (
-          <div
-            key={obstacle.id}
-            className="absolute z-20"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${widthPercent}%`,
-              height: `${heightPercent}%`,
-            }}
-          >
+          <div key={obstacle.id} className="absolute z-20" style={{ left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }}>
             <div className="w-full h-full flex items-end justify-center gap-[10%]">
               {[0, 1, 2].map(i => (
-                <div
-                  key={i}
-                  className="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[25px] border-l-transparent border-r-transparent border-b-red-500 drop-shadow-lg"
-                  style={{ 
-                    borderBottomWidth: `${heightPercent * 0.8}vh`,
-                    borderLeftWidth: `${widthPercent * 0.25}vw`,
-                    borderRightWidth: `${widthPercent * 0.25}vw`,
-                  }}
-                />
+                <div key={i} className="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[25px] border-l-transparent border-r-transparent border-b-red-500 drop-shadow-lg"
+                  style={{ borderBottomWidth: `${heightPercent * 0.8}vh`, borderLeftWidth: `${widthPercent * 0.25}vw`, borderRightWidth: `${widthPercent * 0.25}vw` }} />
               ))}
             </div>
           </div>
@@ -855,7 +777,6 @@ export default function MiniGamePageContent() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
-      {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
@@ -863,28 +784,18 @@ export default function MiniGamePageContent() {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-7xl">
-        {/* Hero Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 mb-4">
             <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="text-sm font-medium bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-              Endless Runner Challenge
-            </span>
+            <span className="text-sm font-medium bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Endless Runner Challenge</span>
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3">
-            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-              Neon Runner
-            </span>
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">Neon Runner</span>
           </h1>
 
           <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto">
-            Jump over obstacles and survive as long as possible! 
-            <span className="text-purple-400 font-semibold"> Earn XP</span> based on your score.
+            Jump over obstacles and survive as long as possible! <span className="text-purple-400 font-semibold"> Earn XP</span> based on your score.
           </p>
 
           <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">
@@ -896,322 +807,115 @@ export default function MiniGamePageContent() {
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main Game Area */}
           <div className="lg:col-span-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className="relative"
-            >
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-2xl blur opacity-30" />
 
               <Card className="relative bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden">
                 <CardContent className="p-0">
-                  <div 
-                    ref={gameContainerRef}
-                    id="game-container"
-                    className="relative w-full select-none bg-black"
-                    style={{ 
-                      aspectRatio: isFullscreen ? 'auto' : '2/1', 
-                      height: isFullscreen ? '100vh' : 'auto',
-                      maxHeight: isFullscreen ? '100vh' : '500px'
-                    }}
-                  >
-                    {/* Fullscreen Toggle Button */}
-                    <button
-                      onClick={toggleFullscreen}
-                      className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-lg border border-white/20 transition-all hover:scale-110"
-                      title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                    >
-                      {isFullscreen ? (
-                        <Minimize2 className="w-5 h-5 text-white" />
-                      ) : (
-                        <Maximize2 className="w-5 h-5 text-white" />
-                      )}
+                  <div ref={gameContainerRef} id="game-container" className="relative w-full select-none bg-black"
+                    style={{ aspectRatio: isFullscreen ? 'auto' : '2/1', height: isFullscreen ? '100vh' : 'auto', maxHeight: isFullscreen ? '100vh' : '500px' }}>
+
+                    <button onClick={toggleFullscreen} className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-lg border border-white/20 transition-all hover:scale-110">
+                      {isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}
                     </button>
 
-                    {/* Time of Day Indicator */}
                     <AnimatePresence mode="wait">
-                      <motion.div
-                        key={timeOfDay}
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        transition={{ duration: 0.5 }}
-                        className="absolute top-4 left-4 z-40 flex items-center gap-2"
-                      >
-                        <div 
-                          className="flex items-center gap-2 px-3 py-2 rounded-full border backdrop-blur-md"
-                          style={{
-                            backgroundColor: `${TIME_CONFIG[timeOfDay].overlayColor}40`,
-                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
-                            boxShadow: `0 0 20px ${TIME_CONFIG[timeOfDay].ambientLight}`,
-                          }}
-                        >
+                      <motion.div key={timeOfDay} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.5 }} className="absolute top-4 left-4 z-40 flex items-center gap-2">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-full border backdrop-blur-md"
+                          style={{ backgroundColor: `${TIME_CONFIG[timeOfDay].overlayColor}40`, borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`, boxShadow: `0 0 20px ${TIME_CONFIG[timeOfDay].ambientLight}` }}>
                           <TimeIcon className="w-5 h-5" style={{ color: TIME_CONFIG[timeOfDay].lineColor }} />
-                          <span className="text-sm font-bold capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
-                            {timeOfDay}
-                          </span>
-                          {cycleCount > 0 && (
-                            <span className="text-xs opacity-70" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
-                              (Cycle {cycleCount + 1})
-                            </span>
-                          )}
+                          <span className="text-sm font-bold capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>{timeOfDay}</span>
+                          {cycleCount > 0 && <span className="text-xs opacity-70" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>(Cycle {cycleCount + 1})</span>}
                         </div>
                       </motion.div>
                     </AnimatePresence>
 
-                    {/* Time Progress Bar */}
                     {gameState.isPlaying && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute top-16 left-4 z-30"
-                      >
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute top-16 left-4 z-30">
                         <div className="flex items-center gap-2">
                           <div className="w-32 h-1.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                            <motion.div
-                              className="h-full rounded-full"
-                              style={{ backgroundColor: TIME_CONFIG[timeOfDay].lineColor }}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${(timeProgress.current / timeProgress.max) * 100}%` }}
-                              transition={{ type: "spring", stiffness: 100 }}
-                            />
+                            <motion.div className="h-full rounded-full" style={{ backgroundColor: TIME_CONFIG[timeOfDay].lineColor }}
+                              initial={{ width: 0 }} animate={{ width: `${(timeProgress.current / timeProgress.max) * 100}%` }} transition={{ type: "spring", stiffness: 100 }} />
                           </div>
-                          <span className="text-xs opacity-60 capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>
-                            → {timeProgress.nextPhase}
-                          </span>
+                          <span className="text-xs opacity-60 capitalize" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>→ {timeProgress.nextPhase}</span>
                         </div>
                       </motion.div>
                     )}
 
-                    <canvas
-                      ref={canvasRef}
-                      width={GAME_WIDTH}
-                      height={GAME_HEIGHT}
-                      className="absolute inset-0 w-full h-full"
-                    />
+                    <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="absolute inset-0 w-full h-full" />
 
-                    {/* Ambient Light Overlay */}
-                    <motion.div
-                      key={timeOfDay}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: TIME_CONFIG[timeOfDay].overlayOpacity }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 1 }}
-                      className="absolute inset-0 pointer-events-none z-10"
-                      style={{ backgroundColor: TIME_CONFIG[timeOfDay].overlayColor }}
-                    />
+                    <motion.div key={timeOfDay} initial={{ opacity: 0 }} animate={{ opacity: TIME_CONFIG[timeOfDay].overlayOpacity }} exit={{ opacity: 0 }} transition={{ duration: 1 }}
+                      className="absolute inset-0 pointer-events-none z-10" style={{ backgroundColor: TIME_CONFIG[timeOfDay].overlayColor }} />
 
                     <div className="absolute inset-0 overflow-hidden">
-                      {/* Character */}
                       {(gameState.isPlaying || gameState.isGameOver) && (
-                        <motion.div
-                          className="absolute z-20"
-                          style={{
-                            left: `${(RUNNER_X / GAME_WIDTH) * 100}%`,
-                            top: `${(runnerY / GAME_HEIGHT) * 100}%`,
-                            width: `${(RUNNER_WIDTH / GAME_WIDTH) * 100}%`,
-                            height: `${(RUNNER_HEIGHT / GAME_HEIGHT) * 100}%`,
-                          }}
-                          animate={gameState.isPlaying && !isJumping ? { 
-                            scaleY: [1, 0.95, 1],
-                            y: [0, 2, 0]
-                          } : {}}
-                          transition={{ repeat: Infinity, duration: 0.15 }}
-                        >
-                          <img 
-                            src="/images/character-jump.png"
-                            alt="Runner"
-                            className="w-full h-full object-contain"
-                            style={{
-                              filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)`,
-                            }}
-                            draggable={false}
-                          />
+                        <motion.div className="absolute z-20" style={{ left: `${(RUNNER_X / GAME_WIDTH) * 100}%`, top: `${(runnerY / GAME_HEIGHT) * 100}%`, width: `${(RUNNER_WIDTH / GAME_WIDTH) * 100}%`, height: `${(RUNNER_HEIGHT / GAME_HEIGHT) * 100}%` }}
+                          animate={gameState.isPlaying && !isJumping ? { scaleY: [1, 0.95, 1], y: [0, 2, 0] } : {}} transition={{ repeat: Infinity, duration: 0.15 }}>
+                          <img src="/images/character-jump.png" alt="Runner" className="w-full h-full object-contain" style={{ filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)` }} draggable={false} />
                         </motion.div>
                       )}
 
                       {!gameState.isPlaying && !gameState.isGameOver && (
-                        <motion.div
-                          className="absolute z-20"
-                          style={{
-                            left: `${(RUNNER_X / GAME_WIDTH) * 100}%`,
-                            top: `${((GROUND_Y - RUNNER_HEIGHT) / GAME_HEIGHT) * 100}%`,
-                            width: `${(RUNNER_WIDTH / GAME_WIDTH) * 100}%`,
-                            height: `${(RUNNER_HEIGHT / GAME_HEIGHT) * 100}%`,
-                          }}
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ repeat: Infinity, duration: 1 }}
-                        >
-                          <img 
-                            src="/images/character-jump.png"
-                            alt="Runner"
-                            className="w-full h-full object-contain"
-                            style={{
-                              filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)`,
-                            }}
-                            draggable={false}
-                          />
+                        <motion.div className="absolute z-20" style={{ left: `${(RUNNER_X / GAME_WIDTH) * 100}%`, top: `${((GROUND_Y - RUNNER_HEIGHT) / GAME_HEIGHT) * 100}%`, width: `${(RUNNER_WIDTH / GAME_WIDTH) * 100}%`, height: `${(RUNNER_HEIGHT / GAME_HEIGHT) * 100}%` }}
+                          animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 1 }}>
+                          <img src="/images/character-jump.png" alt="Runner" className="w-full h-full object-contain" style={{ filter: `drop-shadow(0 0 15px ${TIME_CONFIG[timeOfDay].lineColor}80)` }} draggable={false} />
                         </motion.div>
                       )}
 
-                      {/* Obstacles - Now includes vehicles */}
                       {obstacles.map(renderObstacle)}
 
-                      {/* Particles */}
                       {particles.map(particle => (
-                        <div
-                          key={particle.id}
-                          className="absolute rounded-full pointer-events-none z-30"
-                          style={{
-                            left: `${(particle.x / GAME_WIDTH) * 100}%`,
-                            top: `${(particle.y / GAME_HEIGHT) * 100}%`,
-                            width: '6px',
-                            height: '6px',
-                            backgroundColor: particle.color,
-                            opacity: particle.life / 40,
-                            boxShadow: `0 0 6px ${particle.color}`,
-                          }}
-                        />
+                        <div key={particle.id} className="absolute rounded-full pointer-events-none z-30"
+                          style={{ left: `${(particle.x / GAME_WIDTH) * 100}%`, top: `${(particle.y / GAME_HEIGHT) * 100}%`, width: '6px', height: '6px', backgroundColor: particle.color, opacity: particle.life / 40, boxShadow: `0 0 6px ${particle.color}` }} />
                       ))}
 
-                      {/* Start Screen */}
                       <AnimatePresence>
                         {!gameState.isPlaying && !gameState.isGameOver && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-40"
-                          >
-                            <motion.div
-                              animate={{ scale: [1, 1.05, 1] }}
-                              transition={{ repeat: Infinity, duration: 2 }}
-                            >
-                              <h2 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                                Ready to Run?
-                              </h2>
+                          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-40">
+                            <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                              <h2 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Ready to Run?</h2>
                             </motion.div>
                             <p className="text-gray-400 mb-6 text-sm md:text-base">Jump over obstacles and earn XP!</p>
 
-                            <Button
-                              onClick={handleStartGame}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setIsButtonPressed(true);
-                              }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleStartGame(e);
-                              }}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-purple-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation"
-                              style={{ touchAction: 'manipulation' }}
-                            >
-                              <Play className="w-5 h-5 mr-2" />
-                              Start Game
+                            <Button onClick={handleStartGame} onTouchStart={(e) => { e.stopPropagation(); setIsButtonPressed(true); }} onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleStartGame(e); }}
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-purple-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation" style={{ touchAction: 'manipulation' }}>
+                              <Play className="w-5 h-5 mr-2" />Start Game
                             </Button>
                           </motion.div>
                         )}
                       </AnimatePresence>
 
-                      {/* Game Over Screen */}
                       <AnimatePresence>
                         {gameState.isGameOver && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-50"
-                          >
-                            <motion.div
-                              initial={{ scale: 0, rotate: -180 }}
-                              animate={{ scale: 1, rotate: 0 }}
-                              transition={{ type: "spring", stiffness: 200 }}
-                              className="text-5xl md:text-6xl mb-4"
-                            >
-                              💥
-                            </motion.div>
+                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-50">
+                            <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 200 }} className="text-5xl md:text-6xl mb-4">💥</motion.div>
                             <h2 className="text-3xl md:text-4xl font-bold mb-2 text-red-400">Game Over!</h2>
                             <p className="text-xl md:text-2xl text-white mb-2 font-bold">Score: {gameState.score}</p>
                             {gameState.score > gameState.highScore && (
-                              <motion.p 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="text-yellow-400 mb-4 flex items-center gap-2 font-semibold"
-                              >
-                                <Trophy className="w-5 h-5" />
-                                New High Score!
+                              <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-yellow-400 mb-4 flex items-center gap-2 font-semibold">
+                                <Trophy className="w-5 h-5" />New High Score!
                               </motion.p>
                             )}
 
-                            <Button
-                              onClick={handlePlayAgain}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setIsButtonPressed(true);
-                              }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePlayAgain(e);
-                              }}
-                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-cyan-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation"
-                              style={{ touchAction: 'manipulation' }}
-                            >
-                              <RotateCcw className="w-5 h-5 mr-2" />
-                              Play Again
+                            <Button onClick={handlePlayAgain} onTouchStart={(e) => { e.stopPropagation(); setIsButtonPressed(true); }} onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handlePlayAgain(e); }}
+                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-8 py-6 text-lg rounded-full shadow-lg shadow-cyan-500/25 transition-all hover:scale-105 active:scale-95 touch-manipulation" style={{ touchAction: 'manipulation' }}>
+                              <RotateCcw className="w-5 h-5 mr-2" />Play Again
                             </Button>
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
 
-                    {/* Score Overlay */}
                     {gameState.isPlaying && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-30"
-                      >
-                        <div 
-                          className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg"
-                          style={{ 
-                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
-                            boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}`
-                          }}
-                        >
-                          <div 
-                            className="text-xs uppercase tracking-wider font-semibold"
-                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
-                          >
-                            Score
-                          </div>
-                          <div className="text-2xl md:text-3xl font-bold text-white">
-                            {gameState.score}
-                          </div>
+                      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-30">
+                        <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg" style={{ borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`, boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}` }}>
+                          <div className="text-xs uppercase tracking-wider font-semibold" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>Score</div>
+                          <div className="text-2xl md:text-3xl font-bold text-white">{gameState.score}</div>
                         </div>
-                        <div 
-                          className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg"
-                          style={{ 
-                            borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`,
-                            boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}`
-                          }}
-                        >
-                          <div 
-                            className="text-xs uppercase tracking-wider font-semibold"
-                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
-                          >
-                            Speed
-                          </div>
-                          <div 
-                            className="text-2xl md:text-3xl font-bold"
-                            style={{ color: TIME_CONFIG[timeOfDay].lineColor }}
-                          >
-                            {gameState.speed.toFixed(1)}x
-                          </div>
+                        <div className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border shadow-lg" style={{ borderColor: `${TIME_CONFIG[timeOfDay].lineColor}60`, boxShadow: `0 0 15px ${TIME_CONFIG[timeOfDay].ambientLight}` }}>
+                          <div className="text-xs uppercase tracking-wider font-semibold" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>Speed</div>
+                          <div className="text-2xl md:text-3xl font-bold" style={{ color: TIME_CONFIG[timeOfDay].lineColor }}>{gameState.speed.toFixed(1)}x</div>
                         </div>
                       </motion.div>
                     )}
@@ -1220,13 +924,7 @@ export default function MiniGamePageContent() {
               </Card>
             </motion.div>
 
-            {/* Quick Stats Bar */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-4 grid grid-cols-3 gap-3"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-4 grid grid-cols-3 gap-3">
               <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-500/40 rounded-xl p-3 text-center shadow-lg shadow-purple-500/10">
                 <div className="text-purple-300 text-xs mb-1 uppercase tracking-wider font-semibold">Current</div>
                 <div className="text-xl md:text-2xl font-bold text-white">{gameState.score}</div>
@@ -1242,14 +940,8 @@ export default function MiniGamePageContent() {
             </motion.div>
           </div>
 
-          {/* Sidebar */}
           <div className="lg:col-span-4 space-y-4">
-            {/* Your Stats */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
               <Card className="bg-gray-900/70 border-purple-500/30 backdrop-blur-xl overflow-hidden shadow-xl shadow-purple-500/5">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -1285,20 +977,13 @@ export default function MiniGamePageContent() {
                       </div>
                       <span className="text-gray-300 text-sm font-medium">Games Played</span>
                     </div>
-                    <span className="text-2xl font-bold text-cyan-400">
-                      {Math.floor(totalXp / 125) || 0}
-                    </span>
+                    <span className="text-2xl font-bold text-cyan-400">{Math.floor(totalXp / 125) || 0}</span>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* XP Rewards */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
               <Card className="bg-gray-900/70 border-green-500/30 backdrop-blur-xl overflow-hidden shadow-xl shadow-green-500/5">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -1309,11 +994,9 @@ export default function MiniGamePageContent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {[
-                    { score: 100, xp: 50, color: "from-gray-600 to-gray-500", icon: Star, label: "Score 100+" },
+                  {[{ score: 100, xp: 50, color: "from-gray-600 to-gray-500", icon: Star, label: "Score 100+" },
                     { score: 500, xp: 100, color: "from-yellow-600 to-orange-500", icon: Trophy, label: "Score 500+" },
-                    { score: 1000, xp: 200, color: "from-purple-600 to-pink-500", icon: Award, label: "Score 1000+" },
-                  ].map((reward, idx) => (
+                    { score: 1000, xp: 200, color: "from-purple-600 to-pink-500", icon: Award, label: "Score 1000+" }].map((reward, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 group hover:bg-white/10 transition-all hover:border-green-500/30">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${reward.color} flex items-center justify-center shadow-lg opacity-80 group-hover:opacity-100 transition-all group-hover:scale-110`}>
@@ -1326,10 +1009,7 @@ export default function MiniGamePageContent() {
                   ))}
 
                   <div className="flex justify-between items-center p-3 rounded-xl border border-green-500/30 bg-green-500/10">
-                    <span className="text-gray-300 text-sm flex items-center gap-2 font-medium">
-                      <TrendingUp className="w-4 h-4 text-green-400" />
-                      Per 10 points
-                    </span>
+                    <span className="text-gray-300 text-sm flex items-center gap-2 font-medium"><TrendingUp className="w-4 h-4 text-green-400" />Per 10 points</span>
                     <span className="text-green-400 font-bold text-sm">+1 XP</span>
                   </div>
 
@@ -1341,12 +1021,7 @@ export default function MiniGamePageContent() {
               </Card>
             </motion.div>
 
-            {/* Quest Target */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-            >
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
               <Card className="bg-gray-900/70 border-orange-500/30 backdrop-blur-xl overflow-hidden relative shadow-xl shadow-orange-500/5">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
 
@@ -1362,12 +1037,8 @@ export default function MiniGamePageContent() {
                   <p className="text-gray-300 text-sm mb-3 font-medium">Score 500+ points in a single run!</p>
 
                   <div className="relative h-4 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                    <motion.div
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, (gameState.score / 500) * 100)}%` }}
-                      transition={{ type: "spring", stiffness: 100 }}
-                    />
+                    <motion.div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-full"
+                      initial={{ width: 0 }} animate={{ width: `${Math.min(100, (gameState.score / 500) * 100)}%` }} transition={{ type: "spring", stiffness: 100 }} />
                   </div>
 
                   <div className="flex justify-between mt-2">
@@ -1381,21 +1052,15 @@ export default function MiniGamePageContent() {
         </div>
       </div>
 
-      {/* XP Popup */}
       <Dialog open={showXpPopup} onOpenChange={setShowXpPopup}>
         <DialogContent className="bg-gray-900/95 border-purple-500/30 backdrop-blur-xl text-white max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
-              <Sparkles className="w-6 h-6 text-yellow-400" />
-              Game Complete!
+              <Sparkles className="w-6 h-6 text-yellow-400" />Game Complete!
             </DialogTitle>
           </DialogHeader>
           <div className="text-center py-6">
-            <motion.div 
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2"
-            >
+            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
               +{xpEarned} XP
             </motion.div>
             <p className="text-gray-400 text-sm">Earned from your run!</p>
@@ -1411,10 +1076,7 @@ export default function MiniGamePageContent() {
               </div>
             </div>
 
-            <Button
-              onClick={() => setShowXpPopup(false)}
-              className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-3 rounded-full shadow-lg shadow-purple-500/25"
-            >
+            <Button onClick={() => setShowXpPopup(false)} className="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-8 py-3 rounded-full shadow-lg shadow-purple-500/25">
               Awesome!
             </Button>
           </div>
