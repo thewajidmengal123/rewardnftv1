@@ -67,6 +67,8 @@ const BASE_SPEED = 6;
 const MAX_SPEED = 18;
 const SPEED_INCREMENT = 0.003;
 const PHASE_DURATION = 3000;
+const MIN_OBSTACLE_GAP = 300; // Fixed minimum gap
+const MAX_OBSTACLE_GAP = 600; // Fixed maximum gap
 
 const TIME_CONFIG: Record<TimeOfDay, {
   skyGradient: string[];
@@ -150,6 +152,8 @@ export default function MiniGamePageContent() {
   const gameLoopRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
   const jumpPressedRef = useRef<boolean>(false);
+  const lastObstacleXRef = useRef<number>(GAME_WIDTH + 200);
+  const nextGapRef = useRef<number>(MIN_OBSTACLE_GAP + Math.random() * (MAX_OBSTACLE_GAP - MIN_OBSTACLE_GAP));
 
   useEffect(() => {
     const saved = localStorage.getItem('runnerHighScore');
@@ -260,6 +264,8 @@ export default function MiniGamePageContent() {
     setObstacles([]);
     setParticles([]);
     obstacleIdRef.current = 0;
+    lastObstacleXRef.current = GAME_WIDTH + 200;
+    nextGapRef.current = MIN_OBSTACLE_GAP + Math.random() * (MAX_OBSTACLE_GAP - MIN_OBSTACLE_GAP);
     lastTimeRef.current = performance.now();
     setIsButtonPressed(false);
     setTimeOfDay('morning');
@@ -319,14 +325,17 @@ export default function MiniGamePageContent() {
 
     const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
-      x: GAME_WIDTH + 50 + Math.random() * 80,
+      x: GAME_WIDTH + 50,
       y: obstacleY,
       width: obstacleWidth,
       height: obstacleHeight,
       type,
     };
 
-    setObstacles(prev => [...prev, obstacle]);
+    lastObstacleXRef.current = obstacle.x;
+    nextGapRef.current = MIN_OBSTACLE_GAP + Math.random() * (MAX_OBSTACLE_GAP - MIN_OBSTACLE_GAP);
+
+    return obstacle;
   }, []);
 
   const gameOver = useCallback(() => {
@@ -410,6 +419,7 @@ export default function MiniGamePageContent() {
       lastTimeRef.current = currentTime;
       const timeScale = deltaTime / 16.67;
 
+      // Update runner physics
       setRunnerY(prev => {
         let newY = prev + runnerVy * timeScale;
         let newVy = runnerVy + GRAVITY * timeScale;
@@ -424,29 +434,36 @@ export default function MiniGamePageContent() {
         return newY;
       });
 
+      // Update obstacles and spawn new ones
       setObstacles(prev => {
-        const newObstacles = prev
+        // Move existing obstacles
+        const movedObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed * timeScale }))
           .filter(obs => obs.x > -180);
 
-        const lastObs = newObstacles[newObstacles.length - 1];
-        const minGap = 140 + Math.random() * 120;
-
-        if (!lastObs || lastObs.x < GAME_WIDTH - minGap) {
-          if (Math.random() < 0.045 + gameState.speed * 0.002) {
-            spawnObstacle();
+        // Check if we should spawn a new obstacle
+        const rightmostObstacle = movedObstacles[movedObstacles.length - 1];
+        const rightmostX = rightmostObstacle ? rightmostObstacle.x : lastObstacleXRef.current;
+        
+        // Only spawn if enough gap has passed
+        if (GAME_WIDTH - rightmostX >= nextGapRef.current) {
+          const newObstacle = spawnObstacle();
+          if (newObstacle) {
+            movedObstacles.push(newObstacle);
           }
         }
 
-        return newObstacles;
+        return movedObstacles;
       });
 
+      // Update particles
       setParticles(prev => 
         prev
           .map(p => ({ ...p, x: p.x + p.vx * timeScale, y: p.y + p.vy * timeScale, life: p.life - 1 * timeScale }))
           .filter(p => p.life > 0)
       );
 
+      // Update game state
       setGameState(prev => ({
         ...prev,
         score: prev.score + 1,
