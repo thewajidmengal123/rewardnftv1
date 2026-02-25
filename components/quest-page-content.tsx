@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import Link from "next/link"
 
 // FIREBASE IMPORTS
 import { 
@@ -85,7 +86,7 @@ interface Quest {
   isCustom?: boolean
 }
 
-type FilterType = "all" | "social" | "gaming" | "daily"
+type FilterType = "all" | "social" | "gaming" | "daily" | "bounties"
 
 // ==========================================
 // MAIN COMPONENT
@@ -175,6 +176,7 @@ export function QuestPageContent() {
   // FILTER QUESTS
   const getFilteredQuests = useCallback((quests: any[]) => {
     if (activeFilter === "all") return quests
+    if (activeFilter === "bounties") return [] // Bounties alag page pe hain
     return quests.filter(quest => {
       const type = quest.requirements?.type || ""
       switch (activeFilter) {
@@ -630,6 +632,7 @@ export function QuestPageContent() {
                 { id: "social", label: "Social", icon: Users },
                 { id: "gaming", label: "Gaming", icon: Gamepad2 },
                 { id: "daily", label: "Daily", icon: Calendar },
+                { id: "bounties", label: "Bounties", icon: Trophy },
               ].map((filter) => (
                 <button
                   key={filter.id}
@@ -646,25 +649,62 @@ export function QuestPageContent() {
               ))}
             </div>
 
-            {/* One-Time Quests */}
-            <div className="mb-12">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <Star className="w-5 h-5 text-white" />
+            {/* Bounties Section - NEW */}
+            {(activeFilter === "all" || activeFilter === "bounties") && (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+                      <Trophy className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Bounties</h2>
+                      <p className="text-gray-500 text-sm">High-value tasks with big rewards</p>
+                    </div>
+                  </div>
+                  <Link href="/quests/bounties">
+                    <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10">
+                      View All <ExternalLink className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
                 </div>
-                <h2 className="text-2xl font-bold text-white">One-Time Quests</h2>
-                <span className="text-gray-500 text-sm">({filteredOneTime.length})</span>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/50 rounded-2xl p-6 border border-purple-500/30 text-center">
+                    <Trophy className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-white mb-2">Explore Bounties</h3>
+                    <p className="text-gray-400 mb-4">Complete high-value tasks and earn exclusive rewards</p>
+                    <Link href="/quests/bounties">
+                      <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
+                        Browse Bounties
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredOneTime.map((quest) => (
-                  <QuestCard key={quest.id} quest={quest} />
-                ))}
+            {/* One-Time Quests */}
+            {activeFilter !== "bounties" && (
+              <div className="mb-12">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <Star className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">One-Time Quests</h2>
+                  <span className="text-gray-500 text-sm">({filteredOneTime.length})</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {filteredOneTime.map((quest) => (
+                    <QuestCard key={quest.id} quest={quest} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Daily Quests */}
-            {activeFilter !== "social" && activeFilter !== "gaming" && (
+            {activeFilter !== "social" && activeFilter !== "gaming" && activeFilter !== "bounties" && (
               <div className="mb-12">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
