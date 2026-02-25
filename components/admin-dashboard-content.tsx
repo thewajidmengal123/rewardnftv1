@@ -6,14 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle, RefreshCw } from "lucide-react"
+import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle, RefreshCw, Trophy } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { isAdminWallet } from "@/config/admin"
 import { toast } from "@/components/ui/use-toast"
 import { getExplorerUrl } from "@/config/solana"
-
-
 
 export function AdminDashboardContent() {
   const { connected, publicKey } = useWallet()
@@ -510,7 +508,7 @@ export function AdminDashboardContent() {
 
       {/* Comprehensive Admin Data Tabs */}
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="w-full bg-white/10 mb-6 grid grid-cols-6">
+        <TabsList className="w-full bg-white/10 mb-6 grid grid-cols-7">
           <TabsTrigger value="users" className="data-[state=active]:bg-white/20 text-white">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -526,6 +524,10 @@ export function AdminDashboardContent() {
           <TabsTrigger value="quests" className="data-[state=active]:bg-white/20 text-white">
             <Activity className="w-4 h-4 mr-2" />
             Quests & XP
+          </TabsTrigger>
+          <TabsTrigger value="bounties" className="data-[state=active]:bg-white/20 text-white">
+            <Trophy className="w-4 h-4 mr-2" />
+            Bounties
           </TabsTrigger>
           <TabsTrigger value="transactions" className="data-[state=active]:bg-white/20 text-white">
             <Coins className="w-4 h-4 mr-2" />
@@ -897,6 +899,52 @@ export function AdminDashboardContent() {
                     </table>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Bounties Tab - NEW */}
+        <TabsContent value="bounties" className="mt-0">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Bounties Management</CardTitle>
+                <Button
+                  onClick={() => window.location.href = "/admin/bounties"}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Manage Bounties
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 mb-4">
+                Create and manage bounties. View submissions and approve/reject work.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-white/5 border-white/10 p-4">
+                  <div className="text-center">
+                    <Trophy className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                    <p className="text-lg font-bold text-white">Active Bounties</p>
+                    <p className="text-sm text-gray-400">Create new bounties</p>
+                  </div>
+                </Card>
+                <Card className="bg-white/5 border-white/10 p-4">
+                  <div className="text-center">
+                    <RefreshCw className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                    <p className="text-lg font-bold text-white">Pending Review</p>
+                    <p className="text-sm text-gray-400">Review submissions</p>
+                  </div>
+                </Card>
+                <Card className="bg-white/5 border-white/10 p-4">
+                  <div className="text-center">
+                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                    <p className="text-lg font-bold text-white">Approved</p>
+                    <p className="text-sm text-gray-400">Completed bounties</p>
+                  </div>
+                </Card>
               </div>
             </CardContent>
           </Card>
