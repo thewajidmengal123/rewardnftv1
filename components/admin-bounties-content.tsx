@@ -72,6 +72,9 @@ export function AdminBountiesContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"bounties" | "submissions">("bounties")
   const [searchTerm, setSearchTerm] = useState("")
+  
+  // ✅ ADDED: activeFilter state
+  const [activeFilter, setActiveFilter] = useState("all")
 
   const isAdmin = publicKey?.toString() === ADMIN_WALLET
 
@@ -256,40 +259,44 @@ export function AdminBountiesContent() {
           </Button>
         </div>
 
-   {/* Bounties Section - NEW */}
-{(activeFilter === "all" || activeFilter === "bounties") && (
-  <div className="mb-12">
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
-          <Trophy className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-white">Bounties</h2>
-          <p className="text-gray-500 text-sm">High-value tasks with big rewards</p>
-        </div>
-      </div>
-      <Link href="/quests/bounties">
-        <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10">
-          View All <ExternalLink className="w-4 h-4 ml-2" />
-        </Button>
-      </Link>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/50 rounded-2xl p-6 border border-purple-500/30 text-center">
-        <Trophy className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-white mb-2">Explore Bounties</h3>
-        <p className="text-gray-400 mb-4">Complete high-value tasks and earn exclusive rewards</p>
-        <Link href="/quests/bounties">
-          <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
-            Browse Bounties
-          </Button>
-        </Link>
-      </div>
-    </div>
-  </div>
-)}
+        {/* Bounties Tab */}
+        {activeTab === "bounties" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredBounties.map((bounty) => (
+              <div key={bounty.id} className="bg-gray-900/50 border border-gray-700 rounded-xl p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-white">{bounty.title}</h3>
+                    <p className="text-gray-400 text-sm mt-1 line-clamp-2">{bounty.description}</p>
+                  </div>
+                  <Badge className={`${
+                    bounty.difficulty === "easy" ? "bg-green-500" :
+                    bounty.difficulty === "medium" ? "bg-yellow-500" :
+                    "bg-red-500"
+                  } text-white`}>
+                    {bounty.difficulty}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center gap-2 text-yellow-400 mb-4">
+                  <Trophy className="w-4 h-4" />
+                  <span className="font-bold">{bounty.reward}</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => handleDeleteBounty(bounty.id)}
+                    variant="outline"
+                    className="border-red-500 text-red-400 hover:bg-red-500/10"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Submissions Tab */}
         {activeTab === "submissions" && (
@@ -317,9 +324,9 @@ export function AdminBountiesContent() {
                   href={sub.link} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline flex items-center gap-2 mb-4 p-3 bg-gray-800/50 rounded-lg"
+                  className="text-blue-400 hover:underline flex items-center gap-2 mb-4 p-3 bg-gray-800/50 rounded-lg break-all"
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4 flex-shrink-0" />
                   {sub.link}
                 </a>
 
