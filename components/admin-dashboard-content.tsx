@@ -6,20 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Download, Users, Coins, Disc, TrendingUp, Shield, Database, Activity, AlertTriangle, RefreshCw, Trophy } from "lucide-react"
+import { 
+  Search, 
+  Download, 
+  Users, 
+  Coins, 
+  Disc, 
+  TrendingUp, 
+  Shield, 
+  Database, 
+  Activity, 
+  AlertTriangle, 
+  RefreshCw, 
+  Trophy,
+  CheckCircle
+} from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 import { isAdminWallet } from "@/config/admin"
 import { toast } from "@/components/ui/use-toast"
 import { getExplorerUrl } from "@/config/solana"
-
-export function AdminDashboardContent() {
-  const { connected, publicKey } = useWallet()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [adminData, setAdminData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [realTimeStats, setRealTimeStats] = useState<any>(null)
-  const [questCount, setQuestCount] = useState<number | null>(null)
 
   // Check if current wallet is admin
   const isAdmin = isAdminWallet(publicKey?.toString())
