@@ -61,11 +61,11 @@ export function BountiesPageContent() {
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [submissionLink, setSubmissionLink] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [hasNFT, setHasNFT] = useState(false) // Default false - NFT REQUIRED
+  const [hasNFT, setHasNFT] = useState(false)
 
   const walletAddress = publicKey?.toString()
 
-  // NFT CHECK - Required for submission
+  // ✅ NFT CHECK - Fixed
   useEffect(() => {
     if (!walletAddress) {
       setHasNFT(false)
@@ -74,17 +74,20 @@ export function BountiesPageContent() {
     
     const checkNFT = async () => {
       try {
-        // Method 1: Direct query
-        const q = query(collection(db, "nfts"), where("ownerWallet", "==", walletAddress))
+        // Method 1: Direct query with exact match
+        const q = query(
+          collection(db, "nfts"), 
+          where("ownerWallet", "==", walletAddress)
+        )
         const snapshot = await getDocs(q)
         
         if (!snapshot.empty) {
-          setHasNFT(true)
           console.log("✅ NFT found")
+          setHasNFT(true)
           return
         }
         
-        // Method 2: Case-insensitive check
+        // Method 2: Get all and check case-insensitive
         const allNfts = await getDocs(collection(db, "nfts"))
         const walletLower = walletAddress.toLowerCase()
         
@@ -92,8 +95,8 @@ export function BountiesPageContent() {
           const data = doc.data()
           const owner = (data.ownerWallet || "").toLowerCase()
           if (owner === walletLower) {
-            setHasNFT(true)
             console.log("✅ NFT found (case-insensitive)")
+            setHasNFT(true)
             return
           }
         }
@@ -227,7 +230,6 @@ export function BountiesPageContent() {
     )
   }
 
-  // Filter active bounties only
   const activeBounties = bounties.filter(b => b.isActive !== false)
 
   return (
@@ -277,7 +279,7 @@ export function BountiesPageContent() {
             />
           </div>
 
-          {/* NFT REQUIRED BANNER */}
+          {/* NFT Required Banner */}
           {!hasNFT && (
             <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-4">
               <Wallet className="w-8 h-8 text-red-400" />
