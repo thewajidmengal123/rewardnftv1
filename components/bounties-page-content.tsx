@@ -65,7 +65,7 @@ export function BountiesPageContent() {
 
   const walletAddress = publicKey?.toString()
 
-  // FIX 1: Better NFT detection with debug
+  // FIX: NFT Detection with case-insensitive search
   useEffect(() => {
     if (!walletAddress) {
       setHasNFT(false)
@@ -74,45 +74,51 @@ export function BountiesPageContent() {
     
     const checkNFT = async () => {
       try {
-        console.log("🔍 Checking NFT for wallet:", walletAddress)
+        console.log("🔍 Checking NFT for:", walletAddress)
         
-        // Try multiple query approaches
-        let snapshot = await getDocs(
-          query(collection(db, "nfts"), where("ownerWallet", "==", walletAddress))
+        // Method 1: Direct query
+        const q = query(
+          collection(db, "nfts"), 
+          where("ownerWallet", "==", walletAddress)
         )
+        const snapshot = await getDocs(q)
         
-        // If not found, try case-insensitive search
-        if (snapshot.empty) {
-          console.log("🔍 Trying case-insensitive search...")
-          const allNfts = await getDocs(collection(db, "nfts"))
-          const found = allNfts.docs.find(doc => {
-            const data = doc.data()
-            return data.ownerWallet?.toLowerCase() === walletAddress.toLowerCase()
-          })
+        if (!snapshot.empty) {
+          console.log("✅ NFT found (direct match)")
+          setHasNFT(true)
+          return
+        }
+        
+        // Method 2: Case-insensitive check
+        const allNfts = await getDocs(collection(db, "nfts"))
+        const walletLower = walletAddress.toLowerCase()
+        
+        for (const doc of allNfts.docs) {
+          const data = doc.data()
+          const ownerWallet = (data.ownerWallet || "").toLowerCase()
           
-          if (found) {
-            console.log("✅ NFT found (case-insensitive):", found.id)
+          if (ownerWallet === walletLower) {
+            console.log("✅ NFT found (case-insensitive):", doc.id)
             setHasNFT(true)
             return
           }
         }
         
-        console.log("📊 NFT query result:", snapshot.size, "documents")
-        snapshot.forEach(doc => {
-          console.log("📝 NFT doc:", doc.id, doc.data())
-        })
+        console.log("❌ No NFT found")
+        // TEMPORARY: Allow all users to submit (remove this line after fixing NFT data)
+        // setHasNFT(true)
         
-        setHasNFT(!snapshot.empty)
       } catch (err) {
-        console.error("❌ Error checking NFT:", err)
-        // If error, assume true to let user see bounties
+        console.error("❌ Error:", err)
+        // If error, allow submission (fail-safe)
         setHasNFT(true)
       }
     }
+    
     checkNFT()
   }, [walletAddress])
 
-  // FIX 2: Fetch ALL bounties (remove isActive filter temporarily)
+  // Fetch bounties
   useEffect(() => {
     setLoading(true)
     
@@ -124,19 +130,15 @@ export function BountiesPageContent() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const bountyList: Bounty[] = []
       snapshot.forEach((doc) => {
-        const data = doc.data()
         bountyList.push({ 
           id: doc.id, 
-          ...data,
-          // Default isActive to true if not set
-          isActive: data.isActive !== false
+          ...doc.data()
         } as Bounty)
       })
       setBounties(bountyList)
       setLoading(false)
-      console.log("✅ Loaded bounties:", bountyList.length)
     }, (error) => {
-      console.error("❌ Error fetching bounties:", error)
+      console.error("Error:", error)
       setLoading(false)
     })
 
@@ -233,6 +235,9 @@ export function BountiesPageContent() {
     )
   }
 
+  // FIX: Filter only active bounties
+  const activeBounties = bounties.filter(b => b.isActive !== false)
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white pb-20">
       <main className="relative z-10 pt-12 px-4 sm:px-6 lg:px-8">
@@ -257,7 +262,7 @@ export function BountiesPageContent() {
             <StatCard 
               icon={Trophy} 
               label="Active Bounties" 
-              value={bounties.length}
+              value={activeBounties.length}
               gradient="from-orange-400 to-red-500"
             />
             <StatCard 
@@ -280,9 +285,14 @@ export function BountiesPageContent() {
             />
           </div>
 
-          {/* DEBUG INFO - Console check karo */}
+          {/* DEBUG INFO */}
           <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
-            <p>Debug: Wallet: {walletAddress?.slice(0, 8)}... | NFT: {hasNFT ? "✅" : "❌"} | Bounties: {bounties.length}</p>
+            <p>
+              Debug: Wallet: {walletAddress?.slice(0, 8)}... | 
+              NFT: {hasNFT ? "✅" : "❌"} | 
+              Total Bounties: {bounties.length} | 
+              Active: {activeBounties.length}
+            </p>
           </div>
 
           {!hasNFT && (
@@ -299,7 +309,7 @@ export function BountiesPageContent() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bounties.map((bounty) => {
+            {activeBounties.map((bounty) => {
               const status = getSubmissionStatus(bounty.id)
               
               return (
@@ -364,7 +374,7 @@ export function BountiesPageContent() {
             })}
           </div>
 
-          {bounties.length === 0 && (
+          {activeBounties.length === 0 && (
             <div className="text-center py-20">
               <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-gray-400">No Active Bounties</h3>
