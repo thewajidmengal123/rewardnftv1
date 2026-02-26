@@ -61,15 +61,53 @@ export function BountiesPageContent() {
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [submissionLink, setSubmissionLink] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  
-  // FIX: Always true for now - minting system separate issue
-  const [hasNFT, setHasNFT] = useState(true)
+  const [hasNFT, setHasNFT] = useState(false) // Default false - NFT REQUIRED
 
   const walletAddress = publicKey?.toString()
 
-  // FIX: Skip NFT check - assume user has NFT
+  // NFT CHECK - Required for submission
   useEffect(() => {
-    setHasNFT(true)
+    if (!walletAddress) {
+      setHasNFT(false)
+      return
+    }
+    
+    const checkNFT = async () => {
+      try {
+        // Method 1: Direct query
+        const q = query(collection(db, "nfts"), where("ownerWallet", "==", walletAddress))
+        const snapshot = await getDocs(q)
+        
+        if (!snapshot.empty) {
+          setHasNFT(true)
+          console.log("✅ NFT found")
+          return
+        }
+        
+        // Method 2: Case-insensitive check
+        const allNfts = await getDocs(collection(db, "nfts"))
+        const walletLower = walletAddress.toLowerCase()
+        
+        for (const doc of allNfts.docs) {
+          const data = doc.data()
+          const owner = (data.ownerWallet || "").toLowerCase()
+          if (owner === walletLower) {
+            setHasNFT(true)
+            console.log("✅ NFT found (case-insensitive)")
+            return
+          }
+        }
+        
+        console.log("❌ No NFT found")
+        setHasNFT(false)
+        
+      } catch (err) {
+        console.error("Error:", err)
+        setHasNFT(false)
+      }
+    }
+    
+    checkNFT()
   }, [walletAddress])
 
   // Fetch bounties
@@ -189,7 +227,7 @@ export function BountiesPageContent() {
     )
   }
 
-  // Filter active bounties
+  // Filter active bounties only
   const activeBounties = bounties.filter(b => b.isActive !== false)
 
   return (
@@ -238,6 +276,20 @@ export function BountiesPageContent() {
               gradient="from-emerald-400 to-teal-500"
             />
           </div>
+
+          {/* NFT REQUIRED BANNER */}
+          {!hasNFT && (
+            <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-4">
+              <Wallet className="w-8 h-8 text-red-400" />
+              <div>
+                <p className="text-red-400 font-medium">NFT Required</p>
+                <p className="text-gray-400 text-sm">You need to mint RewardNFT to submit bounties</p>
+              </div>
+              <Link href="/mint" className="ml-auto">
+                <Button className="bg-red-500 hover:bg-red-600">Mint NFT</Button>
+              </Link>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeBounties.map((bounty) => {
@@ -377,13 +429,22 @@ export function BountiesPageContent() {
                     <p className="text-white font-medium">Already Submitted</p>
                     <p className="text-gray-400 text-sm">Status: {getSubmissionStatus(selectedBounty.id)}</p>
                   </div>
-                ) : (
+                ) : hasNFT ? (
                   <Button 
                     onClick={() => setSubmitModalOpen(true)}
                     className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-6 text-lg rounded-xl"
                   >
                     Submit Work <ExternalLink className="w-5 h-5 ml-2" />
                   </Button>
+                ) : (
+                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+                    <Wallet className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-red-400 font-medium">NFT Required</p>
+                    <p className="text-gray-400 text-sm mb-4">Mint RewardNFT to submit bounties</p>
+                    <Link href="/mint">
+                      <Button className="bg-red-500 hover:bg-red-600">Mint NFT</Button>
+                    </Link>
+                  </div>
                 )}
               </div>
             </>
