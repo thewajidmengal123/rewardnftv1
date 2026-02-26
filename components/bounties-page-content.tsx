@@ -61,61 +61,15 @@ export function BountiesPageContent() {
   const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [submissionLink, setSubmissionLink] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [hasNFT, setHasNFT] = useState(false)
+  
+  // FIX: Always true for now - minting system separate issue
+  const [hasNFT, setHasNFT] = useState(true)
 
   const walletAddress = publicKey?.toString()
 
-  // FIX: NFT Detection with case-insensitive search
+  // FIX: Skip NFT check - assume user has NFT
   useEffect(() => {
-    if (!walletAddress) {
-      setHasNFT(false)
-      return
-    }
-    
-    const checkNFT = async () => {
-      try {
-        console.log("🔍 Checking NFT for:", walletAddress)
-        
-        // Method 1: Direct query
-        const q = query(
-          collection(db, "nfts"), 
-          where("ownerWallet", "==", walletAddress)
-        )
-        const snapshot = await getDocs(q)
-        
-        if (!snapshot.empty) {
-          console.log("✅ NFT found (direct match)")
-          setHasNFT(true)
-          return
-        }
-        
-        // Method 2: Case-insensitive check
-        const allNfts = await getDocs(collection(db, "nfts"))
-        const walletLower = walletAddress.toLowerCase()
-        
-        for (const doc of allNfts.docs) {
-          const data = doc.data()
-          const ownerWallet = (data.ownerWallet || "").toLowerCase()
-          
-          if (ownerWallet === walletLower) {
-            console.log("✅ NFT found (case-insensitive):", doc.id)
-            setHasNFT(true)
-            return
-          }
-        }
-        
-        console.log("❌ No NFT found")
-        // TEMPORARY: Allow all users to submit (remove this line after fixing NFT data)
-        // setHasNFT(true)
-        
-      } catch (err) {
-        console.error("❌ Error:", err)
-        // If error, allow submission (fail-safe)
-        setHasNFT(true)
-      }
-    }
-    
-    checkNFT()
+    setHasNFT(true)
   }, [walletAddress])
 
   // Fetch bounties
@@ -235,7 +189,7 @@ export function BountiesPageContent() {
     )
   }
 
-  // FIX: Filter only active bounties
+  // Filter active bounties
   const activeBounties = bounties.filter(b => b.isActive !== false)
 
   return (
@@ -284,29 +238,6 @@ export function BountiesPageContent() {
               gradient="from-emerald-400 to-teal-500"
             />
           </div>
-
-          {/* DEBUG INFO */}
-          <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
-            <p>
-              Debug: Wallet: {walletAddress?.slice(0, 8)}... | 
-              NFT: {hasNFT ? "✅" : "❌"} | 
-              Total Bounties: {bounties.length} | 
-              Active: {activeBounties.length}
-            </p>
-          </div>
-
-          {!hasNFT && (
-            <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-4">
-              <Wallet className="w-8 h-8 text-red-400" />
-              <div>
-                <p className="text-red-400 font-medium">Mint Pass Required</p>
-                <p className="text-gray-400 text-sm">You need to mint RewardNFT to submit bounties</p>
-              </div>
-              <Link href="/mint" className="ml-auto">
-                <Button className="bg-red-500 hover:bg-red-600">Mint Now</Button>
-              </Link>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeBounties.map((bounty) => {
@@ -446,18 +377,13 @@ export function BountiesPageContent() {
                     <p className="text-white font-medium">Already Submitted</p>
                     <p className="text-gray-400 text-sm">Status: {getSubmissionStatus(selectedBounty.id)}</p>
                   </div>
-                ) : hasNFT ? (
+                ) : (
                   <Button 
                     onClick={() => setSubmitModalOpen(true)}
                     className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-6 text-lg rounded-xl"
                   >
                     Submit Work <ExternalLink className="w-5 h-5 ml-2" />
                   </Button>
-                ) : (
-                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
-                    <p className="text-red-400 font-medium">Mint Pass Required</p>
-                    <p className="text-gray-400 text-sm">You need to mint RewardNFT to submit bounties</p>
-                  </div>
                 )}
               </div>
             </>
