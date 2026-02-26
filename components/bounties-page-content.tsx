@@ -65,36 +65,78 @@ export function BountiesPageContent() {
 
   const walletAddress = publicKey?.toString()
 
+  // FIX 1: Better NFT detection with debug
   useEffect(() => {
-    if (!walletAddress) return
+    if (!walletAddress) {
+      setHasNFT(false)
+      return
+    }
     
     const checkNFT = async () => {
-      const q = query(collection(db, "nfts"), where("ownerWallet", "==", walletAddress))
-      const snapshot = await getDocs(q)
-      setHasNFT(!snapshot.empty)
+      try {
+        console.log("🔍 Checking NFT for wallet:", walletAddress)
+        
+        // Try multiple query approaches
+        let snapshot = await getDocs(
+          query(collection(db, "nfts"), where("ownerWallet", "==", walletAddress))
+        )
+        
+        // If not found, try case-insensitive search
+        if (snapshot.empty) {
+          console.log("🔍 Trying case-insensitive search...")
+          const allNfts = await getDocs(collection(db, "nfts"))
+          const found = allNfts.docs.find(doc => {
+            const data = doc.data()
+            return data.ownerWallet?.toLowerCase() === walletAddress.toLowerCase()
+          })
+          
+          if (found) {
+            console.log("✅ NFT found (case-insensitive):", found.id)
+            setHasNFT(true)
+            return
+          }
+        }
+        
+        console.log("📊 NFT query result:", snapshot.size, "documents")
+        snapshot.forEach(doc => {
+          console.log("📝 NFT doc:", doc.id, doc.data())
+        })
+        
+        setHasNFT(!snapshot.empty)
+      } catch (err) {
+        console.error("❌ Error checking NFT:", err)
+        // If error, assume true to let user see bounties
+        setHasNFT(true)
+      }
     }
     checkNFT()
   }, [walletAddress])
 
-  // MAIN FIX: Proper bounty fetching
+  // FIX 2: Fetch ALL bounties (remove isActive filter temporarily)
   useEffect(() => {
     setLoading(true)
     
     const q = query(
-      collection(db, "bounties"), 
-      where("isActive", "==", true),
+      collection(db, "bounties"),
       orderBy("createdAt", "desc")
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const bountyList: Bounty[] = []
       snapshot.forEach((doc) => {
-        bountyList.push({ id: doc.id, ...doc.data() } as Bounty)
+        const data = doc.data()
+        bountyList.push({ 
+          id: doc.id, 
+          ...data,
+          // Default isActive to true if not set
+          isActive: data.isActive !== false
+        } as Bounty)
       })
       setBounties(bountyList)
       setLoading(false)
+      console.log("✅ Loaded bounties:", bountyList.length)
     }, (error) => {
-      console.error("Error fetching bounties:", error)
+      console.error("❌ Error fetching bounties:", error)
       setLoading(false)
     })
 
@@ -236,6 +278,11 @@ export function BountiesPageContent() {
               value={submissions.filter(s => s.status === "pending").length}
               gradient="from-emerald-400 to-teal-500"
             />
+          </div>
+
+          {/* DEBUG INFO - Console check karo */}
+          <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
+            <p>Debug: Wallet: {walletAddress?.slice(0, 8)}... | NFT: {hasNFT ? "✅" : "❌"} | Bounties: {bounties.length}</p>
           </div>
 
           {!hasNFT && (
