@@ -1,3 +1,7 @@
+// app/bounties/page.tsx
+// YA
+// components/bounties-page-content.tsx
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -52,7 +56,7 @@ interface Submission {
   createdAt: any
 }
 
-export function BountiesPageContent() {
+export default function BountiesPage() {
   const { publicKey } = useWallet()
   const [bounties, setBounties] = useState<Bounty[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -76,7 +80,10 @@ export function BountiesPageContent() {
     checkNFT()
   }, [walletAddress])
 
+  // MAIN FIX: Bounty fetching
   useEffect(() => {
+    setLoading(true)
+    
     const q = query(
       collection(db, "bounties"), 
       where("isActive", "==", true),
@@ -89,6 +96,10 @@ export function BountiesPageContent() {
         bountyList.push({ id: doc.id, ...doc.data() } as Bounty)
       })
       setBounties(bountyList)
+      setLoading(false)
+      console.log("Loaded bounties:", bountyList.length)
+    }, (error) => {
+      console.error("Error:", error)
       setLoading(false)
     })
 
@@ -187,11 +198,6 @@ export function BountiesPageContent() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white pb-20">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl" />
-      </div>
-
       <main className="relative z-10 pt-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-4 mb-8">
@@ -326,6 +332,7 @@ export function BountiesPageContent() {
         </div>
       </main>
 
+      {/* Dialogs */}
       <Dialog open={!!selectedBounty && !submitModalOpen} onOpenChange={() => setSelectedBounty(null)}>
         <DialogContent className="bg-[#0f0f14] border-gray-700/50 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedBounty && (
