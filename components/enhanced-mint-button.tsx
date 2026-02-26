@@ -13,6 +13,11 @@ import { Loader2, CheckCircle, AlertCircle, Coins, Gift, ExternalLink, RefreshCw
 import { useRouter } from "next/navigation"
 import { getNetworkInfo, getExplorerUrl } from "@/config/solana"
 
+// ===== FIRESTORE IMPORTS =====
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+// =============================
+
 interface TokenBalance {
   mint: string
   balance: number
@@ -124,6 +129,23 @@ export function EnhancedMintButton() {
         setMintedNFT(result.mintAddress)
         setSuccess(`🎉 Welcome to RewardNFT Community! Your exclusive NFT: ${result.mintAddress} 🚀`)
         setHasAlreadyMinted(true)
+
+        // ===== FIRESTORE RECORD ADD =====
+        try {
+          await addDoc(collection(db, "nfts"), {
+            ownerWallet: publicKey.toString(),
+            mintAddress: result.mintAddress,
+            name: "RewardNFT",
+            mintedAt: serverTimestamp(),
+            transactionSignature: result.signature,
+            mintCost: 5
+          })
+          console.log("✅ NFT record added to Firestore")
+        } catch (firestoreErr) {
+          console.error("❌ Error adding to Firestore:", firestoreErr)
+          // Don't fail the mint if Firestore fails
+        }
+        // =================================
 
         await checkAllTokenBalances()
 
