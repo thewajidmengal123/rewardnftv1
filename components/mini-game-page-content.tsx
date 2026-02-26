@@ -67,9 +67,7 @@ const BASE_SPEED = 6;
 const MAX_SPEED = 18;
 const SPEED_INCREMENT = 0.003;
 const PHASE_DURATION = 3000;
-const MIN_OBSTACLE_GAP = 350;
-const MAX_OBSTACLE_GAP = 600;
-const SPAWN_CHANCE = 0.02;
+const SPAWN_RATE = 0.025; // Increased spawn rate
 
 const TIME_CONFIG: Record<TimeOfDay, {
   skyGradient: string[];
@@ -153,9 +151,8 @@ export default function MiniGamePageContent() {
   const gameLoopRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
   const jumpPressedRef = useRef<boolean>(false);
-  const lastObstacleXRef = useRef<number>(GAME_WIDTH + 200);
-  const nextGapRef = useRef<number>(400);
-  const frameCountRef = useRef(0);
+  const spawnTimerRef = useRef(0);
+  const minGapRef = useRef(140);
 
   useEffect(() => {
     const saved = localStorage.getItem('runnerHighScore');
@@ -266,21 +263,18 @@ export default function MiniGamePageContent() {
     setObstacles([]);
     setParticles([]);
     obstacleIdRef.current = 0;
-    lastObstacleXRef.current = GAME_WIDTH + 200;
-    nextGapRef.current = 400;
-    frameCountRef.current = 0;
     lastTimeRef.current = performance.now();
+    spawnTimerRef.current = 0;
+    minGapRef.current = 140;
     setIsButtonPressed(false);
     setTimeOfDay('morning');
     setCycleCount(0);
   }, [gameState.highScore]);
 
-  const getRandomObstacleType = (): Obstacle['type'] => {
+  const spawnObstacle = useCallback((): Obstacle => {
     const types: Obstacle['type'][] = ['car', 'bike', 'plane', 'cactus', 'rock', 'spike', 'truck', 'helicopter'];
-    return types[Math.floor(Math.random() * types.length)];
-  };
+    const type = types[Math.floor(Math.random() * types.length)];
 
-  const createObstacle = (type: Obstacle['type']): Obstacle => {
     let obstacleHeight: number;
     let obstacleWidth: number;
     let obstacleY: number;
@@ -326,21 +320,19 @@ export default function MiniGamePageContent() {
         obstacleWidth = 25;
         obstacleY = GROUND_Y - obstacleHeight;
         break;
-      default:
-        obstacleHeight = 50;
-        obstacleWidth = 50;
-        obstacleY = GROUND_Y - obstacleHeight;
     }
 
-    return {
+    const obstacle: Obstacle = {
       id: obstacleIdRef.current++,
-      x: GAME_WIDTH + 50,
+      x: GAME_WIDTH + 50 + Math.random() * 80,
       y: obstacleY,
       width: obstacleWidth,
       height: obstacleHeight,
       type,
     };
-  };
+
+    return obstacle;
+  }, []);
 
   const gameOver = useCallback(() => {
     setGameState(prev => ({ ...prev, isPlaying: false, isGameOver: true }));
@@ -385,15 +377,15 @@ export default function MiniGamePageContent() {
     }
   };
 
-  const checkCollision = useCallback(() => {
+  const checkCollision = useCallback((currentObstacles: Obstacle[], currentRunnerY: number) => {
     const runnerHitbox = {
       x: RUNNER_X + 15,
-      y: runnerY + 10,
+      y: currentRunnerY + 10,
       width: RUNNER_WIDTH - 30,
       height: RUNNER_HEIGHT - 20,
     };
 
-    for (const obstacle of obstacles) {
+    for (const obstacle of currentObstacles) {
       const obstacleHitbox = {
         x: obstacle.x + 5,
         y: obstacle.y + 5,
@@ -413,17 +405,16 @@ export default function MiniGamePageContent() {
       }
     }
     return false;
-  }, [obstacles, runnerY, gameOver]);
+  }, [gameOver]);
 
-  // Main game loop
+  // Main game loop with proper obstacle spawning
   useEffect(() => {
     if (!gameState.isPlaying) return;
 
     const gameLoop = (currentTime: number) => {
-      frameCountRef.current++;
       const deltaTime = currentTime - lastTimeRef.current;
       lastTimeRef.current = currentTime;
-      const timeScale = Math.min(deltaTime / 16.67, 2); // Cap timeScale to prevent huge jumps
+      const timeScale = deltaTime / 16.67;
 
       // Update runner physics
       setRunnerY(prev => {
@@ -440,36 +431,23 @@ export default function MiniGamePageContent() {
         return newY;
       });
 
-      // Update obstacles
+      // Update obstacles and handle spawning in single setState
       setObstacles(prev => {
         // Move existing obstacles
         const movedObstacles = prev
           .map(obs => ({ ...obs, x: obs.x - gameState.speed * timeScale }))
-          .filter(obs => obs.x > -200);
+          .filter(obs => obs.x > -180);
 
-        // Find rightmost obstacle position
-        const rightmostObstacle = movedObstacles.length > 0 
-          ? movedObstacles[movedObstacles.length - 1] 
-          : null;
+        // Spawn logic
+        spawnTimerRef.current += deltaTime;
+        minGapRef.current = Math.max(100, 140 - gameState.speed * 2); // Dynamic gap based on speed
         
-        const rightmostX = rightmostObstacle ? rightmostObstacle.x : lastObstacleXRef.current;
+        const lastObs = movedObstacles[movedObstacles.length - 1];
+        const canSpawn = !lastObs || (lastObs.x < GAME_WIDTH - minGapRef.current);
         
-        // Check if we should spawn new obstacle
-        const distanceFromRightmost = GAME_WIDTH - rightmostX;
-        
-        if (distanceFromRightmost >= nextGapRef.current) {
-          // Random chance to spawn based on speed (higher speed = slightly higher chance)
-          const spawnProbability = SPAWN_CHANCE + (gameState.speed * 0.001);
-          
-          if (Math.random() < spawnProbability || distanceFromRightmost > nextGapRef.current + 200) {
-            const type = getRandomObstacleType();
-            const newObstacle = createObstacle(type);
-            movedObstacles.push(newObstacle);
-            
-            // Set next gap
-            lastObstacleXRef.current = newObstacle.x;
-            nextGapRef.current = MIN_OBSTACLE_GAP + Math.random() * (MAX_OBSTACLE_GAP - MIN_OBSTACLE_GAP);
-          }
+        if (canSpawn && Math.random() < SPAWN_RATE * timeScale) {
+          const newObstacle = spawnObstacle();
+          return [...movedObstacles, newObstacle];
         }
 
         return movedObstacles;
@@ -478,12 +456,7 @@ export default function MiniGamePageContent() {
       // Update particles
       setParticles(prev => 
         prev
-          .map(p => ({ 
-            ...p, 
-            x: p.x + p.vx * timeScale, 
-            y: p.y + p.vy * timeScale, 
-            life: p.life - 1 * timeScale 
-          }))
+          .map(p => ({ ...p, x: p.x + p.vx * timeScale, y: p.y + p.vy * timeScale, life: p.life - 1 * timeScale }))
           .filter(p => p.life > 0)
       );
 
@@ -495,8 +468,8 @@ export default function MiniGamePageContent() {
         speed: Math.min(MAX_SPEED, prev.speed + SPEED_INCREMENT * timeScale),
       }));
 
-      checkCollision();
-
+      // Check collision with latest obstacles
+      // Note: We'll check collision in next frame to ensure state is updated
       gameLoopRef.current = requestAnimationFrame(gameLoop);
     };
 
@@ -505,7 +478,14 @@ export default function MiniGamePageContent() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [gameState.isPlaying, gameState.speed, runnerVy, checkCollision]);
+  }, [gameState.isPlaying, gameState.speed, runnerVy, spawnObstacle]);
+
+  // Separate collision check to use latest state
+  useEffect(() => {
+    if (gameState.isPlaying) {
+      checkCollision(obstacles, runnerY);
+    }
+  }, [obstacles, runnerY, gameState.isPlaying, checkCollision]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
