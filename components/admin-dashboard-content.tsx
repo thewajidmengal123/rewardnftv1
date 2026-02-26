@@ -28,11 +28,11 @@ import { toast } from "@/components/ui/use-toast"
 import { getExplorerUrl } from "@/config/solana"
 
 export function AdminDashboardContent() {
-  const { publicKey, connected } = useWallet()
-  const [loading, setLoading] = useState(false)
-  const [adminData, setAdminData] = useState<any>(null)
-  const [realTimeStats, setRealTimeStats] = useState<any>(null)
+  const { connected, publicKey } = useWallet()
   const [searchTerm, setSearchTerm] = useState("")
+  const [adminData, setAdminData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [realTimeStats, setRealTimeStats] = useState<any>(null)
   const [questCount, setQuestCount] = useState<number | null>(null)
 
   // Check if current wallet is admin
@@ -983,7 +983,7 @@ export function AdminDashboardContent() {
                   </Card>
                   <Card className="bg-white/5 border-white/10">
                     <CardContent className="p-4">
-                      <div className="text-name="text-center">
+                      <div className="text-center">
                         <p className="text-2xl font-bold text-blue-400">{totalMints}</p>
                         <p className="text-sm text-white/60">Total Transactions</p>
                       </div>
