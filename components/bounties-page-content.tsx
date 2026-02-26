@@ -1,7 +1,3 @@
-// app/bounties/page.tsx
-// YA
-// components/bounties-page-content.tsx
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -56,7 +52,7 @@ interface Submission {
   createdAt: any
 }
 
-export default function BountiesPage() {
+export function BountiesPageContent() {
   const { publicKey } = useWallet()
   const [bounties, setBounties] = useState<Bounty[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -80,7 +76,7 @@ export default function BountiesPage() {
     checkNFT()
   }, [walletAddress])
 
-  // MAIN FIX: Bounty fetching
+  // MAIN FIX: Proper bounty fetching
   useEffect(() => {
     setLoading(true)
     
@@ -97,9 +93,8 @@ export default function BountiesPage() {
       })
       setBounties(bountyList)
       setLoading(false)
-      console.log("Loaded bounties:", bountyList.length)
     }, (error) => {
-      console.error("Error:", error)
+      console.error("Error fetching bounties:", error)
       setLoading(false)
     })
 
@@ -332,7 +327,6 @@ export default function BountiesPage() {
         </div>
       </main>
 
-      {/* Dialogs */}
       <Dialog open={!!selectedBounty && !submitModalOpen} onOpenChange={() => setSelectedBounty(null)}>
         <DialogContent className="bg-[#0f0f14] border-gray-700/50 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedBounty && (
