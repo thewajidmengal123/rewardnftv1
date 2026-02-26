@@ -256,49 +256,40 @@ export function AdminBountiesContent() {
           </Button>
         </div>
 
-        {/* Bounties Tab */}
-        {activeTab === "bounties" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredBounties.map((bounty) => (
-              <div key={bounty.id} className="bg-gray-900/50 border border-gray-700 rounded-xl overflow-hidden">
-                {bounty.imageUrl && (
-                  <div className="h-40 overflow-hidden">
-                    <img src={bounty.imageUrl} alt={bounty.title} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      bounty.difficulty === "easy" ? "bg-green-500/20 text-green-400" :
-                      bounty.difficulty === "medium" ? "bg-yellow-500/20 text-yellow-400" :
-                      "bg-red-500/20 text-red-400"
-                    }`}>
-                      {bounty.difficulty}
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteBounty(bounty.id)}
-                      className="text-red-400 hover:text-red-300 p-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <h3 className="text-lg font-bold mb-2">{bounty.title}</h3>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{bounty.description}</p>
-                  
-                  <div className="flex items-center gap-2 text-yellow-400 mb-4">
-                    <Trophy className="w-4 h-4" />
-                    <span className="font-bold">{bounty.reward}</span>
-                  </div>
-
-                  <div className="text-xs text-gray-500">
-                    Submissions: {submissions.filter(s => s.bountyId === bounty.id).length}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+   {/* Bounties Section - NEW */}
+{(activeFilter === "all" || activeFilter === "bounties") && (
+  <div className="mb-12">
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+          <Trophy className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-white">Bounties</h2>
+          <p className="text-gray-500 text-sm">High-value tasks with big rewards</p>
+        </div>
+      </div>
+      <Link href="/quests/bounties">
+        <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10">
+          View All <ExternalLink className="w-4 h-4 ml-2" />
+        </Button>
+      </Link>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/50 rounded-2xl p-6 border border-purple-500/30 text-center">
+        <Trophy className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-white mb-2">Explore Bounties</h3>
+        <p className="text-gray-400 mb-4">Complete high-value tasks and earn exclusive rewards</p>
+        <Link href="/quests/bounties">
+          <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
+            Browse Bounties
+          </Button>
+        </Link>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Submissions Tab */}
         {activeTab === "submissions" && (
