@@ -14,7 +14,9 @@ import {
   Clock,
   ExternalLink,
   ArrowLeft,
-  Search
+  Search,
+  Copy,        // ✅ ADDED
+  Check        // ✅ ADDED
 } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { toast } from "@/components/ui/use-toast"
@@ -72,9 +74,10 @@ export function AdminBountiesContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"bounties" | "submissions">("bounties")
   const [searchTerm, setSearchTerm] = useState("")
-  
-  // ✅ ADDED: activeFilter state
   const [activeFilter, setActiveFilter] = useState("all")
+  
+  // ✅ ADDED: Copy wallet feature states
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const isAdmin = publicKey?.toString() === ADMIN_WALLET
 
@@ -88,6 +91,18 @@ export function AdminBountiesContent() {
     category: "Content",
     steps: [""]
   })
+
+  // ✅ ADDED: Copy to clipboard function
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      toast({ title: "✅ Copied!", description: "Wallet address copied to clipboard" })
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (err) {
+      toast({ title: "❌ Failed to copy", variant: "destructive" })
+    }
+  }
 
   useEffect(() => {
     const bountiesQ = query(collection(db, "bounties"), orderBy("createdAt", "desc"))
@@ -298,16 +313,36 @@ export function AdminBountiesContent() {
           </div>
         )}
 
-        {/* Submissions Tab */}
+        {/* Submissions Tab - ✅ UPDATED with Copy Wallet Feature */}
         {activeTab === "submissions" && (
           <div className="space-y-4">
             {filteredSubmissions.map((sub) => (
               <div key={sub.id} className="bg-gray-900/50 border border-gray-700 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-bold text-lg">{sub.bountyTitle || "Unknown Bounty"}</h3>
-                    <p className="text-gray-400 text-sm font-mono">{sub.userWallet.slice(0, 8)}...{sub.userWallet.slice(-8)}</p>
-                    <p className="text-gray-500 text-xs mt-1">
+                    
+                    {/* ✅ UPDATED: Wallet Address with Copy Button */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <code className="text-gray-300 text-sm bg-gray-800 px-3 py-1.5 rounded-lg font-mono break-all">
+                        {sub.userWallet}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(sub.userWallet, sub.id)}
+                        className="border-gray-600 hover:bg-gray-700 hover:border-gray-500 h-9 px-3 flex-shrink-0"
+                      >
+                        {copiedId === sub.id ? (
+                          <Check className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                        <span className="ml-2 text-xs">{copiedId === sub.id ? "Copied" : "Copy"}</span>
+                      </Button>
+                    </div>
+                    
+                    <p className="text-gray-500 text-xs mt-2">
                       {sub.createdAt?.toDate?.().toLocaleString() || "Just now"}
                     </p>
                   </div>
@@ -315,7 +350,7 @@ export function AdminBountiesContent() {
                     sub.status === "approved" ? "bg-green-500" :
                     sub.status === "rejected" ? "bg-red-500" :
                     "bg-yellow-500"
-                  } text-white`}>
+                  } text-white ml-4`}>
                     {sub.status}
                   </Badge>
                 </div>
