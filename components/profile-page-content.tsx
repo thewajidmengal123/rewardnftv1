@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,12 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy, Camera, Edit2, Check, X, Twitter, Globe, MessageCircle, Github } from "lucide-react"
+import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy, Edit2, Check, X, Twitter, Globe, MessageCircle, Github, Link2, ImageIcon } from "lucide-react"
 import { getExplorerUrl } from "@/config/solana"
 import { toast } from "@/components/ui/use-toast"
-import { collection, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db, storage } from "@/lib/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Social link interface
 interface SocialLinks {
@@ -76,13 +75,11 @@ export function ProfilePageContent() {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
   const [editBio, setEditBio] = useState("")
+  const [editAvatar, setEditAvatar] = useState("")
   const [editTwitter, setEditTwitter] = useState("")
   const [editDiscord, setEditDiscord] = useState("")
   const [editGithub, setEditGithub] = useState("")
   const [editWebsite, setEditWebsite] = useState("")
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -205,6 +202,7 @@ export function ProfilePageContent() {
       // Set edit states with loaded data
       setEditName(userProfileData.name || "")
       setEditBio(userProfileData.bio || "")
+      setEditAvatar(userProfileData.avatar || "")
       setEditTwitter(userProfileData.socials?.twitter || "")
       setEditDiscord(userProfileData.socials?.discord || "")
       setEditGithub(userProfileData.socials?.github || "")
@@ -250,7 +248,7 @@ export function ProfilePageContent() {
       const profileData: UserProfileData = {
         name: editName.trim(),
         bio: editBio.trim(),
-        avatar: profile?.profileData?.avatar,
+        avatar: editAvatar.trim() || undefined,
         socials: {
           twitter: editTwitter.trim(),
           discord: editDiscord.trim(),
@@ -279,74 +277,6 @@ export function ProfilePageContent() {
         description: "Failed to save profile. Please try again.",
         variant: "destructive",
       })
-    }
-  }
-
-  // Handle photo upload
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !publicKey) return
-
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "❌ Invalid File",
-        description: "Please upload an image file (JPG, PNG, GIF)",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "❌ File Too Large",
-        description: "Maximum file size is 5MB",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setUploadingPhoto(true)
-
-    try {
-      const walletAddress = publicKey.toString()
-      const fileExtension = file.name.split('.').pop()
-      const fileName = `avatars/${walletAddress}.${fileExtension}`
-      const storageRef = ref(storage, fileName)
-
-      // Upload to Firebase Storage
-      await uploadBytes(storageRef, file)
-      const downloadURL = await getDownloadURL(storageRef)
-
-      // Update Firestore
-      const userDocRef = doc(db, "users", walletAddress)
-      await updateDoc(userDocRef, {
-        avatar: downloadURL,
-        updatedAt: serverTimestamp(),
-      })
-
-      // Update local state
-      setProfile(prev => prev ? {
-        ...prev,
-        profileData: {
-          ...prev.profileData,
-          avatar: downloadURL,
-        }
-      } : null)
-
-      toast({
-        title: "✅ Photo Updated",
-        description: "Your profile photo has been uploaded!",
-      })
-    } catch (err) {
-      console.error("Error uploading photo:", err)
-      toast({
-        title: "❌ Upload Failed",
-        description: "Failed to upload photo. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setUploadingPhoto(false)
     }
   }
 
@@ -432,34 +362,14 @@ export function ProfilePageContent() {
             <div className="relative -mt-20 mx-4 md:mx-8">
               <div className="bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50">
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                  {/* Avatar with Upload */}
-                  <div className="relative group">
+                  {/* Avatar */}
+                  <div className="relative">
                     <Avatar className="w-32 h-32 border-4 border-gray-900 ring-2 ring-purple-500/50">
                       <AvatarImage src={profile?.profileData?.avatar || profile?.nfts[0]?.image || "/placeholder.svg"} />
                       <AvatarFallback className="bg-purple-600 text-2xl">
                         {(profile?.profileData?.name || formatAddress(publicKey?.toString() || "")).slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    
-                    {/* Upload Button */}
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingPhoto}
-                      className="absolute bottom-0 right-0 w-10 h-10 bg-purple-600 hover:bg-purple-700 rounded-full flex items-center justify-center border-2 border-gray-900 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                    >
-                      {uploadingPhoto ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Camera className="w-5 h-5" />
-                      )}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
                   </div>
 
                   {/* User Info */}
@@ -478,6 +388,16 @@ export function ProfilePageContent() {
                           placeholder="Short bio about yourself..."
                           className="bg-gray-800 border-gray-700 text-gray-300 max-w-md"
                         />
+                        {/* Avatar URL Input */}
+                        <div className="flex items-center gap-2 max-w-md">
+                          <ImageIcon className="w-5 h-5 text-purple-400" />
+                          <Input
+                            value={editAvatar}
+                            onChange={(e) => setEditAvatar(e.target.value)}
+                            placeholder="Profile photo URL (Imgur, etc.)"
+                            className="bg-gray-800 border-gray-700 text-gray-300"
+                          />
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -644,7 +564,7 @@ export function ProfilePageContent() {
             </div>
           </div>
 
-          {/* Rest of the component remains same... */}
+          {/* Rest of tabs same as before... */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
             <TabsList className="grid grid-cols-4 md:grid-cols-5 mb-8 bg-gray-900/50 border border-gray-700/50">
               <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
