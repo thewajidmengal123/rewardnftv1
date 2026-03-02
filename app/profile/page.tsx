@@ -1,10 +1,10 @@
-import { AdminUsersContent } from "@/components/admin-users-content"
+import { ProfilePageContent } from "@/components/profile-page-content"
 
 export const metadata = {
-  title: "Admin - Users | Reward NFT Platform",
-  description: "Manage users and view social profiles",
+  title: "My Profile | Reward NFT Platform",
+  description: "View and edit your profile",
 }
 
-export default function AdminUsersPage() {
-  return <AdminUsersContent />
+export default function ProfilePage() {
+  return <ProfilePageContent />
 }
