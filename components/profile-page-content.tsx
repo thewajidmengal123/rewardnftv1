@@ -13,9 +13,8 @@ import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy, Camera, Edit2, 
 import { getExplorerUrl } from "@/config/solana"
 import { toast } from "@/components/ui/use-toast"
 import { collection, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/lib/firebase"
 
 // Social link interface
 interface SocialLinks {
@@ -63,7 +62,6 @@ interface UserProfile {
     activeReferrals: number
     totalEarned: number
   }
-  // User editable data
   profileData?: UserProfileData
 }
 
@@ -106,7 +104,7 @@ export function ProfilePageContent() {
       const userDoc = await getDoc(userDocRef)
       const userProfileData: UserProfileData = userDoc.exists() ? userDoc.data() as UserProfileData : {}
 
-      // Fetch other data (NFTs, quests, referrals) - same as before
+      // Fetch other data (NFTs, quests, referrals)
       const [referralResponse, questXPResponse, questProgressResponse, nftStatsResponse] = await Promise.all([
         fetch(`/api/users/referrals?wallet=${walletAddress}`),
         fetch(`/api/quests?action=get-user-xp&wallet=${walletAddress}`),
@@ -646,6 +644,7 @@ export function ProfilePageContent() {
             </div>
           </div>
 
+          {/* Rest of the component remains same... */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
             <TabsList className="grid grid-cols-4 md:grid-cols-5 mb-8 bg-gray-900/50 border border-gray-700/50">
               <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
@@ -655,7 +654,7 @@ export function ProfilePageContent() {
               <TabsTrigger value="activity" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">Activity</TabsTrigger>
             </TabsList>
 
-            {/* ... rest of the tabs content same as before ... */}
+            {/* Overview Tab */}
             <TabsContent value="overview">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <Card className="bg-gray-900/50 border-gray-700/50">
@@ -792,7 +791,7 @@ export function ProfilePageContent() {
               </Card>
             </TabsContent>
 
-            {/* ... other tabs remain same ... */}
+            {/* Other tabs... */}
             <TabsContent value="nfts">
               <Card className="bg-gray-900/50 border-gray-700/50">
                 <CardHeader>
@@ -817,14 +816,6 @@ export function ProfilePageContent() {
                           </div>
                           <CardContent className="p-4">
                             <h3 className="font-bold mb-2 text-white">{nft.name}</h3>
-                            <div className="space-y-1">
-                              {nft.attributes.map((attr, index) => (
-                                <div key={index} className="flex justify-between text-sm">
-                                  <span className="text-gray-400">{attr.trait_type}:</span>
-                                  <span className="text-gray-200">{attr.value}</span>
-                                </div>
-                              ))}
-                            </div>
                             <Button variant="outline" size="sm" className="w-full mt-3 border-gray-600 text-gray-300 hover:bg-gray-700" asChild>
                               <a href={getExplorerLink(nft.mint)} target="_blank" rel="noopener noreferrer">
                                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -839,7 +830,6 @@ export function ProfilePageContent() {
                     <div className="text-center py-8">
                       <Gift className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                       <p className="text-gray-400 mb-4">No NFTs found</p>
-                      <p className="text-gray-500 text-sm mb-6">Start minting NFTs to build your collection and earn referral rewards!</p>
                       <Button asChild className="bg-purple-600 hover:bg-purple-700">
                         <a href="/mint">Mint Your First NFT</a>
                       </Button>
@@ -856,56 +846,24 @@ export function ProfilePageContent() {
                   <CardDescription className="text-gray-400">Complete quests to earn XP and rewards</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-yellow-400">{profile?.stats.points || 0}</p>
-                        <p className="text-sm text-gray-400">Total XP</p>
-                      </div>
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-green-400">{profile?.stats.questsCompleted || 0}</p>
-                        <p className="text-sm text-gray-400">Quests Completed</p>
-                      </div>
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-blue-400">Level {Math.floor((profile?.stats.points || 0) / 500) + 1}</p>
-                        <p className="text-sm text-gray-400">Current Level</p>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-yellow-400">{profile?.stats.points || 0}</p>
+                      <p className="text-sm text-gray-400">Total XP</p>
                     </div>
-                    <div className="space-y-4">
-                      <div className="text-center py-4">
-                        <p className="text-gray-400 mb-4">Visit the Quests page to start earning XP and complete challenges!</p>
-                        <div className="flex gap-4 justify-center">
-                          <Button asChild className="bg-purple-600 hover:bg-purple-700">
-                            <a href="/quests">View All Quests</a>
-                          </Button>
-                          <Button asChild variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
-                            <a href="/mini-game">Play Mini-Game</a>
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* XP Progress Bar */}
-                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm text-gray-400">Progress to Next Level</span>
-                          <span className="text-sm text-gray-400">
-                            Level {Math.floor((profile?.stats.points || 0) / 500) + 1}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-700 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${((profile?.stats.points || 0) % 500) / 500 * 100}%`
-                            }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>{(profile?.stats.points || 0) % 500} XP</span>
-                          <span>500 XP</span>
-                        </div>
-                      </div>
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-green-400">{profile?.stats.questsCompleted || 0}</p>
+                      <p className="text-sm text-gray-400">Quests Completed</p>
                     </div>
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-blue-400">Level {Math.floor((profile?.stats.points || 0) / 500) + 1}</p>
+                      <p className="text-sm text-gray-400">Current Level</p>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <Button asChild className="bg-purple-600 hover:bg-purple-700">
+                      <a href="/quests">View All Quests</a>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -918,42 +876,34 @@ export function ProfilePageContent() {
                   <CardDescription className="text-gray-400">Invite friends and earn rewards</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-2">Your Referral Code</p>
-                      <div className="flex items-center gap-2">
-                        <code className="font-mono text-lg flex-1 bg-gray-900 px-3 py-2 rounded-lg text-purple-300">
-                          {profile?.referralCode || "Loading..."}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyToClipboard(profile?.referralCode || "")}
-                          disabled={!profile?.referralCode}
-                          className="border-gray-600 hover:bg-gray-700"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-white">{profile?.referralStats.totalReferrals || 0}</p>
-                        <p className="text-sm text-gray-400">Total Referrals</p>
-                      </div>
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-white">{profile?.referralStats.activeReferrals || 0}</p>
-                        <p className="text-sm text-gray-400">Active</p>
-                      </div>
-                      <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <p className="text-2xl font-bold text-green-400">{((profile?.referralStats.totalReferrals || 0) * 4).toFixed(2)}</p>
-                        <p className="text-sm text-gray-400">USDC Earned</p>
-                      </div>
-                    </div>
-                    <div className="text-center pt-4">
-                      <Button asChild className="bg-purple-600 hover:bg-purple-700">
-                        <a href="/referrals">View Referral Details</a>
+                  <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50 mb-4">
+                    <p className="text-sm text-gray-400 mb-2">Your Referral Code</p>
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-lg flex-1 bg-gray-900 px-3 py-2 rounded-lg text-purple-300">
+                        {profile?.referralCode || "Loading..."}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(profile?.referralCode || "")}
+                        className="border-gray-600 hover:bg-gray-700"
+                      >
+                        <Copy className="w-4 h-4" />
                       </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-white">{profile?.referralStats.totalReferrals || 0}</p>
+                      <p className="text-sm text-gray-400">Total Referrals</p>
+                    </div>
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-white">{profile?.referralStats.activeReferrals || 0}</p>
+                      <p className="text-sm text-gray-400">Active</p>
+                    </div>
+                    <div className="text-center p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                      <p className="text-2xl font-bold text-green-400">{((profile?.referralStats.totalReferrals || 0) * 4).toFixed(2)}</p>
+                      <p className="text-sm text-gray-400">USDC Earned</p>
                     </div>
                   </div>
                 </CardContent>
