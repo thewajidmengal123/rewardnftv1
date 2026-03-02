@@ -72,6 +72,7 @@ export function AdminUsersContent() {
         })
       })
 
+      // Sort by last active
       usersList.sort((a, b) => {
         const aTime = a.lastActive?.toMillis?.() || 0
         const bTime = b.lastActive?.toMillis?.() || 0
