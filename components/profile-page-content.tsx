@@ -9,13 +9,12 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useWallet } from "@/contexts/wallet-context"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy, Edit2, Check, X, Twitter, Globe, MessageCircle, Github, Link2, ImageIcon } from "lucide-react"
+import { Loader2, Trophy, Gift, Users, Star, ExternalLink, Copy, Edit2, Check, X, Twitter, Globe, MessageCircle, Github, ImageIcon } from "lucide-react"
 import { getExplorerUrl } from "@/config/solana"
 import { toast } from "@/components/ui/use-toast"
-import { collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-// Social link interface
 interface SocialLinks {
   twitter?: string
   discord?: string
@@ -23,7 +22,6 @@ interface SocialLinks {
   website?: string
 }
 
-// User profile interface
 interface UserProfileData {
   name?: string
   bio?: string
@@ -564,7 +562,7 @@ export function ProfilePageContent() {
             </div>
           </div>
 
-          {/* Rest of tabs same as before... */}
+          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
             <TabsList className="grid grid-cols-4 md:grid-cols-5 mb-8 bg-gray-900/50 border border-gray-700/50">
               <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
