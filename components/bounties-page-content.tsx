@@ -402,11 +402,12 @@ export function BountiesPageContent() {
                   </div>
                 </div>
 
+                {/* ✅ FIXED: Changed <p> to <div> and added whitespace-pre-wrap */}
                 <div>
                   <h4 className="text-lg font-semibold text-white mb-2">About this Bounty</h4>
-                  <p className="text-gray-400 leading-relaxed">
+                  <div className="text-gray-400 leading-relaxed whitespace-pre-wrap">
                     {selectedBounty.fullDescription || selectedBounty.description}
-                  </p>
+                  </div>
                 </div>
 
                 {selectedBounty.steps && selectedBounty.steps.length > 0 && (
