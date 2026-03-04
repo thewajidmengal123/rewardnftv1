@@ -3,18 +3,17 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useWallet } from "@/contexts/wallet-context"
-import { Loader2, Search, ExternalLink, Twitter, MessageCircle, Github, Globe, Copy } from "lucide-react"
+import { Loader2, ArrowLeft, ExternalLink, Twitter, MessageCircle, Github, Globe, Copy, Trophy, Gift, Users, Star } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-import { collection, getDocs } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getExplorerUrl } from "@/config/solana"
+import Link from "next/link"
 
 interface UserData {
-  id: string
   walletAddress: string
   name?: string
   bio?: string
@@ -32,34 +31,33 @@ interface UserData {
   createdAt?: any
 }
 
-const ADMIN_WALLET = "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ"
+const ADMIN_WALLETS = [
+  "6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ", // Original admin
+]
 
-export function AdminUsersContent() {
+export function AdminUserProfileContent({ walletAddress }: { walletAddress: string }) {
   const { publicKey } = useWallet()
-  const [users, setUsers] = useState<UserData[]>([])
+  const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
 
-  const isAdmin = publicKey?.toString() === ADMIN_WALLET
+  const isAdmin = ADMIN_WALLETS.includes(publicKey?.toString() || "")
 
   useEffect(() => {
-    if (isAdmin) {
-      loadUsers()
+    if (isAdmin && walletAddress) {
+      loadUser()
     }
-  }, [isAdmin])
+  }, [isAdmin, walletAddress])
 
-  const loadUsers = async () => {
+  const loadUser = async () => {
     try {
       setLoading(true)
-      const usersSnapshot = await getDocs(collection(db, "users"))
-      const usersList: UserData[] = []
-
-      usersSnapshot.forEach((doc) => {
-        const data = doc.data()
-        usersList.push({
-          id: doc.id,
-          walletAddress: doc.id,
+      const userDocRef = doc(db, "users", walletAddress)
+      const userDoc = await getDoc(userDocRef)
+      
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        setUser({
+          walletAddress: walletAddress,
           name: data.name,
           bio: data.bio,
           avatar: data.avatar,
@@ -70,32 +68,24 @@ export function AdminUsersContent() {
           lastActive: data.lastActive,
           createdAt: data.createdAt,
         })
-      })
-
-      usersList.sort((a, b) => {
-        const aTime = a.lastActive?.toMillis?.() || 0
-        const bTime = b.lastActive?.toMillis?.() || 0
-        return bTime - aTime
-      })
-
-      setUsers(usersList)
+      } else {
+        toast({
+          title: "User not found",
+          description: "This user has no profile data",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
-      console.error("Error loading users:", error)
+      console.error("Error loading user:", error)
       toast({
         title: "Error",
-        description: "Failed to load users",
+        description: "Failed to load user profile",
         variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
   }
-
-  const filteredUsers = users.filter(user => 
-    user.walletAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.socials?.twitter?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -114,6 +104,12 @@ export function AdminUsersContent() {
       case 'website': return username.startsWith('http') ? username : `https://${username}`
       default: return null
     }
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString()
   }
 
   if (!isAdmin) {
@@ -135,272 +131,189 @@ export function AdminUsersContent() {
     )
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-400">User Not Found</h1>
+          <Link href="/admin/users">
+            <Button className="mt-4 bg-purple-600 hover:bg-purple-700">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Users
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/admin/users">
+            <Button variant="outline" className="border-gray-700 hover:bg-gray-800">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+          </Link>
           <div>
-            <h1 className="text-3xl font-bold">Users Management</h1>
-            <p className="text-gray-400 mt-1">View all users and their social profiles</p>
+            <h1 className="text-3xl font-bold">User Profile</h1>
+            <p className="text-gray-400">Admin view</p>
           </div>
-          <Button onClick={loadUsers} variant="outline" className="border-gray-700">
-            Refresh
-          </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search by wallet, name, or Twitter..."
-            className="pl-10 bg-gray-900 border-gray-700 text-white"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        {/* Profile Card */}
+        <Card className="bg-gray-900/50 border-gray-700/50 mb-6">
+          <CardContent className="p-8">
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              {/* Avatar */}
+              <Avatar className="w-24 h-24 border-4 border-purple-500/30">
+                <AvatarImage src={user.avatar} />
+                <AvatarFallback className="bg-purple-600 text-2xl">
+                  {(user.name || user.walletAddress).slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
 
-        {/* Users Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUsers.map((user) => (
-            <Card 
-              key={user.id} 
-              className="bg-gray-900/50 border-gray-700/50 hover:border-purple-500/50 transition-all cursor-pointer"
-              onClick={() => setSelectedUser(user)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <Avatar className="w-16 h-16 border-2 border-purple-500/30">
-                    <AvatarImage src={user.avatar} />
-                    <AvatarFallback className="bg-purple-600">
-                      {(user.name || user.walletAddress).slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-white truncate">
-                      {user.name || "Anonymous"}
-                    </h3>
-                    <p className="text-sm text-gray-400 font-mono truncate">
-                      {user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-8)}
-                    </p>
-                    
-                    {/* Social Links */}
-                    <div className="flex gap-2 mt-3">
-                      {user.socials?.twitter && (
-                        <a
-                          href={getSocialUrl('twitter', user.socials.twitter) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
-                        >
-                          <Twitter className="w-4 h-4 text-blue-400" />
-                        </a>
-                      )}
-                      {user.socials?.discord && (
-                        <div 
-                          className="w-8 h-8 bg-indigo-600/20 rounded-full flex items-center justify-center border border-indigo-500/30"
-                          title={user.socials.discord}
-                        >
-                          <MessageCircle className="w-4 h-4 text-indigo-400" />
-                        </div>
-                      )}
-                      {user.socials?.github && (
-                        <a
-                          href={getSocialUrl('github', user.socials.github) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center border border-gray-600 hover:bg-gray-600 transition-colors"
-                        >
-                          <Github className="w-4 h-4 text-gray-400" />
-                        </a>
-                      )}
-                      {user.socials?.website && (
-                        <a
-                          href={getSocialUrl('website', user.socials.website) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center border border-green-500/30 hover:bg-green-600/30 transition-colors"
-                        >
-                          <Globe className="w-4 h-4 text-green-400" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-700/50">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-white">{user.nftsMinted || 0}</p>
-                    <p className="text-xs text-gray-400">NFTs</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-white">{user.totalReferrals || 0}</p>
-                    <p className="text-xs text-gray-400">Referrals</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-green-400">{user.totalEarned || 0}</p>
-                    <p className="text-xs text-gray-400">Earned</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* User Detail Modal */}
-        {selectedUser && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="bg-gray-900 border-gray-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>User Details</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
-                  ✕
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Profile Header */}
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20 border-2 border-purple-500">
-                    <AvatarImage src={selectedUser.avatar} />
-                    <AvatarFallback className="bg-purple-600 text-xl">
-                      {(selectedUser.name || selectedUser.walletAddress).slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">{selectedUser.name || "Anonymous"}</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                      <code className="text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded">
-                        {selectedUser.walletAddress}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => copyToClipboard(selectedUser.walletAddress)}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bio */}
-                {selectedUser.bio && (
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-                    <p className="text-gray-300">{selectedUser.bio}</p>
-                  </div>
-                )}
-
-                {/* Social Links Detail */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-white">Social Links</h3>
-                  
-                  {selectedUser.socials?.twitter && (
-                    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Twitter className="w-5 h-5 text-blue-400" />
-                        <span className="text-gray-300">Twitter</span>
-                      </div>
-                      <a
-                        href={getSocialUrl('twitter', selectedUser.socials.twitter) || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline flex items-center gap-1"
-                      >
-                        {selectedUser.socials.twitter}
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  )}
-
-                  {selectedUser.socials?.discord && (
-                    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <MessageCircle className="w-5 h-5 text-indigo-400" />
-                        <span className="text-gray-300">Discord</span>
-                      </div>
-                      <span className="text-indigo-400">{selectedUser.socials.discord}</span>
-                    </div>
-                  )}
-
-                  {selectedUser.socials?.github && (
-                    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Github className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-300">GitHub</span>
-                      </div>
-                      <a
-                        href={getSocialUrl('github', selectedUser.socials.github) || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:underline flex items-center gap-1"
-                      >
-                        {selectedUser.socials.github}
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  )}
-
-                  {selectedUser.socials?.website && (
-                    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-green-400" />
-                        <span className="text-gray-300">Website</span>
-                      </div>
-                      <a
-                        href={getSocialUrl('website', selectedUser.socials.website) || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-400 hover:underline flex items-center gap-1"
-                      >
-                        {selectedUser.socials.website}
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  )}
-
-                  {!selectedUser.socials?.twitter && !selectedUser.socials?.discord && 
-                   !selectedUser.socials?.github && !selectedUser.socials?.website && (
-                    <p className="text-gray-500 text-center py-4">No social links added</p>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-700">
-                  <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                    <p className="text-2xl font-bold text-white">{selectedUser.nftsMinted || 0}</p>
-                    <p className="text-sm text-gray-400">NFTs Minted</p>
-                  </div>
-                  <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                    <p className="text-2xl font-bold text-white">{selectedUser.totalReferrals || 0}</p>
-                    <p className="text-sm text-gray-400">Total Referrals</p>
-                  </div>
-                  <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-400">{selectedUser.totalEarned || 0}</p>
-                    <p className="text-sm text-gray-400">USDC Earned</p>
-                  </div>
-                </div>
-
-                {/* Explorer Link */}
-                <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
-                  <a 
-                    href={getExplorerUrl(selectedUser.walletAddress, "address")} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+              {/* Info */}
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-white">{user.name || "Anonymous User"}</h2>
+                {user.bio && <p className="text-gray-400 mt-2">{user.bio}</p>}
+                
+                <div className="flex items-center gap-2 mt-3">
+                  <code className="text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded">
+                    {user.walletAddress}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(user.walletAddress)}
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View on Solana Explorer
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                    <a 
+                      href={getExplorerUrl(user.walletAddress, "address")} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                </div>
+
+                {/* Social Links */}
+                <div className="flex gap-3 mt-4">
+                  {user.socials?.twitter && (
+                    <a
+                      href={getSocialUrl('twitter', user.socials.twitter) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                    >
+                      <Twitter className="w-5 h-5" />
+                      <span>{user.socials.twitter}</span>
+                    </a>
+                  )}
+                  {user.socials?.discord && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 rounded-lg border border-indigo-500/30 text-indigo-400">
+                      <MessageCircle className="w-5 h-5" />
+                      <span>{user.socials.discord}</span>
+                    </div>
+                  )}
+                  {user.socials?.github && (
+                    <a
+                      href={getSocialUrl('github', user.socials.github) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 text-gray-400 hover:bg-gray-600 transition-colors"
+                    >
+                      <Github className="w-5 h-5" />
+                      <span>{user.socials.github}</span>
+                    </a>
+                  )}
+                  {user.socials?.website && (
+                    <a
+                      href={getSocialUrl('website', user.socials.website) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-lg border border-green-500/30 text-green-400 hover:bg-green-600/30 transition-colors"
+                    >
+                      <Globe className="w-5 h-5" />
+                      <span>Website</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="bg-gray-900/50 border-gray-700/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center text-white">
+                <Gift className="w-5 h-5 mr-2 text-purple-400" />
+                NFTs Minted
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-white">{user.nftsMinted || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-900/50 border-gray-700/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center text-white">
+                <Users className="w-5 h-5 mr-2 text-blue-400" />
+                Total Referrals
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-white">{user.totalReferrals || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-900/50 border-gray-700/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center text-white">
+                <Trophy className="w-5 h-5 mr-2 text-yellow-400" />
+                USDC Earned
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-green-400">{user.totalEarned || 0}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Info */}
+        <Card className="bg-gray-900/50 border-gray-700/50">
+          <CardHeader>
+            <CardTitle className="text-white">Account Info</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between py-2 border-b border-gray-700/50">
+              <span className="text-gray-400">Wallet Address</span>
+              <span className="text-white font-mono">{user.walletAddress}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-700/50">
+              <span className="text-gray-400">Account Created</span>
+              <span className="text-white">{formatDate(user.createdAt)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-700/50">
+              <span className="text-gray-400">Last Active</span>
+              <span className="text-white">{formatDate(user.lastActive)}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-gray-400">Profile Status</span>
+              <Badge className={user.name ? "bg-green-600" : "bg-yellow-600"}>
+                {user.name ? "Complete" : "Incomplete"}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
