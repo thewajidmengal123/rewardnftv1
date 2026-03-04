@@ -59,6 +59,12 @@ export function Header() {
               Quests
             </Link>
             <Link
+              href="/prediction-market"
+              className="text-purple-400 hover:text-purple-300 transition-colors font-medium text-sm"
+            >
+              Prediction
+            </Link>
+            <Link
               href="/airdrops"
               className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
             >
@@ -72,7 +78,7 @@ export function Header() {
             </Link>
             <AdminOnly>
               <Link
-                href="/admin/dashboard"
+                href="/admin"
                 className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium text-sm border border-yellow-400/30 px-3 py-1 rounded-md"
               >
                 Admin
