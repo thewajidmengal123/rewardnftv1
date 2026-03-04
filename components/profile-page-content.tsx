@@ -235,7 +235,7 @@ export function ProfilePageContent() {
     }
   }
 
-  // Save profile changes
+  // ✅ FIXED: Save profile changes - no undefined values
   const handleSaveProfile = async () => {
     if (!publicKey) return
 
@@ -243,24 +243,38 @@ export function ProfilePageContent() {
       const walletAddress = publicKey.toString()
       const userDocRef = doc(db, "users", walletAddress)
 
-      const profileData: UserProfileData = {
-        name: editName.trim(),
-        bio: editBio.trim(),
-        avatar: editAvatar.trim() || undefined,
-        socials: {
-          twitter: editTwitter.trim(),
-          discord: editDiscord.trim(),
-          github: editGithub.trim(),
-          website: editWebsite.trim(),
-        },
+      // Build object dynamically - only include fields with values
+      const profileData: any = {
+        name: editName.trim() || null,
+        bio: editBio.trim() || null,
         updatedAt: serverTimestamp(),
+      }
+
+      // Only add avatar if it has value
+      if (editAvatar.trim()) {
+        profileData.avatar = editAvatar.trim()
+      }
+
+      // Build socials object dynamically
+      const socials: any = {}
+      if (editTwitter.trim()) socials.twitter = editTwitter.trim()
+      if (editDiscord.trim()) socials.discord = editDiscord.trim()
+      if (editGithub.trim()) socials.github = editGithub.trim()
+      if (editWebsite.trim()) socials.website = editWebsite.trim()
+
+      // Only add socials if at least one field has value
+      if (Object.keys(socials).length > 0) {
+        profileData.socials = socials
       }
 
       await setDoc(userDocRef, profileData, { merge: true })
 
       setProfile(prev => prev ? {
         ...prev,
-        profileData: profileData
+        profileData: {
+          ...prev.profileData,
+          ...profileData
+        }
       } : null)
 
       setIsEditing(false)
