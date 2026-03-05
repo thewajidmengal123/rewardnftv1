@@ -70,6 +70,13 @@ export function Header() {
             >
               Mini-Game
             </Link>
+            {/* PREDICTIONS ADDED HERE */}
+            <Link
+              href="/predictions"
+              className="text-gray-400 hover:text-white transition-colors font-medium text-sm"
+            >
+              Predictions
+            </Link>
             <AdminOnly>
               <Link
                 href="/admin/dashboard"
