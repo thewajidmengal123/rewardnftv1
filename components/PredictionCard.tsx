@@ -24,25 +24,19 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
   const [timeLeft, setTimeLeft] = useState('');
   const [txStatus, setTxStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
 
-  // Safe wallet values
   const connected = wallet?.connected || false;
   const publicKey = wallet?.publicKey;
   const signTransaction = wallet?.signTransaction;
 
-  // Safe prediction values
   const safePrediction = prediction || {};
   const totalPool = safePrediction.totalPool || 0;
   const upPool = safePrediction.upPool || 0;
   const downPool = safePrediction.downPool || 0;
   const totalBets = safePrediction.totalBets || 0;
 
-  // USDC Mint
   const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-  
-  // Treasury wallet
   const PLATFORM_WALLET_STRING = 'A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP';
 
-  // Countdown timer
   useEffect(() => {
     if (!safePrediction.endTime) return;
     
@@ -89,14 +83,12 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
     setTxStatus('processing');
     
     try {
-      // Use Helius RPC from env
       const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_MAINNET_RPC || 
                      process.env.NEXT_PUBLIC_SOLANA_RPC || 
                      'https://mainnet.helius-rpc.com/?api-key=18fec3d0-97ce-4d0a-8692-9d116157ee54';
       
       const connection = new Connection(rpcUrl, 'confirmed');
       
-      // Validate platform wallet
       let platformWalletPubkey: PublicKey;
       try {
         platformWalletPubkey = new PublicKey(PLATFORM_WALLET_STRING);
@@ -110,7 +102,6 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
       let signature: string;
 
       if (token === 'SOL') {
-        // Native SOL transfer
         const transaction = new Transaction();
         transaction.add(
           SystemProgram.transfer({
@@ -134,7 +125,6 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
         }, 'confirmed');
         
       } else {
-        // USDC SPL Token transfer
         const userTokenAccount = await getAssociatedTokenAddress(USDC_MINT, publicKey);
         const platformTokenAccount = await getAssociatedTokenAddress(USDC_MINT, platformWalletPubkey);
         
@@ -170,7 +160,6 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
         }, 'confirmed');
       }
 
-      // Save to database
       const res = await fetch('/api/predictions/bet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,6 +203,7 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
   const isEnded = timeLeft === 'Ended';
   const isBTC = safePrediction.category === 'btc-5min';
 
+  // COMPACT VARIANT
   if (variant === 'compact') {
     return (
       <div className="bg-[#1a1d29] rounded-2xl overflow-hidden border border-gray-800 hover:border-gray-700 transition-all">
@@ -340,16 +330,14 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
     );
   }
 
-  // Default full size
+  // DEFAULT VARIANT
   return (
     <div className="bg-[#1a1d29] rounded-2xl overflow-hidden border border-gray-800">
       <div className="h-48 bg-gradient-to-br from-blue-600/20 to-purple-600/20 relative overflow-hidden">
         {isBTC ? (
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-8xl animate-pulse">₿</span>
-            </div>
-          </>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-8xl animate-pulse">₿</span>
+          </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-6xl">🔮</span>
