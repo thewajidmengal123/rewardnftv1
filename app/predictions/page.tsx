@@ -15,10 +15,19 @@ export default function PredictionsPage() {
   const [activeTab, setActiveTab] = useState<'trending' | 'ending' | 'all'>('trending');
   const [btcPrice, setBtcPrice] = useState<number>(0);
   const [priceChange, setPriceChange] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Admin wallet check
+  // Admin wallet
   const ADMIN_WALLET = '6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ';
-  const isAdmin = connected && publicKey?.toString() === ADMIN_WALLET;
+
+  // Check admin on client side only
+  useEffect(() => {
+    if (connected && publicKey) {
+      setIsAdmin(publicKey.toString() === ADMIN_WALLET);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [connected, publicKey]);
 
   useEffect(() => {
     fetchData();
@@ -145,8 +154,8 @@ export default function PredictionsPage() {
             </button>
           ))}
           
-          {/* CREATE A DUEL BUTTON - Admin ke liye */}
-          {isAdmin ? (
+          {/* CREATE A DUEL BUTTON - Sirf Admin ke liye */}
+          {isAdmin && (
             <Link 
               href="/admin/dashboard"
               className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold transition-colors"
@@ -154,15 +163,6 @@ export default function PredictionsPage() {
               <Plus className="w-4 h-4" />
               Create a Duel
             </Link>
-          ) : (
-            <button 
-              onClick={() => alert('Only admin can create predictions')}
-              className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full bg-yellow-500/50 text-black/50 font-bold cursor-not-allowed"
-              disabled
-            >
-              <Zap className="w-4 h-4" />
-              Create a Duel
-            </button>
           )}
         </div>
 
