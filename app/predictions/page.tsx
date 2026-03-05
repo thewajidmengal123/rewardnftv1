@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/contexts/wallet-context';
-import { TrendingUp, Clock, Zap, BarChart3, Bitcoin } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { TrendingUp, Clock, BarChart3, Bitcoin } from 'lucide-react';
 import PredictionCard from '@/components/PredictionCard';
 
 export default function PredictionsPage() {
   const { publicKey } = useWallet();
-  const router = useRouter();
   const [predictions, setPredictions] = useState<any[]>([]);
   const [btcRound, setBtcRound] = useState<any>(null);
   const [myBets, setMyBets] = useState<any[]>([]);
@@ -44,20 +42,14 @@ export default function PredictionsPage() {
     try {
       setLoading(true);
       
-      // Fetch regular predictions
-      const predRes = await fetch('/api/predictions?status=active');
+      const [predRes, btcRes, betsRes] = await Promise.all([
+        fetch('/api/predictions?status=active'),
+        fetch('/api/predictions/btc-rounds'),
+        publicKey ? fetch(`/api/predictions/bet?wallet=${publicKey.toString()}`) : Promise.resolve(null)
+      ]);
+
       const predData = await predRes.json();
-      
-      // Fetch BTC round - SEPARATE API CALL
-      const btcRes = await fetch('/api/predictions/btc-rounds');
       const btcData = await btcRes.json();
-      
-      // Fetch my bets
-      let betsData = { bets: [] };
-      if (publicKey) {
-        const betsRes = await fetch(`/api/predictions/bet?wallet=${publicKey.toString()}`);
-        betsData = await betsRes.json();
-      }
       
       console.log('Predictions:', predData);
       console.log('BTC Data:', btcData);
@@ -66,17 +58,15 @@ export default function PredictionsPage() {
         setPredictions(predData.predictions.filter((p: any) => p.category === 'manual'));
       }
       
-      // IMPORTANT: Check if btcRound exists in response
       if (btcData.success && btcData.currentRound) {
         setBtcRound(btcData.currentRound);
-        console.log('✅ BTC Round set:', btcData.currentRound);
       } else {
-        console.log('❌ No BTC round found');
         setBtcRound(null);
       }
       
-      if (betsData.bets) {
-        setMyBets(betsData.bets);
+      if (betsRes) {
+        const betsData = await betsRes.json();
+        if (betsData.success) setMyBets(betsData.bets);
       }
     } catch (error) {
       console.error('Fetch error:', error);
@@ -143,7 +133,7 @@ export default function PredictionsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Tabs */}
+        {/* Tabs - NO "Create a Duel" button for users */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: 'trending', label: 'Trending', icon: TrendingUp },
@@ -161,14 +151,6 @@ export default function PredictionsPage() {
               {tab.label}
             </button>
           ))}
-          
-          <button 
-            onClick={() => router.push('/admin/dashboard')}
-            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold transition-colors"
-          >
-            <Zap className="w-4 h-4" />
-            Create a Duel
-          </button>
         </div>
 
         {loading ? (
@@ -177,7 +159,7 @@ export default function PredictionsPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* 🔥 BTC 5-Min Section - ALWAYS SHOW IF EXISTS */}
+            {/* BTC 5-Min Section */}
             {btcRound && (
               <section>
                 <div className="flex items-center gap-3 mb-4">
@@ -199,7 +181,6 @@ export default function PredictionsPage() {
               </section>
             )}
 
-            {/* Show message if no BTC round */}
             {!btcRound && !loading && (
               <section className="bg-[#1a1d29] rounded-xl p-6 border border-gray-800">
                 <div className="flex items-center gap-3 text-gray-400">
@@ -227,7 +208,7 @@ export default function PredictionsPage() {
               </div>
             </section>
 
-            {/* My Bets Section */}
+            {/* My Bets */}
             {publicKey && myBets.length > 0 && (
               <section className="bg-[#1a1d29] rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4">My Active Bets</h2>
@@ -237,33 +218,21 @@ export default function PredictionsPage() {
                       key={bet.id}
                       className="flex items-center justify-between p-4 bg-[#0d1117] rounded-xl border border-gray-800"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          bet.side === 'up' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {bet.side === 'up' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white">{bet.predictionId?.title || 'BTC Round'}</p>
-                          <p className="text-sm text-gray-400">
-                            You bet: <span className={bet.side === 'up' ? 'text-green-400' : 'text-red-400'}>
-                              {bet.side.toUpperCase()}
-                            </span> • {bet.amount} {bet.token}
-                          </p>
-                        </div>
+                      <div>
+                        <p className="font-semibold text-white">{bet.predictionId?.title || 'BTC Round'}</p>
+                        <p className="text-sm text-gray-400">
+                          You bet: <span className={bet.side === 'up' ? 'text-green-400' : 'text-red-400'}>
+                            {bet.side.toUpperCase()}
+                          </span> • {bet.amount} {bet.token}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          bet.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                          bet.status === 'won' ? 'bg-green-500/20 text-green-400' :
-                          'bg-red-500/20 text-red-400'
-                        }`}>
-                          {bet.status.toUpperCase()}
-                        </span>
-                        {bet.payoutAmount > 0 && (
-                          <p className="text-green-400">+{bet.payoutAmount.toFixed(2)}</p>
-                        )}
-                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        bet.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                        bet.status === 'won' ? 'bg-green-500/20 text-green-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {bet.status.toUpperCase()}
+                      </span>
                     </div>
                   ))}
                 </div>
