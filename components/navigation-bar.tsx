@@ -39,6 +39,7 @@ export function NavigationBar() {
     { href: "/mint", label: "Mint NFT" },
     { href: "/referrals", label: "Referrals" },
     { href: "/quests", label: "Quests" },
+    { href: "/predictions", label: "Predictions" }, // ← ADDED HERE
     { href: "/leaderboard", label: "Leaderboard" },
   ]
 
