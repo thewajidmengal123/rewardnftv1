@@ -1,9 +1,14 @@
-// components/PredictionCard.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { Clock, Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { 
+  getAssociatedTokenAddress, 
+  createTransferInstruction,
+  getOrCreateAssociatedTokenAccount
+} from '@solana/spl-token';
+import { Clock, Users, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
 
 interface PredictionCardProps {
   prediction: any;
@@ -12,13 +17,20 @@ interface PredictionCardProps {
 }
 
 export default function PredictionCard({ prediction, onBetPlaced, variant = 'default' }: PredictionCardProps) {
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction, connected } = useWallet();
+  const { connection } = useConnection();
   const [selectedSide, setSelectedSide] = useState<'up' | 'down' | null>(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<'USDC' | 'SOL'>('USDC');
   const [timeLeft, setTimeLeft] = useState('');
+  const [txStatus, setTxStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
 
+  // Token mint addresses
+  const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+  const PLATFORM_WALLET = new PublicKey(process.env.NEXT_PUBLIC_PLATFORM_WALLET || '6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9...');
+
+  // Countdown timer
   useEffect(() => {
     const updateTimer = () => {
       const end = prediction.endTime?.toMillis ? prediction.endTime.toMillis() : new Date(prediction.endTime).getTime();
@@ -46,12 +58,77 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
   }, [prediction.endTime]);
 
   const handleBet = async () => {
-    if (!publicKey || !selectedSide || !amount) return;
+    if (!publicKey || !signTransaction || !selectedSide || !amount) {
+      alert('Please connect wallet and fill all fields');
+      return;
+    }
     
+    const betAmount = parseFloat(amount);
+    if (isNaN(betAmount) || betAmount <= 0) {
+      alert('Please enter valid amount');
+      return;
+    }
+
     setLoading(true);
+    setTxStatus('processing');
+    
     try {
-      const txSignature = 'demo-tx-' + Date.now();
+      let signature: string;
+
+      if (token === 'SOL') {
+        // Native SOL transfer
+        const transaction = new Transaction();
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: PLATFORM_WALLET,
+            lamports: betAmount * 1000000000, // SOL has 9 decimals
+          })
+        );
+        
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey;
+        
+        const signed = await signTransaction(transaction);
+        signature = await connection.sendRawTransaction(signed.serialize());
+        
+      } else {
+        // USDC SPL Token transfer
+        const userTokenAccount = await getAssociatedTokenAddress(USDC_MINT, publicKey);
+        const platformTokenAccount = await getAssociatedTokenAddress(USDC_MINT, PLATFORM_WALLET);
+        
+        // Check user's token account exists
+        const userAccountInfo = await connection.getAccountInfo(userTokenAccount);
+        if (!userAccountInfo) {
+          alert('You need a USDC token account. Please receive some USDC first.');
+          setLoading(false);
+          setTxStatus('error');
+          return;
+        }
+
+        const transaction = new Transaction();
+        transaction.add(
+          createTransferInstruction(
+            userTokenAccount,
+            platformTokenAccount,
+            publicKey,
+            betAmount * 1000000 // USDC has 6 decimals
+          )
+        );
+        
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey;
+        
+        const signed = await signTransaction(transaction);
+        signature = await connection.sendRawTransaction(signed.serialize());
+      }
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
       
+      // Save to database
       const res = await fetch('/api/predictions/bet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,26 +136,31 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
           predictionId: prediction.id,
           userWallet: publicKey.toString(),
           side: selectedSide,
-          amount: parseFloat(amount),
+          amount: betAmount,
           token,
-          txSignature
+          txSignature: signature
         })
       });
       
       const data = await res.json();
       
       if (res.ok) {
-        alert('Bet placed successfully!');
+        setTxStatus('success');
+        alert(`✅ Bet placed successfully!\nTx: ${signature.slice(0, 16)}...`);
         setAmount('');
         setSelectedSide(null);
         onBetPlaced();
       } else {
-        alert(data.error || 'Failed to place bet');
+        throw new Error(data.error || 'Failed to save bet');
       }
-    } catch (error) {
-      alert('Error placing bet');
+      
+    } catch (error: any) {
+      console.error('Bet error:', error);
+      setTxStatus('error');
+      alert(`❌ Transaction failed: ${error.message}`);
     } finally {
       setLoading(false);
+      setTimeout(() => setTxStatus('idle'), 3000);
     }
   };
 
@@ -143,19 +225,19 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setSelectedSide('down')}
-              disabled={isEnded}
+              disabled={isEnded || loading}
               className={`py-2 rounded-lg text-sm font-bold transition-all ${
                 selectedSide === 'down' ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-              }`}
+              } disabled:opacity-50`}
             >
               NO
             </button>
             <button
               onClick={() => setSelectedSide('up')}
-              disabled={isEnded}
+              disabled={isEnded || loading}
               className={`py-2 rounded-lg text-sm font-bold transition-all ${
                 selectedSide === 'up' ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-              }`}
+              } disabled:opacity-50`}
             >
               YES
             </button>
@@ -181,14 +263,28 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
                 placeholder={`Amount in ${token}`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                disabled={loading}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50"
               />
               <button
                 onClick={handleBet}
-                disabled={loading || !amount}
-                className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-bold py-2 rounded-lg transition-colors"
+                disabled={loading || !amount || !connected}
+                className={`w-full text-white text-sm font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  txStatus === 'success' ? 'bg-green-500' : 
+                  txStatus === 'error' ? 'bg-red-500' : 
+                  'bg-blue-500 hover:bg-blue-600'
+                } disabled:opacity-50`}
               >
-                {loading ? '...' : `Bet ${selectedSide.toUpperCase()}`}
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : txStatus === 'success' ? (
+                  '✓ Success!'
+                ) : (
+                  `Bet ${selectedSide.toUpperCase()}`
+                )}
               </button>
             </div>
           )}
@@ -240,6 +336,13 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
         <h2 className="text-2xl font-bold text-white mb-2">{prediction.title}</h2>
         <p className="text-gray-400 mb-6">{prediction.description}</p>
 
+        {!connected && (
+          <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-center">
+            <Wallet className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+            <p className="text-yellow-400 text-sm">Connect wallet to place bets</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
@@ -277,17 +380,19 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setSelectedSide('up')}
+                disabled={isEnded || loading || !connected}
                 className={`py-4 rounded-xl font-bold text-lg transition-all transform ${
                   selectedSide === 'up' ? 'bg-green-500 text-white shadow-lg shadow-green-500/25 scale-[1.02]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 📈 Bet UP
               </button>
               <button
                 onClick={() => setSelectedSide('down')}
+                disabled={isEnded || loading || !connected}
                 className={`py-4 rounded-xl font-bold text-lg transition-all transform ${
                   selectedSide === 'down' ? 'bg-red-500 text-white shadow-lg shadow-red-500/25 scale-[1.02]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 📉 Bet DOWN
               </button>
@@ -300,9 +405,10 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
                     <button
                       key={t}
                       onClick={() => setToken(t as any)}
+                      disabled={loading}
                       className={`px-6 py-2 rounded-lg font-semibold transition-all ${
                         token === t ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                      }`}
+                      } disabled:opacity-50`}
                     >
                       {t}
                     </button>
@@ -315,7 +421,8 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
                     placeholder={`Enter ${token} amount`}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-gray-900 border-2 border-gray-800 rounded-xl px-4 py-4 text-xl text-white text-center placeholder-gray-600 focus:border-blue-500 focus:outline-none transition-colors"
+                    disabled={loading}
+                    className="w-full bg-gray-900 border-2 border-gray-800 rounded-xl px-4 py-4 text-xl text-white text-center placeholder-gray-600 focus:border-blue-500 focus:outline-none transition-colors disabled:opacity-50"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">{token}</span>
                 </div>
@@ -324,15 +431,31 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
                   <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                     <p className="text-sm text-gray-400 mb-1">Potential Win</p>
                     <p className="text-2xl font-bold text-blue-400">{(parseFloat(amount) * 1.85).toFixed(2)} {token}</p>
+                    <p className="text-xs text-gray-500 mt-1">85% return (after 2% fee)</p>
                   </div>
                 )}
 
                 <button
                   onClick={handleBet}
-                  disabled={loading || !amount || parseFloat(amount) <= 0}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-blue-500/25"
+                  disabled={loading || !amount || parseFloat(amount) <= 0 || !connected}
+                  className={`w-full text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 ${
+                    txStatus === 'success' ? 'bg-green-500 shadow-green-500/25' : 
+                    txStatus === 'error' ? 'bg-red-500 shadow-red-500/25' : 
+                    'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-blue-500/25'
+                  } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
                 >
-                  {loading ? 'Processing...' : `Place Bet on ${selectedSide.toUpperCase()}`}
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing Transaction...
+                    </>
+                  ) : txStatus === 'success' ? (
+                    '✓ Bet Placed Successfully!'
+                  ) : txStatus === 'error' ? (
+                    '✗ Transaction Failed - Try Again'
+                  ) : (
+                    `Place Bet on ${selectedSide.toUpperCase()}`
+                  )}
                 </button>
               </div>
             )}
@@ -345,9 +468,15 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
             <p className={`text-3xl font-bold ${prediction.winningSide === 'up' ? 'text-green-400' : 'text-red-400'}`}>
               {prediction.winningSide === 'up' ? '📈 UP' : '📉 DOWN'} WINS
             </p>
+            {prediction.btcPriceEnd && (
+              <p className="text-sm text-gray-500 mt-2">Final: ${prediction.btcPriceEnd.toLocaleString()}</p>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+
+// Need to import SystemProgram for SOL transfers
+import { SystemProgram } from '@solana/web3.js';
