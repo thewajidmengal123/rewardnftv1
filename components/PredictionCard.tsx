@@ -16,7 +16,7 @@ interface PredictionCardProps {
 }
 
 export default function PredictionCard({ prediction, onBetPlaced, variant = 'default' }: PredictionCardProps) {
-  const { connected, publicKey, signTransaction } = useWallet();
+  const wallet = useWallet();
   const [selectedSide, setSelectedSide] = useState<'up' | 'down' | null>(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,16 +24,32 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
   const [timeLeft, setTimeLeft] = useState('');
   const [txStatus, setTxStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
 
-  // Treasury wallet from console (COPY EXACTLY)
-  const PLATFORM_WALLET = new PublicKey('A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP');
-  
+  // Safe wallet values
+  const connected = wallet?.connected || false;
+  const publicKey = wallet?.publicKey;
+  const signTransaction = wallet?.signTransaction;
+
+  // Safe prediction values
+  const safePrediction = prediction || {};
+  const totalPool = safePrediction.totalPool || 0;
+  const upPool = safePrediction.upPool || 0;
+  const downPool = safePrediction.downPool || 0;
+  const totalBets = safePrediction.totalBets || 0;
+
   // USDC Mint
   const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+  
+  // Treasury wallet
+  const PLATFORM_WALLET_STRING = 'A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP';
 
   // Countdown timer
   useEffect(() => {
+    if (!safePrediction.endTime) return;
+    
     const updateTimer = () => {
-      const end = prediction.endTime?.toMillis ? prediction.endTime.toMillis() : new Date(prediction.endTime).getTime();
+      const end = safePrediction.endTime?.toMillis 
+        ? safePrediction.endTime.toMillis() 
+        : new Date(safePrediction.endTime).getTime();
       const now = Date.now();
       const diff = end - now;
       
@@ -55,7 +71,7 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [prediction.endTime]);
+  }, [safePrediction.endTime]);
 
   const handleBet = async () => {
     if (!connected || !publicKey || !signTransaction || !selectedSide || !amount) {
@@ -73,8 +89,24 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
     setTxStatus('processing');
     
     try {
-      // Reliable RPC connection
-      const connection = new Connection('https://rpc.ankr.com/solana', 'confirmed');
+      // Use Helius RPC from env
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_MAINNET_RPC || 
+                     process.env.NEXT_PUBLIC_SOLANA_RPC || 
+                     'https://mainnet.helius-rpc.com/?api-key=18fec3d0-97ce-4d0a-8692-9d116157ee54';
+      
+      const connection = new Connection(rpcUrl, 'confirmed');
+      
+      // Validate platform wallet
+      let platformWalletPubkey: PublicKey;
+      try {
+        platformWalletPubkey = new PublicKey(PLATFORM_WALLET_STRING);
+      } catch (e) {
+        alert('Invalid platform wallet address configured');
+        setLoading(false);
+        setTxStatus('error');
+        return;
+      }
+
       let signature: string;
 
       if (token === 'SOL') {
@@ -83,63 +115,67 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
         transaction.add(
           SystemProgram.transfer({
             fromPubkey: publicKey,
-            toPubkey: PLATFORM_WALLET,
+            toPubkey: platformWalletPubkey,
             lamports: Math.floor(betAmount * 1000000000),
           })
         );
         
-        const { blockhash } = await connection.getLatestBlockhash();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = publicKey;
         
         const signed = await signTransaction(transaction);
         signature = await connection.sendRawTransaction(signed.serialize());
         
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight
+        }, 'confirmed');
+        
       } else {
         // USDC SPL Token transfer
-        try {
-          const userTokenAccount = await getAssociatedTokenAddress(USDC_MINT, publicKey);
-          const platformTokenAccount = await getAssociatedTokenAddress(USDC_MINT, PLATFORM_WALLET);
-          
-          // Check user's token account
-          const userAccountInfo = await connection.getAccountInfo(userTokenAccount);
-          if (!userAccountInfo) {
-            alert('You need a USDC token account. Please receive some USDC first.');
-            setLoading(false);
-            setTxStatus('error');
-            return;
-          }
-
-          const transaction = new Transaction();
-          transaction.add(
-            createTransferInstruction(
-              userTokenAccount,
-              platformTokenAccount,
-              publicKey,
-              Math.floor(betAmount * 1000000)
-            )
-          );
-          
-          const { blockhash } = await connection.getLatestBlockhash();
-          transaction.recentBlockhash = blockhash;
-          transaction.feePayer = publicKey;
-          
-          const signed = await signTransaction(transaction);
-          signature = await connection.sendRawTransaction(signed.serialize());
-        } catch (err: any) {
-          throw new Error('USDC transfer failed: ' + err.message);
+        const userTokenAccount = await getAssociatedTokenAddress(USDC_MINT, publicKey);
+        const platformTokenAccount = await getAssociatedTokenAddress(USDC_MINT, platformWalletPubkey);
+        
+        const userAccountInfo = await connection.getAccountInfo(userTokenAccount);
+        if (!userAccountInfo) {
+          alert('You need a USDC token account. Please receive some USDC first.');
+          setLoading(false);
+          setTxStatus('error');
+          return;
         }
+
+        const transaction = new Transaction();
+        transaction.add(
+          createTransferInstruction(
+            userTokenAccount,
+            platformTokenAccount,
+            publicKey,
+            Math.floor(betAmount * 1000000)
+          )
+        );
+        
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey;
+        
+        const signed = await signTransaction(transaction);
+        signature = await connection.sendRawTransaction(signed.serialize());
+        
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight
+        }, 'confirmed');
       }
 
-      // Wait for confirmation
-      await connection.confirmTransaction(signature, 'confirmed');
-      
       // Save to database
       const res = await fetch('/api/predictions/bet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          predictionId: prediction.id,
+          predictionId: safePrediction.id,
           userWallet: publicKey.toString(),
           side: selectedSide,
           amount: betAmount,
@@ -152,7 +188,7 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
       
       if (res.ok) {
         setTxStatus('success');
-        alert(`✅ Bet placed! Tx: ${signature.slice(0, 16)}...`);
+        alert(`✅ Bet placed successfully! Tx: ${signature.slice(0, 16)}...`);
         setAmount('');
         setSelectedSide(null);
         onBetPlaced();
@@ -163,23 +199,20 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
     } catch (error: any) {
       console.error('Bet error:', error);
       setTxStatus('error');
-      alert(`❌ Failed: ${error.message}`);
+      alert(`❌ Transaction failed: ${error.message}`);
     } finally {
       setLoading(false);
       setTimeout(() => setTxStatus('idle'), 3000);
     }
   };
 
-  const totalPool = prediction.totalPool || 0;
-  const upPool = prediction.upPool || 0;
-  const downPool = prediction.downPool || 0;
   const upPercent = totalPool > 0 ? (upPool / totalPool) * 100 : 50;
   const downPercent = totalPool > 0 ? (downPool / totalPool) * 100 : 50;
   const upChance = Math.round(upPercent);
   const downChance = Math.round(downPercent);
 
   const isEnded = timeLeft === 'Ended';
-  const isBTC = prediction.category === 'btc-5min';
+  const isBTC = safePrediction.category === 'btc-5min';
 
   if (variant === 'compact') {
     return (
@@ -200,13 +233,13 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
           </div>
           <div className="absolute top-3 right-3 bg-black/60 backdrop-blur px-3 py-1 rounded-full text-xs">
             <Users className="w-3 h-3 inline mr-1" />
-            {prediction.totalBets || 0}
+            {totalBets}
           </div>
         </div>
 
         <div className="p-4">
           <h3 className="text-white font-semibold text-sm mb-3 line-clamp-2">
-            {prediction.title}
+            {safePrediction.title || 'Unknown Prediction'}
           </h3>
 
           <div className="flex justify-between items-center mb-4">
@@ -242,4 +275,252 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
               onClick={() => setSelectedSide('up')}
               disabled={isEnded || loading}
               className={`py-2 rounded-lg text-sm font-bold transition-all ${
-                selectedSide ===
+                selectedSide === 'up' ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+              } disabled:opacity-50`}
+            >
+              YES
+            </button>
+          </div>
+
+          {selectedSide && !isEnded && (
+            <div className="mt-3 space-y-2">
+              {!connected ? (
+                <div className="text-center p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                  <p className="text-yellow-400 text-sm">Connect wallet to bet</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    {['USDC', 'SOL'].map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setToken(t as any)}
+                        className={`flex-1 py-1.5 rounded text-xs font-semibold ${
+                          token === t ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-400'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    placeholder={`Amount in ${token}`}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={loading}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleBet}
+                    disabled={loading || !amount}
+                    className={`w-full text-white text-sm font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                      txStatus === 'success' ? 'bg-green-500' : 
+                      txStatus === 'error' ? 'bg-red-500' : 
+                      'bg-blue-500 hover:bg-blue-600'
+                    } disabled:opacity-50`}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Processing...
+                      </>
+                    ) : txStatus === 'success' ? (
+                      '✓ Success!'
+                    ) : (
+                      `Bet ${selectedSide.toUpperCase()}`
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Default full size
+  return (
+    <div className="bg-[#1a1d29] rounded-2xl overflow-hidden border border-gray-800">
+      <div className="h-48 bg-gradient-to-br from-blue-600/20 to-purple-600/20 relative overflow-hidden">
+        {isBTC ? (
+          <>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-8xl animate-pulse">₿</span>
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-6xl">🔮</span>
+          </div>
+        )}
+        
+        <div className="absolute top-4 left-4 flex gap-2">
+          <span className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-mono text-white border border-white/10">
+            <Clock className="w-3 h-3 inline mr-1.5" />
+            {timeLeft}
+          </span>
+          {isBTC && (
+            <span className="bg-orange-500/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-orange-400 border border-orange-500/30">
+              ⚡ LIVE
+            </span>
+          )}
+        </div>
+        
+        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs text-gray-300 border border-white/10">
+          <Users className="w-3 h-3 inline mr-1.5" />
+          {totalBets} bets
+        </div>
+
+        <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+          <p className="text-xs text-gray-400 mb-0.5">Total Pool</p>
+          <p className="text-xl font-bold text-white">${totalPool.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <h2 className="text-2xl font-bold text-white mb-2">{safePrediction.title || 'Unknown'}</h2>
+        <p className="text-gray-400 mb-6">{safePrediction.description || ''}</p>
+
+        {!connected && (
+          <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-center">
+            <Wallet className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+            <p className="text-yellow-400 text-sm">Connect wallet to place bets</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-green-400 font-semibold flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" />
+                UP
+              </span>
+              <span className="text-2xl font-bold text-green-400">{upChance}%</span>
+            </div>
+            <p className="text-sm text-gray-400 mb-1">Pool: ${upPool.toLocaleString()}</p>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-500" style={{ width: `${upPercent}%` }} />
+            </div>
+          </div>
+
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-red-400 font-semibold flex items-center gap-1">
+                <TrendingDown className="w-4 h-4" />
+                DOWN
+              </span>
+              <span className="text-2xl font-bold text-red-400">{downChance}%</span>
+            </div>
+            <p className="text-sm text-gray-400 mb-1">Pool: ${downPool.toLocaleString()}</p>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-500" style={{ width: `${downPercent}%` }} />
+            </div>
+          </div>
+        </div>
+
+        {!isEnded && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSelectedSide('up')}
+                disabled={isEnded || loading || !connected}
+                className={`py-4 rounded-xl font-bold text-lg transition-all transform ${
+                  selectedSide === 'up' ? 'bg-green-500 text-white shadow-lg shadow-green-500/25 scale-[1.02]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                📈 Bet UP
+              </button>
+              <button
+                onClick={() => setSelectedSide('down')}
+                disabled={isEnded || loading || !connected}
+                className={`py-4 rounded-xl font-bold text-lg transition-all transform ${
+                  selectedSide === 'down' ? 'bg-red-500 text-white shadow-lg shadow-red-500/25 scale-[1.02]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                📉 Bet DOWN
+              </button>
+            </div>
+
+            {selectedSide && connected && (
+              <div className="space-y-3">
+                <div className="flex gap-2 justify-center">
+                  {['USDC', 'SOL'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setToken(t as any)}
+                      disabled={loading}
+                      className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                        token === t ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      } disabled:opacity-50`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="number"
+                    placeholder={`Enter ${token} amount`}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={loading}
+                    className="w-full bg-gray-900 border-2 border-gray-800 rounded-xl px-4 py-4 text-xl text-white text-center placeholder-gray-600 focus:border-blue-500 focus:outline-none transition-colors disabled:opacity-50"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">{token}</span>
+                </div>
+
+                {amount && (
+                  <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                    <p className="text-sm text-gray-400 mb-1">Potential Win</p>
+                    <p className="text-2xl font-bold text-blue-400">{(parseFloat(amount) * 1.85).toFixed(2)} {token}</p>
+                    <p className="text-xs text-gray-500 mt-1">85% return (after 2% fee)</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleBet}
+                  disabled={loading || !amount || parseFloat(amount) <= 0}
+                  className={`w-full text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 ${
+                    txStatus === 'success' ? 'bg-green-500 shadow-green-500/25' : 
+                    txStatus === 'error' ? 'bg-red-500 shadow-red-500/25' : 
+                    'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-blue-500/25'
+                  } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing Transaction...
+                    </>
+                  ) : txStatus === 'success' ? (
+                    '✓ Bet Placed Successfully!'
+                  ) : txStatus === 'error' ? (
+                    '✗ Transaction Failed - Try Again'
+                  ) : (
+                    `Place Bet on ${selectedSide.toUpperCase()}`
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isEnded && safePrediction.winningSide && (
+          <div className="text-center py-6 bg-gray-800/50 rounded-xl border border-gray-700">
+            <p className="text-gray-400 mb-2">Prediction Ended</p>
+            <p className={`text-3xl font-bold ${safePrediction.winningSide === 'up' ? 'text-green-400' : 'text-red-400'}`}>
+              {safePrediction.winningSide === 'up' ? '📈 UP' : '📉 DOWN'} WINS
+            </p>
+            {safePrediction.btcPriceEnd && (
+              <p className="text-sm text-gray-500 mt-2">Final: ${safePrediction.btcPriceEnd.toLocaleString()}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
