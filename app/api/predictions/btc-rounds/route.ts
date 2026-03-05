@@ -1,9 +1,9 @@
-// app/api/predictions/btc-rounds/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentBTCRound, createBTCRound } from '@/lib/predictions';
 
 const COINGECKO_API_KEY = 'CG-nEtmMQLWcJLffamKWoGTyY7D';
 
+// Fetch BTC price with your API key
 async function getBTCPrice(): Promise<number> {
   try {
     const res = await fetch(
@@ -19,25 +19,28 @@ async function getBTCPrice(): Promise<number> {
     return data.bitcoin.usd;
   } catch (error) {
     console.error('BTC price error:', error);
-    return 85000; // Fallback
+    return 85000; // Fallback price
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
-    // Check for active round
+    // Check for active BTC round
     let currentRound = await getCurrentBTCRound();
     
-    // Create new if none exists
+    // Create new round if none exists
     if (!currentRound) {
+      console.log('🔄 Creating new BTC round...');
       const btcPrice = await getBTCPrice();
       const roundNumber = Math.floor(Date.now() / (5 * 60 * 1000)); // Simple round number
+      
       const id = await createBTCRound(btcPrice, roundNumber);
       
+      // Return newly created round
       currentRound = {
         id,
         title: `BTC Round #${roundNumber}`,
-        description: `Will BTC go UP or DOWN? Starting: $${btcPrice.toLocaleString()}`,
+        description: `Will BTC go UP or DOWN in next 5 minutes? Starting: $${btcPrice.toLocaleString()}`,
         category: 'btc-5min',
         status: 'active',
         roundNumber,
@@ -48,12 +51,16 @@ export async function GET(req: NextRequest) {
         totalBets: 0,
         totalUsers: 0,
         startTime: new Date(),
-        endTime: new Date(Date.now() + 5 * 60 * 1000),
+        endTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
         createdBy: 'system',
         platformFee: 2,
       };
+      
+      console.log('✅ New BTC round created:', currentRound);
+    } else {
+      console.log('✅ Existing BTC round found:', currentRound);
     }
-    
+
     return NextResponse.json({ 
       success: true, 
       currentRound,
@@ -61,7 +68,7 @@ export async function GET(req: NextRequest) {
     });
     
   } catch (error: any) {
-    console.error('BTC round error:', error);
+    console.error('❌ BTC round error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
