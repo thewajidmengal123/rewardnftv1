@@ -26,7 +26,7 @@ export default function PredictionCard({ prediction, onBetPlaced, variant = 'def
 
   // Token mint addresses
   const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-  const PLATFORM_WALLET = new PublicKey(process.env.NEXT_PUBLIC_PLATFORM_WALLET || '11111111111111111111111111111111');
+  const PLATFORM_WALLET = new PublicKey(process.env.NEXT_PUBLIC_PLATFORM_WALLET || '1A9GT8pYUR5F1oRwUsQ9ADeZTWq7LJMfmPQ3TZLmV6cQP');
 
   // Countdown timer
   useEffect(() => {
