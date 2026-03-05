@@ -34,20 +34,21 @@ export function NavigationBar() {
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
+  // Your actual menu structure from screenshot
   const navItems = [
-    { href: "/", label: "Home" },
-    { href: "/mint", label: "Mint NFT" },
+    { href: "/mint", label: "Mint" },
     { href: "/referrals", label: "Referrals" },
-    { href: "/quests", label: "Quests" },
-    { href: "/predictions", label: "Predictions" }, // ← ADDED HERE
     { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/quests", label: "Quests" },
+    { href: "/airdrops", label: "Airdrops" },
+    { href: "/mini-game", label: "Mini-Game" },
+    { href: "/predictions", label: "Predictions" }, // ← ADDED HERE
   ]
 
   // Add profile link if connected
   const authenticatedItems = connected
     ? [
         { href: "/profile", label: "My Profile" },
-        { href: "/airdrops", label: "Airdrops" },
         // Add admin link (in a real app, this would check for admin role)
         { href: "/admin/dashboard", label: "Admin" },
       ]
