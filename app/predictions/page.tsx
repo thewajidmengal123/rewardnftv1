@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/contexts/wallet-context';
-import { TrendingUp, Clock, BarChart3, Bitcoin } from 'lucide-react';
+import { TrendingUp, Clock, BarChart3, Bitcoin, Info } from 'lucide-react';
 import PredictionCard from '@/components/PredictionCard';
 
 export default function PredictionsPage() {
@@ -75,13 +75,14 @@ export default function PredictionsPage() {
     }
   };
 
-  // Example predictions for demo
+  // Example predictions with images
   const examplePredictions = [
     {
       id: '1',
       title: 'Will Bitcoin reach $100K by end of March?',
       description: 'BTC price target before March 31, 2026',
       category: 'manual',
+      image: '/images/predictions/btc-100k.png', // 👈 IMAGE ADDED
       totalPool: 12500,
       upPool: 8750,
       downPool: 3750,
@@ -93,6 +94,7 @@ export default function PredictionsPage() {
       title: 'Will SOL be above $150 on March 10?',
       description: 'Solana price prediction',
       category: 'manual',
+      image: '/images/predictions/sol-150.png', // 👈 IMAGE ADDED
       totalPool: 5400,
       upPool: 3240,
       downPool: 2160,
@@ -133,7 +135,7 @@ export default function PredictionsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Tabs - NO "Create a Duel" button for users */}
+        {/* Tabs - NO CREATE BUTTON FOR USERS */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: 'trending', label: 'Trending', icon: TrendingUp },
@@ -151,6 +153,12 @@ export default function PredictionsPage() {
               {tab.label}
             </button>
           ))}
+          
+          {/* 👇 USER KO INFO DIKHAO, BUTTON NAHI */}
+          <div className="ml-auto flex items-center gap-2 text-gray-500 text-sm">
+            <Info className="w-4 h-4" />
+            <span className="hidden sm:inline">Predictions created by admin</span>
+          </div>
         </div>
 
         {loading ? (
@@ -218,21 +226,33 @@ export default function PredictionsPage() {
                       key={bet.id}
                       className="flex items-center justify-between p-4 bg-[#0d1117] rounded-xl border border-gray-800"
                     >
-                      <div>
-                        <p className="font-semibold text-white">{bet.predictionId?.title || 'BTC Round'}</p>
-                        <p className="text-sm text-gray-400">
-                          You bet: <span className={bet.side === 'up' ? 'text-green-400' : 'text-red-400'}>
-                            {bet.side.toUpperCase()}
-                          </span> • {bet.amount} {bet.token}
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          bet.side === 'up' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {bet.side === 'up' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white">{bet.predictionId?.title || 'BTC Round'}</p>
+                          <p className="text-sm text-gray-400">
+                            You bet: <span className={bet.side === 'up' ? 'text-green-400' : 'text-red-400'}>
+                              {bet.side.toUpperCase()}
+                            </span> • {bet.amount} {bet.token}
+                          </p>
+                        </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        bet.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        bet.status === 'won' ? 'bg-green-500/20 text-green-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {bet.status.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          bet.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                          bet.status === 'won' ? 'bg-green-500/20 text-green-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {bet.status.toUpperCase()}
+                        </span>
+                        {bet.payoutAmount > 0 && (
+                          <p className="text-green-400">+{bet.payoutAmount.toFixed(2)}</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
