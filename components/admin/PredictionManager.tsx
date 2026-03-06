@@ -1,260 +1,300 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useWallet } from '@/contexts/wallet-context';
-import { Plus, X, Check, Clock, DollarSign, Users } from 'lucide-react';
+import { 
+  Plus, 
+  Trophy, 
+  X, 
+  Image as ImageIcon, 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign,
+  Clock,
+  Users
+} from 'lucide-react';
+import { createPrediction, getAllPredictions, settlePrediction, Prediction } from '@/lib/predictions';
+import { Timestamp } from 'firebase/firestore';
 
 export default function PredictionManager() {
-  const { publicKey, connected } = useWallet();
-  const [predictions, setPredictions] = useState<any[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [showCreate, setShowCreate] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    startTime: '',
+    image: '',
     endTime: '',
     platformFee: 2,
   });
 
-  const ADMIN_WALLET = '6nHPbBNxh31qpKfLrs3WzzDGkDjmQYQGuVsh9qB7VLBQ';
-  const isAdmin = connected && publicKey?.toString() === ADMIN_WALLET;
-
   useEffect(() => {
-    if (isAdmin) {
-      fetchPredictions();
-    }
-  }, [isAdmin]);
+    fetchPredictions();
+  }, []);
 
   const fetchPredictions = async () => {
-    try {
-      const res = await fetch('/api/predictions?status=all');
-      const data = await res.json();
-      if (data.success) setPredictions(data.predictions);
-    } catch (error) {
-      console.error('Fetch predictions error:', error);
-    }
+    const data = await getAllPredictions();
+    setPredictions(data);
   };
 
-  const createPrediction = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) {
-      alert('Admin only!');
-      return;
-    }
-    
     setLoading(true);
+
     try {
-      const res = await fetch('/api/predictions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          category: 'manual',
-          adminWallet: publicKey?.toString(),
-        }),
-      });
+      const endTime = new Date(formData.endTime);
       
-      if (res.ok) {
-        alert('✅ Prediction created successfully!');
-        setShowCreate(false);
-        setFormData({ title: '', description: '', startTime: '', endTime: '', platformFee: 2 });
-        fetchPredictions();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to create');
-      }
-    } catch (error) {
-      alert('❌ Error creating prediction');
+      await createPrediction({
+        title: formData.title,
+        description: formData.description,
+        image: formData.image || '/images/default-prediction.png',
+        category: 'manual',
+        status: 'active',
+        startTime: new Date(),
+        endTime: endTime,
+        totalPool: 0,
+        upPool: 0,
+        downPool: 0,
+        totalBets: 0,
+        totalUsers: 0,
+        createdBy: 'admin',
+        platformFee: formData.platformFee,
+      });
+
+      alert('✅ Prediction created successfully!');
+      setShowCreate(false);
+      setFormData({ title: '', description: '', image: '', endTime: '', platformFee: 2 });
+      fetchPredictions();
+    } catch (error: any) {
+      alert('❌ Error: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const settlePrediction = async (id: string, outcome: 'up' | 'down') => {
-    if (!confirm(`Settle as ${outcome.toUpperCase()}?`)) return;
+  const handleSettle = async (predictionId: string, outcome: 'up' | 'down') => {
+    if (!confirm(`Are you sure you want to settle this prediction as ${outcome.toUpperCase()}?`)) return;
     
-    const res = await fetch('/api/predictions/settle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        predictionId: id,
-        outcome,
-        adminWallet: publicKey?.toString(),
-      }),
-    });
-    
-    if (res.ok) {
-      alert('✅ Settled!');
+    setLoading(true);
+    try {
+      await settlePrediction(predictionId, outcome, 'admin');
+      alert(`✅ Prediction settled as ${outcome.toUpperCase()}`);
       fetchPredictions();
+    } catch (error: any) {
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const triggerAutoSettle = async () => {
-    const res = await fetch('/api/predictions/settle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auto: true }),
-    });
-    
-    const data = await res.json();
-    if (data.success) {
-      alert(`✅ Auto-settled ${data.settled} rounds`);
-      fetchPredictions();
-    }
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString();
   };
-
-  if (!isAdmin) {
-    return (
-      <div className="p-8 text-center text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20">
-        <p className="text-lg font-bold">⚠️ Admin Access Required</p>
-        <p className="text-sm mt-2">Connect admin wallet to manage predictions</p>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-[#1a1d29] p-6 rounded-2xl border border-gray-800">
+    <div className="bg-[#1a1d29] rounded-2xl p-6 border border-gray-800">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-white">🎯 Prediction Market Admin</h2>
-          <p className="text-gray-400 text-sm mt-1">Create and manage prediction markets</p>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-yellow-500" />
+            Prediction Market Admin
+          </h2>
+          <p className="text-gray-400 text-sm mt-1">Create and manage prediction duels</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={triggerAutoSettle}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 border border-orange-500/30"
-          >
-            <Clock className="w-4 h-4" />
-            Auto-Settle BTC
-          </button>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
-          >
-            {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {showCreate ? 'Cancel' : 'Create Market'}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowCreate(!showCreate)}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold transition-colors"
+        >
+          {showCreate ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+          {showCreate ? 'Cancel' : 'Create a Duel'}
+        </button>
       </div>
 
+      {/* Create Form */}
       {showCreate && (
-        <form onSubmit={createPrediction} className="bg-[#1a1d29] p-6 rounded-2xl border border-gray-800 space-y-4">
-          <h3 className="text-lg font-bold text-white mb-4">Create New Prediction Market</h3>
+        <form onSubmit={handleCreate} className="mb-8 bg-[#0d1117] rounded-xl p-6 border border-gray-800 space-y-4">
+          <h3 className="text-lg font-semibold text-white mb-4">Create New Prediction</h3>
           
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-gray-400 text-sm mb-2">Prediction Title</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g., Will SOL reach $150 by March 10?"
-                className="w-full bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                value={formData.title}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
-              />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-gray-400 text-sm mb-2">Description</label>
-              <textarea
-                required
-                rows={3}
-                placeholder="Detailed description of the prediction..."
-                className="w-full bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-              />
-            </div>
-            
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Title</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g., Will BTC reach $100K?"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full bg-[#1a1d29] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Description</label>
+            <textarea
+              required
+              placeholder="Describe the prediction details..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-[#1a1d29] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none h-24"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              Image URL
+            </label>
+            <input
+              type="url"
+              placeholder="https://example.com/image.png or /images/local.png"
+              value={formData.image}
+              onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+              className="w-full bg-[#1a1d29] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">Leave empty for default image</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-gray-400 text-sm mb-2">Start Time</label>
+              <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                End Time
+              </label>
               <input
                 type="datetime-local"
                 required
-                className="w-full bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                value={formData.startTime}
-                onChange={(e) => setFormData({...formData, startTime: e.target.value})}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-gray-400 text-sm mb-2">End Time</label>
-              <input
-                type="datetime-local"
-                required
-                className="w-full bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
                 value={formData.endTime}
-                onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                className="w-full bg-[#1a1d29] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Platform Fee (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={formData.platformFee}
+                onChange={(e) => setFormData({ ...formData, platformFee: parseInt(e.target.value) })}
+                className="w-full bg-[#1a1d29] border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
               />
             </div>
           </div>
-          
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-lg"
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50"
           >
-            {loading ? 'Creating...' : 'Create Prediction Market'}
+            {loading ? 'Creating...' : '🚀 Create Prediction Duel'}
           </button>
         </form>
       )}
 
-      <div className="space-y-3">
-        <h3 className="text-lg font-bold text-white mb-4">All Markets</h3>
+      {/* Predictions List */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-white mb-4">All Predictions</h3>
+        
         {predictions.length === 0 ? (
-          <div className="text-center py-12 bg-[#1a1d29] rounded-2xl border border-gray-800">
-            <p className="text-gray-500">No predictions created yet</p>
+          <div className="text-center py-12 text-gray-500">
+            <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No predictions created yet</p>
           </div>
         ) : (
-          predictions.map((pred) => (
-            <div key={pred.id} className="bg-[#1a1d29] p-5 rounded-xl border border-gray-800">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                      pred.category === 'btc-5min' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'
-                    }`}>
-                      {pred.category === 'btc-5min' ? '⚡ BTC 5-Min' : '📊 Manual'}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                      pred.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-                    }`}>
-                      {pred.status?.toUpperCase()}
-                    </span>
+          <div className="grid gap-4">
+            {predictions.map((pred) => (
+              <div 
+                key={pred.id} 
+                className="bg-[#0d1117] rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition-colors"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Image */}
+                  <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+                    {pred.image ? (
+                      <img 
+                        src={pred.image} 
+                        alt={pred.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/images/default-prediction.png';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-600">
+                        <ImageIcon className="w-8 h-8" />
+                      </div>
+                    )}
                   </div>
-                  
-                  <h4 className="text-lg font-semibold text-white mb-1">{pred.title}</h4>
-                  <p className="text-gray-400 text-sm mb-3">{pred.description}</p>
-                  
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-gray-500">Pool: <span className="text-white font-semibold">${pred.totalPool?.toLocaleString() || 0}</span></span>
-                    <span className="text-gray-500">Bets: <span className="text-white font-semibold">{pred.totalBets || 0}</span></span>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-semibold text-white truncate">{pred.title}</h4>
+                        <p className="text-sm text-gray-400 mt-1 line-clamp-2">{pred.description}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        pred.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                        pred.status === 'settled' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-gray-700 text-gray-400'
+                      }`}>
+                        {pred.status.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-6 mt-3 text-sm text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="w-4 h-4" />
+                        Pool: ${pred.totalPool?.toLocaleString() || 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        Bets: {pred.totalBets || 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Ends: {formatDate(pred.endTime)}
+                      </span>
+                    </div>
+
+                    {/* Settlement Buttons */}
+                    {pred.status === 'active' && (
+                      <div className="flex gap-2 mt-4">
+                        <button
+                          onClick={() => handleSettle(pred.id!, 'up')}
+                          disabled={loading}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg transition-colors border border-green-500/30"
+                        >
+                          <TrendingUp className="w-4 h-4" />
+                          Settle UP
+                        </button>
+                        <button
+                          onClick={() => handleSettle(pred.id!, 'down')}
+                          disabled={loading}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors border border-red-500/30"
+                        >
+                          <TrendingDown className="w-4 h-4" />
+                          Settle DOWN
+                        </button>
+                      </div>
+                    )}
+
+                    {pred.status === 'settled' && (
+                      <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                        <p className="text-sm text-blue-400">
+                          Winner: <span className="font-bold">{pred.winningSide?.toUpperCase()}</span>
+                          {pred.payoutCalculated && ' • Payouts distributed'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                {pred.status === 'active' && pred.category === 'manual' && (
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => settlePrediction(pred.id, 'up')}
-                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 border border-green-500/30 font-semibold"
-                    >
-                      <Check className="w-4 h-4 inline mr-1" />
-                      UP Wins
-                    </button>
-                    <button
-                      onClick={() => settlePrediction(pred.id, 'down')}
-                      className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 border border-red-500/30 font-semibold"
-                    >
-                      <X className="w-4 h-4 inline mr-1" />
-                      DOWN Wins
-                    </button>
-                  </div>
-                )}
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
